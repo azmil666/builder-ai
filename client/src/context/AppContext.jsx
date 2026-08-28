@@ -190,7 +190,8 @@ export function AppContextProvider({children}){
         loadProjects,
         loadProject,
         handleGenerate,
-        handleDelete
+        handleDelete,
+        logout
         }}>
         {children}
        </AppContext.Provider> 
