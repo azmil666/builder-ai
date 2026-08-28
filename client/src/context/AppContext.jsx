@@ -145,8 +145,7 @@ export function AppContextProvider({children}){
            try {
               const { data } = await api.post("/api/projects", { prompt });
               toast.success("AI Agent is planning structure...")
-              navigate(`/builder${data._id}`);
-
+              navigate(`/builder/${data._id}`)
            } catch (err) {
             console.error("Failed to generate project:", err);
             toast.error(err?.response?.data?.error || "Failed to generate project");
