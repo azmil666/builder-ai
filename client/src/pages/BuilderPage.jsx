@@ -14,52 +14,36 @@ import toast from "react-hot-toast";
 import { exportProjectZip } from "../utils/exportProject";
 
 const BuilderPage = () => {
-
-  const {id} = useParams()
-  const navigate = useNavigate()
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [leftTab, setLeftTab] = useState("chat");
   const [publishing, setPublishing] = useState(false);
   const [publishUrl, setPublishUrl] = useState(null);
 
   const {
-  activeProject,
-  loadingActiveProject,
-  activeFile,
-  showCode,
-  setActiveFile,
-  setShowCode,
-  loadProject,
-  logout,
-  chatLoading,
+    activeProject,
+    loadingActiveProject,
+    activeFile,
+    showCode,
+    setActiveFile,
+    setShowCode,
+    loadProject,
+    logout,
+    chatLoading,
     handleChat,
-} = useAppContext();
+  } = useAppContext();
 
-useEffect(() => {
-  if (!id) return;
-  loadProject(id);
-}, [id]);
+  useEffect(() => {
+    if (!id) return;
+    loadProject(id);
+  }, [id]);
 
-useEffect(() => {
-  if (!id || !activeProject) return;
-
-  if (
-    activeProject.status === "pending" ||
-    activeProject.status === "generating"
-  ) {
-    const interval = setInterval(() => {
-      loadProject(id, true);
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }
-}, [id, loadProject, activeProject]);
-
- const handleOpenPreview = () => {
+  const handleOpenPreview = () => {
     if (!id) return;
     window.open(`/preview/${id}`, "_blank");
   };
 
-const handlePublish = async () => {
+  const handlePublish = async () => {
     if (!id) return;
     setPublishing(true);
     try {
@@ -79,14 +63,16 @@ const handlePublish = async () => {
     if (!activeProject) return;
     exportProjectZip(activeProject);
   };
-  
-if(loadingActiveProject || !activeProject){
-  return <Loading />
-}
+
+  if (loadingActiveProject || !activeProject) {
+    return <Loading />;
+  }
+
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden text-zinc-900 relative">
-    {/* top bar header */}
-    <BuilderHeader projectName={activeProject.name}
+      {/* {Top Bar Header} */}
+      <BuilderHeader
+        projectName={activeProject.name}
         version={activeProject.version}
         showCode={showCode}
         publishing={publishing}
@@ -95,10 +81,10 @@ if(loadingActiveProject || !activeProject){
         onPublish={handlePublish}
         onDownload={handleDownload}
         onBack={() => navigate("/")}
-        onLogout={logout}/>
-    {/* main layout */}
+        onLogout={logout}
+      />
 
-    {/* {Main Layout} */}
+      {/* {Main Layout} */}
       <div className="flex-1 flex overflow-hidden">
         {/* {Left Sidebar} */}
         <div className="w-[320px] shrink-0 flex flex-col border-r border-zinc-200 bg-white">
@@ -119,7 +105,7 @@ if(loadingActiveProject || !activeProject){
             </button>
           </div>
 
-           {/* {Sidebar Content} */}
+          {/* {Sidebar Content} */}
           <div className="flex-1 overflow-hidden">
             {leftTab === "chat" ? (
               <ChatPanel
@@ -162,9 +148,8 @@ if(loadingActiveProject || !activeProject){
           onClose={() => setPublishUrl(null)}
         />
       )}
-
     </div>
-  )
-}
+  );
+};
 
-export default BuilderPage
+export default BuilderPage;
