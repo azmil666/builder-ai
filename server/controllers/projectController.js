@@ -30,7 +30,7 @@ export async function createProject(req, res) {
       { role: "assistant", content: "Planning project structure..." },
     ],
     version: 0,
-    owner: req.user.userId,
+    owner: req.user.userID,
     status: "pending",
     filesPlanned: [],
     filesGenerated: [],
@@ -168,7 +168,7 @@ export async function listProjects(req, res) {
   }
 
   const projects = await Project.find(
-    { owner: req.user.userId },
+    { owner: req.user.userID },
     { name: 1, description: 1, version: 1, createdAt: 1, updatedAt: 1 },
   ).sort({ updatedAt: -1 });
 
@@ -185,7 +185,7 @@ export async function getProject(req, res) {
 
   const project = await Project.findOne({
     _id: req.params.id,
-    owner: req.user.userId,
+    owner: req.user.userID,
   });
 
   if (!project) {
@@ -225,7 +225,7 @@ export async function deleteProject(req, res) {
 
   const result = await Project.findOneAndDelete({
     _id: req.params.id,
-    owner: req.user.userId,
+    owner: req.user.userID,
   });
 
   if (!result) {
@@ -251,7 +251,7 @@ export async function updateProjectFiles(req, res) {
 
   const project = await Project.findOne({
     _id: req.params.id,
-    owner: req.user.userId,
+    owner: req.user.userID,
   });
 
   if (!project) {
@@ -296,7 +296,7 @@ export async function publishProject(req, res) {
   }
 
   const project = await Project.findOneAndUpdate(
-    { _id: req.params.id, owner: req.user.userId },
+    { _id: req.params.id, owner: req.user.userID },
     { published: true },
     { returnDocument: "after" },
   );
