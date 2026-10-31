@@ -206,7 +206,16 @@ export async function listProjects(req, res) {
 
   const projects = await Project.find(
     { owner: userId },
-    { name: 1, description: 1, version: 1, createdAt: 1, updatedAt: 1 },
+    {
+      name: 1,
+      description: 1,
+      version: 1,
+      status: 1,
+      published: 1,
+      designSpec: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    },
   ).sort({ updatedAt: -1 });
 
   res.json(projects);
