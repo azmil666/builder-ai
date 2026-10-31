@@ -22,6 +22,7 @@ export function AppContextProvider({children}){
     const [generatingProject, setGeneratingProject] = useState(false);
     const [activeFile, setActiveFile] = useState("/App.js");
     const [showCode, setShowCode] = useState(false);
+    const [syncStatus, setSyncStatus] = useState("saved"); // "saved" | "saving" | "error"
     
     //Auth Actions
     const checkSession = useCallback(async () => {
@@ -205,10 +206,13 @@ export function AppContextProvider({children}){
   const debouncedSave = React.useMemo(
     () =>
       debounce(async (files, id) => {
+        setSyncStatus("saving");
         try {
           await api.put(`/api/projects/${id}/files`, { files });
+          setSyncStatus("saved");
         } catch (err) {
           console.error("Failed to auto-save files:", err);
+          setSyncStatus("error");
           toast.error("Failed to save code modifications");
         }
       }, 1000),
@@ -221,12 +225,97 @@ export function AppContextProvider({children}){
     };
   }, [debouncedSave]);
 
-   const updateProjectFiles = useCallback(
+  const updateProjectFiles = useCallback(
     async (files) => {
       if (!activeProject || !user) return;
+      setSyncStatus("saving");
       debouncedSave(files, activeProject._id);
     },
     [activeProject, user, debouncedSave],
+  );
+
+  const createFile = useCallback(
+    async (path, initialContent = "// New Component\nimport React from 'react';\n\nexport default function Component() {\n  return <div>Component</div>;\n}\n") => {
+      if (!activeProject || !user) return;
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      const currentFiles = activeProject.files || {};
+      if (currentFiles[normalizedPath]) {
+        toast.error("File already exists");
+        return;
+      }
+      const updated = {
+        ...currentFiles,
+        [normalizedPath]: { content: initialContent },
+      };
+      setActiveProject((prev) => (prev ? { ...prev, files: updated } : prev));
+      setActiveFile(normalizedPath);
+      setShowCode(true);
+      updateProjectFiles(updated);
+      toast.success(`Created ${normalizedPath}`);
+    },
+    [activeProject, user, updateProjectFiles],
+  );
+
+  const renameFile = useCallback(
+    async (oldPath, newPath) => {
+      if (!activeProject || !user) return;
+      if (oldPath === "/App.js") {
+        toast.error("Cannot rename primary entry point /App.js");
+        return;
+      }
+      const normalizedNew = newPath.startsWith("/") ? newPath : `/${newPath}`;
+      const currentFiles = activeProject.files || {};
+      if (currentFiles[normalizedNew]) {
+        toast.error("A file with that name already exists");
+        return;
+      }
+      const fileData = currentFiles[oldPath];
+      if (!fileData) return;
+
+      const updated = { ...currentFiles };
+      delete updated[oldPath];
+      updated[normalizedNew] = fileData;
+
+      setActiveProject((prev) => (prev ? { ...prev, files: updated } : prev));
+      setActiveFile((prev) => (prev === oldPath ? normalizedNew : prev));
+      updateProjectFiles(updated);
+      toast.success(`Renamed to ${normalizedNew}`);
+    },
+    [activeProject, user, updateProjectFiles],
+  );
+
+  const deleteFile = useCallback(
+    async (path) => {
+      if (!activeProject || !user) return;
+      if (path === "/App.js" || path === "/styles.css") {
+        toast.error(`Cannot delete core file ${path}`);
+        return;
+      }
+      const currentFiles = activeProject.files || {};
+      if (!currentFiles[path]) return;
+
+      const updated = { ...currentFiles };
+      delete updated[path];
+
+      setActiveProject((prev) => (prev ? { ...prev, files: updated } : prev));
+      setActiveFile((prev) => (prev === path ? "/App.js" : prev));
+      updateProjectFiles(updated);
+      toast.success(`Deleted ${path}`);
+    },
+    [activeProject, user, updateProjectFiles],
+  );
+
+  const updateProjectName = useCallback(
+    async (newName) => {
+      if (!activeProject || !user || !newName.trim()) return;
+      try {
+        setActiveProject((prev) => (prev ? { ...prev, name: newName.trim() } : prev));
+        toast.success("Project updated");
+      } catch (err) {
+        console.error("Failed to update project name:", err);
+      }
+    },
+    [activeProject, user],
   );
 
     return (
@@ -251,7 +340,12 @@ export function AppContextProvider({children}){
         handleDelete,
         logout,
         handleChat,
-updateProjectFiles,
+        updateProjectFiles,
+        syncStatus,
+        createFile,
+        renameFile,
+        deleteFile,
+        updateProjectName,
         }}>
         {children}
        </AppContext.Provider> 
