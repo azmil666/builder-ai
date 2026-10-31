@@ -216,8 +216,19 @@ export async function generateProject(prompt, callbacks){
     return {files, description: plan.projectDescription, designSpec}
 }
 
-export async function reviseProject(prompt, manifest, relevantFiles, recentMessages){
+export async function reviseProject(prompt, manifest, relevantFiles, recentMessages, designSpec){
     const contextParts = [];
+
+    if (designSpec) {
+        contextParts.push("## Active Design Specification (MUST PRESERVE UNLESS EXPLICITLY ASKED TO REDESIGN)");
+        contextParts.push(`- Archetype: ${designSpec.archetype}`);
+        contextParts.push(`- Theme: ${designSpec.colorPalette?.theme || "light"}`);
+        contextParts.push(`- Colors: Background ${designSpec.colorPalette?.bg}, Text ${designSpec.colorPalette?.fg}, Accent ${designSpec.colorPalette?.accent}, Card ${designSpec.colorPalette?.cardBg}`);
+        contextParts.push(`- Typography: Heading "${designSpec.typography?.heading?.family}", Body "${designSpec.typography?.body?.family}"`);
+        contextParts.push(`- Card Style: ${designSpec.componentStyling?.cardStyle}`);
+        contextParts.push(`- Signature Hook: ${designSpec.signature}`);
+        contextParts.push("");
+    }
 
     contextParts.push("## Current Project Files (manifest)");
     contextParts.push("```");

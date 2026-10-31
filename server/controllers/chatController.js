@@ -73,12 +73,13 @@ export async function chat(req, res) {
         `(${manifest.length} files, manifest ~${JSON.stringify(manifest).length} chars)`,
     );
 
-    // Call AI with manifest + relevant files
+    // Call AI with manifest + relevant files + designSpec
     const result = await reviseProject(
       prompt,
       manifest,
       relevantFiles,
       recentMessages,
+      project.designSpec,
     );
 
     console.log(

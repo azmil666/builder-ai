@@ -53,6 +53,11 @@ export const DesignSpecSchema = z.object({
     "neo_brutalism",
     "bento_grid",
     "minimal_utility",
+    "experimental_creative",
+    "futuristic_technology",
+    "organic_natural",
+    "modern_ecommerce",
+    "professional_corporate",
   ]).default("clean_modern"),
   brandPersonality: z.array(z.string()).default(["clean", "professional", "modern"]),
 
