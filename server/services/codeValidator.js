@@ -21,9 +21,76 @@ const FORBIDDEN_CLIENT_MODULES = new Set([
   "@ai-sdk/openai", "ai"
 ]);
 
+// Explicitly supported browser packages for Sandpack preview
+const SUPPORTED_PACKAGES = new Set([
+  "react",
+  "react-dom",
+  "react/jsx-runtime",
+  "lucide-react",
+  "canvas-confetti",
+  "framer-motion",
+  "date-fns",
+  "moment",
+  "lodash",
+  "lodash-es",
+  "clsx",
+  "tailwind-merge",
+  "zustand",
+  "recharts",
+  "axios",
+]);
+
+// Common Lucide icon aliases for frequent AI naming mistakes / deprecated icons
+export const LUCIDE_ICON_ALIASES = {
+  Cart: "ShoppingCart",
+  CartIcon: "ShoppingCart",
+  ShoppingCartIcon: "ShoppingCart",
+  Basket: "ShoppingBag",
+  ShoppingBasket: "ShoppingBag",
+  ShoppingBagIcon: "ShoppingBag",
+  Bag: "ShoppingBag",
+  Cross: "X",
+  Close: "X",
+  Cancel: "X",
+  Tick: "Check",
+  Checkmark: "Check",
+  MagnifyingGlass: "Search",
+  SearchIcon: "Search",
+  TrashCan: "Trash2",
+  Trash: "Trash2",
+  Delete: "Trash2",
+  Bin: "Trash2",
+  Edit: "Pencil",
+  Edit2: "Pencil",
+  Edit3: "Pencil",
+  PencilIcon: "Pencil",
+  Hamburger: "Menu",
+  NavMenu: "Menu",
+  UserCircle2: "CircleUser",
+  UserCircle: "CircleUser",
+  Alert: "AlertTriangle",
+  Warning: "AlertTriangle",
+  Information: "Info",
+  InfoCircle: "Info",
+  Gear: "Settings",
+  SettingsIcon: "Settings",
+  HeartIcon: "Heart",
+  StarIcon: "Star",
+  Help: "HelpCircle",
+  Question: "HelpCircle",
+};
+
 // Dynamically locate the lightweight AST parser (provided by rolldown/oxc)
 let _parseAst = null;
 let _parserLoaded = false;
+
+// Dynamically locate Vite transformWithOxc compiler for real JSX compilation checks
+let _transformWithOxc = null;
+let _compilerLoaded = false;
+
+// Dynamically locate installed Lucide React icon names
+let _lucideIconsSet = null;
+let _lucideLoaded = false;
 
 async function getParser() {
   if (_parserLoaded) return _parseAst;
@@ -50,8 +117,205 @@ async function getParser() {
   return _parseAst;
 }
 
-// Pre-load parser asynchronously at module initialization
+async function getCompiler() {
+  if (_compilerLoaded) return _transformWithOxc;
+  try {
+    const candidates = [
+      path.resolve(process.cwd(), "client/node_modules/vite/dist/node/index.js"),
+      path.resolve(process.cwd(), "../client/node_modules/vite/dist/node/index.js"),
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/node_modules/vite/dist/node/index.js"),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        const mod = await import(candidate);
+        if (mod && mod.transformWithOxc) {
+          _transformWithOxc = mod.transformWithOxc;
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[Validator] Note: Vite compiler could not be loaded (${err.message}).`);
+  }
+  _compilerLoaded = true;
+  return _transformWithOxc;
+}
+
+async function getLucideIcons() {
+  if (_lucideLoaded) return _lucideIconsSet;
+  try {
+    const candidates = [
+      path.resolve(process.cwd(), "client/node_modules/lucide-react/dist/esm/lucide-react.mjs"),
+      path.resolve(process.cwd(), "../client/node_modules/lucide-react/dist/esm/lucide-react.mjs"),
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/node_modules/lucide-react/dist/esm/lucide-react.mjs"),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        const mod = await import(candidate);
+        if (mod) {
+          _lucideIconsSet = new Set(Object.keys(mod));
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[Validator] Note: Lucide icons could not be loaded (${err.message}).`);
+  }
+
+  if (!_lucideIconsSet) {
+    _lucideIconsSet = new Set([
+      "ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "ChevronRight", "ChevronLeft",
+      "ChevronDown", "ChevronUp", "Check", "X", "Sparkles", "Star", "Heart", "Search",
+      "Menu", "ShoppingCart", "ShoppingBag", "Plus", "Minus", "Trash2", "Pencil",
+      "Eye", "EyeOff", "User", "CircleUser", "Settings", "Info", "AlertTriangle",
+      "HelpCircle", "Filter", "SlidersHorizontal", "ExternalLink", "Share2", "Mail",
+      "Phone", "MapPin", "Calendar", "Clock", "Shield", "Zap", "Sun", "Moon",
+    ]);
+  }
+  _lucideLoaded = true;
+  return _lucideIconsSet;
+}
+
+// Pre-load dependencies asynchronously at module initialization
 const parserPromise = getParser();
+const compilerPromise = getCompiler();
+const lucidePromise = getLucideIcons();
+
+/**
+ * Checks if a named icon exists in the installed Lucide React package.
+ */
+export function isValidLucideIcon(iconName) {
+  if (!_lucideIconsSet) {
+    return true;
+  }
+  return _lucideIconsSet.has(iconName);
+}
+
+/**
+ * Validates and repairs Lucide icon imports against installed package exports.
+ */
+export function validateAndFixLucideIcons(code, filePath, options = {}) {
+  const warnings = [];
+  const errors = [];
+  const validIcons = _lucideIconsSet;
+
+  const importRegex = /import\s*\{([\s\S]*?)\}\s*from\s*['"]lucide-react['"];?/g;
+  if (!importRegex.test(code)) {
+    return { code, warnings, errors };
+  }
+  importRegex.lastIndex = 0;
+
+  const replacements = [];
+
+  let newCode = code.replace(importRegex, (match, specifiersBlock) => {
+    const rawItems = specifiersBlock.split(",").map((s) => s.trim()).filter(Boolean);
+    const newItems = [];
+
+    for (const item of rawItems) {
+      let iconName = item;
+      let alias = "";
+      if (item.includes(" as ")) {
+        const parts = item.split(/\s+as\s+/);
+        iconName = parts[0].trim();
+        alias = parts[1].trim();
+      }
+
+      // 1. Direct match with valid icon export
+      if (!validIcons || validIcons.has(iconName)) {
+        newItems.push(item);
+        continue;
+      }
+
+      // 2. Check canonical alias map
+      if (LUCIDE_ICON_ALIASES[iconName] && (!validIcons || validIcons.has(LUCIDE_ICON_ALIASES[iconName]))) {
+        const replacement = LUCIDE_ICON_ALIASES[iconName];
+        warnings.push(`${filePath}: Replaced invalid/deprecated Lucide icon '${iconName}' with valid '${replacement}'`);
+        if (alias) {
+          newItems.push(`${replacement} as ${alias}`);
+        } else {
+          newItems.push(replacement);
+          replacements.push({ from: iconName, to: replacement });
+        }
+        continue;
+      }
+
+      // 3. Case-insensitive match in valid icon set
+      if (validIcons) {
+        const lower = iconName.toLowerCase();
+        const found = [...validIcons].find((v) => v.toLowerCase() === lower);
+        if (found) {
+          warnings.push(`${filePath}: Corrected Lucide icon casing '${iconName}' -> '${found}'`);
+          if (alias) {
+            newItems.push(`${found} as ${alias}`);
+          } else {
+            newItems.push(found);
+            replacements.push({ from: iconName, to: found });
+          }
+          continue;
+        }
+      }
+
+      // 4. Safe fallback if requested
+      if (options.autoFallback) {
+        warnings.push(`${filePath}: Unknown Lucide icon '${iconName}' safely replaced with fallback 'Sparkles'`);
+        if (alias) {
+          newItems.push(`Sparkles as ${alias}`);
+        } else {
+          newItems.push("Sparkles");
+          replacements.push({ from: iconName, to: "Sparkles" });
+        }
+      } else {
+        // Record structured error
+        errors.push({
+          type: "icon",
+          file: filePath,
+          message: `Invalid Lucide icon '${iconName}' imported in '${filePath}'. Icon does not exist in installed 'lucide-react'.`,
+        });
+        newItems.push(item);
+      }
+    }
+
+    return `import { ${[...new Set(newItems)].join(", ")} } from 'lucide-react';`;
+  });
+
+  // Apply symbol replacements to component body
+  for (const { from, to } of replacements) {
+    const usageRegex = new RegExp(`\\b${from}\\b`, "g");
+    newCode = newCode.replace(usageRegex, to);
+  }
+
+  return { code: newCode, warnings, errors };
+}
+
+/**
+ * Runs real JSX/JS compilation check using Vite transformWithOxc.
+ */
+export async function compileModuleCode(code, filePath = "file.jsx") {
+  const compiler = await compilerPromise;
+  if (!compiler) {
+    return { success: true, compiledCode: code, errors: [] };
+  }
+  try {
+    // Ensure .jsx extension is used for React JSX files so Oxc enables JSX parsing mode
+    const oxcFilePath = filePath.endsWith(".js") ? filePath.replace(/\.js$/, ".jsx") : filePath;
+    const result = await compiler(code, oxcFilePath);
+    return { success: true, compiledCode: result.code, errors: [] };
+  } catch (err) {
+    return {
+      success: false,
+      compiledCode: null,
+      errors: [
+        {
+          type: "compilation",
+          file: filePath,
+          message: err.message || "JSX/JS compilation failed",
+        },
+      ],
+    };
+  }
+}
 
 /**
  * Parses JavaScript / JSX code into an AST.
@@ -174,6 +438,14 @@ export function validateAndFixCode(code, filePath, context = {}) {
     warnings.push(...fixResult.warnings);
   }
 
+  // 8b. Validate and repair Lucide icon imports
+  const iconResult = validateAndFixLucideIcons(code, filePath, {
+    autoFallback: context?.autoFallbackIcons ?? false,
+  });
+  code = iconResult.code;
+  warnings.push(...iconResult.warnings);
+  errors.push(...iconResult.errors);
+
   // 9. AST-based Syntax & Semantic Validation
   let ast = null;
   try {
@@ -236,6 +508,12 @@ export function validateAndFixCode(code, filePath, context = {}) {
             type: "dependency",
             file: filePath,
             message: `Unsupported server/Node.js module '${source}' imported in client component.`,
+          });
+        } else if (!SUPPORTED_PACKAGES.has(pkgName)) {
+          errors.push({
+            type: "dependency",
+            file: filePath,
+            message: `Unsupported package '${source}' imported in client component.`,
           });
         }
       } else if (context?.allPlannedFiles || context?.existingFiles) {
@@ -436,7 +714,25 @@ export function validateProject(files, plannedFiles = []) {
         const resolved = resolvePath(currentDir, source);
         const resolvedPath = filePaths.find((p) => cleanExtension(p) === cleanExtension(resolved));
 
-        if (resolvedPath && fileExports.has(resolvedPath)) {
+        if (!resolvedPath) {
+          const wasPlanned = plannedFiles.some((p) => cleanExtension(p.path) === cleanExtension(resolved));
+          if (wasPlanned) {
+            errors.push({
+              type: "import",
+              file: filePath,
+              message: `File '${filePath}' imports '${source}', but this planned target was never generated.`,
+            });
+          } else {
+            errors.push({
+              type: "import",
+              file: filePath,
+              message: `Unresolvable import '${source}' in '${filePath}'. Target file does not exist.`,
+            });
+          }
+          continue;
+        }
+
+        if (fileExports.has(resolvedPath)) {
           const targetExports = fileExports.get(resolvedPath);
           for (const spec of imp.specifiers || []) {
             if (spec.type === "ImportDefaultSpecifier" && !targetExports.hasDefault) {
@@ -445,6 +741,15 @@ export function validateProject(files, plannedFiles = []) {
                 file: filePath,
                 message: `File '${filePath}' imports default from '${source}', but '${resolvedPath}' has no default export.`,
               });
+            } else if (spec.type === "ImportSpecifier") {
+              const importedName = spec.imported?.name || spec.local?.name;
+              if (importedName && !targetExports.named.has(importedName)) {
+                errors.push({
+                  type: "contract",
+                  file: filePath,
+                  message: `File '${filePath}' imports '{ ${importedName} }' from '${source}', but '${resolvedPath}' does not export '${importedName}'.`,
+                });
+              }
             }
           }
         }

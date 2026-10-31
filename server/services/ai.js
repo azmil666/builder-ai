@@ -1,3 +1,4 @@
+import "dotenv/config";
 import {createOpenAI} from '@ai-sdk/openai'
 import { generateObject } from 'ai';
 import pMap from "p-map";
@@ -5,20 +6,27 @@ import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema 
 import { buildFileCodeSystem, buildFilePlanSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
 import { validateAndFixCode, validateRevisionContent, validateProject } from './codeValidator.js';
+import { deriveFeatureChecklist, validateFeatureChecklist } from './featureValidator.js';
 
 // --- OpenRouter Model Client Setup ---
-const MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
-const MAX_CONCURRENCY = parseInt(process.env.AI_MAX_CONCURRENCY || "6", 10)
+function getModel() {
+    const modelName = process.env.OPENROUTER_MODEL || "openrouter/free";
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+        throw new Error("OPENROUTER_API_KEY environment variable is missing.");
+    }
+    const client = createOpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey,
+    });
+    return client(modelName);
+}
 
-const openrouter = createOpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
-})
-
-const model = openrouter(MODEL);
+const MAX_CONCURRENCY = parseInt(process.env.AI_MAX_CONCURRENCY || "6", 10);
 
 // Generate a single file's code
 async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles, designSpec){
+     const model = getModel();
      const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec);
 
      const userMsg = `Project: ${prompt}\n\nWrite the complete code for: ${file.path}\nPurpose: ${file.description}`;
@@ -80,8 +88,112 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles,
      return {path: file.path, code}
 }
 
+/**
+ * Targeted AI Self-Repair Loop
+ * Repairs only the affected broken files within a bounded retry limit (max 2 attempts).
+ * Preserves already valid components, project architecture, and DesignSpec.
+ */
+export async function repairProjectFiles(
+    files,
+    allPlannedFiles,
+    errors,
+    prompt,
+    designSpec,
+    callbacks = {},
+    maxAttempts = 2
+) {
+    const model = getModel();
+    let currentFiles = { ...files };
+    let currentErrors = [...errors];
+    const repairLogs = [];
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        if (currentErrors.length === 0) break;
+
+        const brokenFiles = [
+            ...new Set(
+                currentErrors
+                    .map((e) => e.file)
+                    .filter((f) => f && f !== "/" && currentFiles[f])
+            ),
+        ];
+
+        if (brokenFiles.length === 0) {
+            break;
+        }
+
+        console.log(`[AI Repair] Attempt ${attempt}/${maxAttempts} repairing ${brokenFiles.length} file(s): ${brokenFiles.join(", ")}`);
+
+        if (callbacks?.onRepairRound) {
+            await callbacks.onRepairRound({
+                attempt,
+                maxAttempts,
+                brokenFiles,
+                errorCount: currentErrors.length,
+            });
+        }
+
+        for (const filePath of brokenFiles) {
+            const fileErrors = currentErrors.filter((e) => e.file === filePath);
+            const errorSummary = fileErrors.map((e) => `- [${e.type.toUpperCase()}] ${e.message}`).join("\n");
+            const currentCode = currentFiles[filePath];
+            const system = buildFileCodeSystem(allPlannedFiles, currentFiles, designSpec);
+
+            const repairPrompt = `Project: ${prompt}\n\nThe file '${filePath}' failed validation with these errors:\n${errorSummary}\n\nCurrent code for ${filePath}:\n\`\`\`javascript\n${currentCode}\n\`\`\`\n\nRepair only the code for '${filePath}'. Fix all syntax, import, export, and contract errors while preserving visual styling and DesignSpec tokens. Return the complete corrected code.`;
+
+            try {
+                const { object } = await generateObject({
+                    model,
+                    schema: FileCodeSchema,
+                    system,
+                    prompt: repairPrompt,
+                    maxRetries: 1,
+                });
+
+                const repairedCode = normalizeContent(object.code);
+                const reval = validateAndFixCode(repairedCode, filePath, {
+                    allPlannedFiles,
+                    existingFiles: Object.keys(currentFiles),
+                });
+
+                currentFiles[filePath] = reval.code;
+                repairLogs.push({
+                    attempt,
+                    file: filePath,
+                    resolvedErrors: fileErrors.length,
+                    valid: reval.valid,
+                });
+
+                if (callbacks?.onFileComplete) {
+                    await callbacks.onFileComplete(filePath, reval.code);
+                }
+            } catch (err) {
+                console.warn(`[AI Repair] Attempt ${attempt} failed for ${filePath}: ${err.message}`);
+                repairLogs.push({
+                    attempt,
+                    file: filePath,
+                    error: err.message,
+                });
+            }
+        }
+
+        const recheck = validateProject(currentFiles, allPlannedFiles);
+        currentErrors = recheck.errors;
+    }
+
+    const finalCheck = validateProject(currentFiles, allPlannedFiles);
+    return {
+        success: finalCheck.valid,
+        files: currentFiles,
+        errors: finalCheck.errors,
+        warnings: finalCheck.warnings,
+        repairLogs,
+    };
+}
+
 // Generate project files: DesignSpec first, then plan, then build files in order with fallback retries
 export async function generateProject(prompt, callbacks){
+    const model = getModel();
     // Phase 1: Design Intelligence - Establish visual identity and design tokens
     console.log(`[AI] Phase 1: Generating DesignSpec for: "${prompt.slice(0,80)}..."`);
     let designSpec = null;
@@ -208,34 +320,8 @@ export async function generateProject(prompt, callbacks){
 
     if(pendingFiles.length > 0){
         const failedPaths = pendingFiles.map((f)=>f.path).join(", ");
-        console.error(`[AI] Failed to generate ${pendingFiles.length} files after all retry rounds: ${failedPaths}`);
-
-        // Provide fallback placeholders for non-App.js components/styles so the project can still build if entry point succeeded
-        for (const pendingFile of pendingFiles) {
-            if (pendingFile.path === "/App.js") {
-                // Do not create a fake placeholder for /App.js — entry point failure must not be masked
-                continue;
-            }
-            const ext = pendingFile.path.split(".").pop()?.toLowerCase();
-
-            if(ext === "css"){
-                const fontImport = designSpec?.typography?.googleFontsUrl
-                    ? `@import url('${designSpec.typography.googleFontsUrl}');\n\n`
-                    : "";
-                files[pendingFile.path] = `${fontImport}/* ${pendingFile.description || pendingFile.path} — Fallback styles */\n:root {\n  --color-primary: ${designSpec?.colorPalette?.primary || "#3b82f6"};\n  --color-accent: ${designSpec?.colorPalette?.accent || "#8b5cf6"};\n}\n`;
-            }else{
-                files[pendingFile.path] = "import React from 'react';\n\n" +
-                `// ⚠️ This file could not be generated. Please retry.\n` +
-                `// Purpose: ${pendingFile.description || pendingFile.path}\n\n` +
-                "export default function Placeholder() {\n" +
-                "  return (\n" +
-                    "    <div className='p-8 text-center text-zinc-400'>\n" +
-                    "      <p>⚠️ Component failed to generate. Please try again.</p>\n" +
-                    "    </div>\n" +
-                    "  );\n" +
-                    "}\n";
-            }
-        }
+        console.error(`[AI] Failed to generate ${pendingFiles.length} mandatory files after all retries: ${failedPaths}`);
+        throw new Error(`Failed to generate mandatory planned file(s): ${failedPaths}`);
     }
 
     if(!files["/App.js"]){
@@ -243,12 +329,54 @@ export async function generateProject(prompt, callbacks){
     }
 
     // Phase 4: Final project-level semantic & cross-file validation
-    const projectValidation = validateProject(files, plan.files);
+    if (callbacks?.onValidationStart) {
+        await callbacks.onValidationStart();
+    }
+    let projectValidation = validateProject(files, plan.files);
+
+    // If validation fails, initiate targeted AI self-repair loop
     if (!projectValidation.valid) {
-        console.warn(`[Validator] Project validation found ${projectValidation.errors.length} cross-file issues:\n  - ${projectValidation.errors.map(e => `[${e.type}] ${e.file}: ${e.message}`).join("\n  - ")}`);
+        console.warn(`[Validator] Project validation found ${projectValidation.errors.length} cross-file issues. Starting targeted self-repair loop...`);
+
+        if (callbacks?.onRepairStart) {
+            await callbacks.onRepairStart(projectValidation.errors);
+        }
+
+        const repairResult = await repairProjectFiles(
+            files,
+            plan.files,
+            projectValidation.errors,
+            prompt,
+            designSpec,
+            callbacks,
+            2
+        );
+
+        files = repairResult.files;
+        projectValidation = {
+            valid: repairResult.success,
+            errors: repairResult.errors,
+            warnings: repairResult.warnings,
+        };
+
+        if (!projectValidation.valid) {
+            const errorSummary = projectValidation.errors.map(e => `[${e.type}] ${e.file}: ${e.message}`).join("; ");
+            throw new Error(`Project validation failed after self-repair attempts: ${errorSummary}`);
+        }
     }
 
-    return {files, description: plan.projectDescription, designSpec}
+    // Phase 5: Feature-specific checklist verification
+    const featureChecklist = deriveFeatureChecklist(prompt, designSpec);
+    const featureReport = validateFeatureChecklist(files, featureChecklist);
+    console.log(`[Validator] Feature checklist verified: score=${featureReport.score}%, allMandatoryPassed=${featureReport.allMandatoryPassed}`);
+
+    return {
+        files,
+        description: plan.projectDescription,
+        designSpec,
+        manifest: plan.manifest,
+        featureReport,
+    };
 }
 
 export async function reviseProject(prompt, manifest, relevantFiles, recentMessages, designSpec){
@@ -290,6 +418,7 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
 
     console.log("[AI] Revising project...");
 
+    const model = getModel();
     const { object: rawParsed } = await generateObject({
         model,
         schema: RevisionResultSchema,

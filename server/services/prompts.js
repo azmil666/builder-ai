@@ -108,8 +108,10 @@ Motion should elevate the user experience, not overwhelm it:
 ## 6. ICONS (Lucide React)
 
 Always use \`lucide-react\` inline SVG icons:
-- \`import { ArrowRight, Check, Sparkles, Star, ChevronRight, Menu, X } from 'lucide-react';\`
+- \`import { ArrowRight, Check, Sparkles, Star, ChevronRight, Menu, X, ShoppingCart, ShoppingBag, Plus, Minus, Trash2, Search, Heart, CircleUser, Settings, Info, AlertTriangle, HelpCircle, Filter } from 'lucide-react';\`
 - Render with standard JSX: \`<ArrowRight className='w-4 h-4' />\`
+- ONLY import icons that genuinely exist in \`lucide-react\`. E.g., use \`ShoppingCart\` (NOT \`Cart\` or \`CartIcon\`), use \`ShoppingBag\` (NOT \`Basket\`), use \`Trash2\` (NOT \`TrashCan\` or \`Delete\`), use \`CircleUser\` (NOT \`UserCircle2\`).
+- Never invent icon names or guess nonexistent exports.
 - Never import from external font CDNs (like Font Awesome).
 
 ---
@@ -120,6 +122,10 @@ Always use \`lucide-react\` inline SVG icons:
 - Custom styles, fonts, and keyframes go in \`/styles.css\`.
 - Modular components go in \`/components/\`.
 - Every \`.js\` component file MUST have exactly ONE default export. E.g., \`export default function Header() { ... }\`
+- Every local relative import MUST resolve to a planned file with the exact relative path (e.g., \`./components/Header\`).
+- Every imported symbol must match the target file's exports. If using default import, the target must have \`export default\`. If using named import \`{ Foo }\`, the target must export \`Foo\`.
+- Only import supported client packages (\`react\`, \`react-dom\`, \`lucide-react\`, \`canvas-confetti\`, \`framer-motion\`).
+- Never import Node.js server built-ins (\`fs\`, \`path\`, \`crypto\`, \`os\`) or backend modules (\`mongoose\`, \`express\`).
 - Always use \`className\`, NOT \`class\`. Always use \`htmlFor\`, NOT \`for\`.
 - Self-close void HTML elements: \`<img />\`, \`<br />\`, \`<hr />\`, \`<input />\`, \`<link />\`, \`<meta />\`.
 - All open JSX tags must be properly closed.

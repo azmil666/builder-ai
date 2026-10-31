@@ -134,7 +134,7 @@ export function AppContextProvider({children}){
     }
 
     const isOngoing =
-      status === "generating" || status === "pending" || status === "revising";
+      status === "generating" || status === "pending" || status === "validating" || status === "repairing" || status === "revising";
 
     if (!isOngoing) {
       setChatLoading(false);
@@ -234,6 +234,34 @@ export function AppContextProvider({children}){
           });
         } catch (err) {
           console.error("Failed to parse file_complete SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("validating", () => {
+        try {
+          setActiveProject((prev) =>
+            prev ? { ...prev, status: "validating", currentFile: null } : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse validating SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("repairing", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "repairing",
+                  repairAttempt: data.attempt,
+                  repairErrors: data.errors,
+                }
+              : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse repairing SSE event:", err);
         }
       });
 

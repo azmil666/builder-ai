@@ -1,0 +1,108 @@
+{
+  "prompt": "Create a premium modern e-commerce storefront for a lifestyle and fashion brand. Include a responsive navigation bar, hero section, product categories, product grid, product cards, product filtering, shopping cart, quantity controls, subtotal and total calculations, and a professional footer. Make the interactions functional.",
+  "model": "cohere/north-mini-code:free",
+  "startTime": "2026-10-31T15:22:44.421Z",
+  "designSpec": {
+    "purpose": "Atmospheric culinary & dining destination website",
+    "targetAudience": "Guests seeking memorable culinary dining experiences and reservations",
+    "category": "restaurant_hospitality",
+    "visualDirection": "Warm organic elegance with rich sensory food photography and refined typography",
+    "archetype": "organic_natural",
+    "brandPersonality": [
+      "artisanal",
+      "inviting",
+      "sophisticated"
+    ],
+    "colorPalette": {
+      "theme": "light",
+      "bg": "#fdfcf9",
+      "fg": "#1c1917",
+      "muted": "#78716c",
+      "line": "#e7e5e4",
+      "accent": "#d97706",
+      "accentForeground": "#ffffff",
+      "cardBg": "#ffffff",
+      "cardBorder": "#f5f5f4"
+    },
+    "typography": {
+      "heading": {
+        "family": "Fraunces",
+        "weights": [
+          "600",
+          "700"
+        ],
+        "googleFontsUrl": "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+        "usage": "Menu categories, story headlines, restaurant name"
+      },
+      "body": {
+        "family": "Plus Jakarta Sans",
+        "weights": [
+          "400",
+          "500"
+        ],
+        "googleFontsUrl": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+        "usage": "Dish descriptions, operating hours, reservation copy"
+      },
+      "fontImportUrl": "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
+    },
+    "layout": {
+      "containerWidth": "max-w-6xl",
+      "sectionPadding": "py-20 md:py-32",
+      "gap": "gap-8 md:gap-12",
+      "structure": "Atmospheric narrative (Hero, Chef's Philosophy, Curated Menu, Ambient Gallery, Reservation)"
+    },
+    "componentStyling": {
+      "cardRadius": "rounded-2xl",
+      "buttonRadius": "rounded-full",
+      "shadow": "shadow-sm hover:shadow-md",
+      "borderStyle": "border border-amber-900/10",
+      "cardStyle": "bg-white border border-stone-100 rounded-2xl p-8 shadow-sm"
+    },
+    "navigation": {
+      "type": "floating_island",
+      "details": "Translucent floating header with menu link, hours, and reservation CTA"
+    },
+    "hero": {
+      "composition": "split",
+      "headline": "Culinary craft rooted in season and place.",
+      "subheadline": "An intimate dining room celebrating wild heritage ingredients and natural wine.",
+      "ctaText": "Reserve Table",
+      "details": "Split hero with atmospheric dining photography and reservation booking drawer trigger"
+    },
+    "mediaDirection": {
+      "type": "curated_photography",
+      "description": "Atmospheric dining room interior and seasonal plated dish photography",
+      "imageTreatment": "Warm tone with subtle border radius",
+      "iconStyle": "Lucide React inline SVG icons"
+    },
+    "motion": {
+      "strategy": "Gentle entrance fades and subtle warm hover elevation",
+      "keyframes": [
+        "fadeIn",
+        "fadeInUp"
+      ],
+      "reducedMotion": true
+    },
+    "responsive": {
+      "breakpoints": "Mobile (<640px), Desktop (>640px)",
+      "mobileStrategy": "Fluid stacked menu with sticky reservation bar"
+    },
+    "accessibility": {
+      "contrastRatio": "WCAG 2.2 AA compliant",
+      "focusRings": "focus-visible:ring-2 focus-visible:ring-amber-600",
+      "semanticElements": true
+    },
+    "signature": "Ambient candlelight warmth with interactive seasonal tasting menu and reservation drawer"
+  },
+  "filesPlanned": [],
+  "filesGenerated": [],
+  "repairAttempts": 0,
+  "repairRounds": [],
+  "validationErrorsInitial": [],
+  "validationErrorsFinal": [],
+  "featureChecklistReport": null,
+  "finalStatus": "failed",
+  "error": "OpenAI API key is missing. Pass it using the 'apiKey' parameter or the OPENAI_API_KEY environment variable.",
+  "generatedFiles": {},
+  "endTime": "2026-10-31T15:22:44.500Z"
+}

@@ -173,6 +173,41 @@ async function runBackgroundGeneration(projectId, prompt) {
           });
         }
       },
+      onValidationStart: async () => {
+        console.log(`[Background AI] Starting semantic validation for project ${projectId}`);
+        await Project.findByIdAndUpdate(projectId, {
+          status: "validating",
+          currentFile: null,
+          CurrentFile: null,
+          $push: {
+            messages: {
+              role: "assistant",
+              content: "Validating code syntax, imports, exports, and component contracts...",
+              timestamp: new Date(),
+            },
+          },
+        });
+        emitProjectEvent(projectId, "validating", {
+          status: "validating",
+        });
+      },
+      onRepairStart: async (errors) => {
+        console.log(`[Background AI] Starting targeted repair loop for project ${projectId} (${errors.length} errors)`);
+        await Project.findByIdAndUpdate(projectId, {
+          status: "repairing",
+          $push: {
+            messages: {
+              role: "assistant",
+              content: `Identified ${errors.length} code issue(s). Initiating AI self-repair...`,
+              timestamp: new Date(),
+            },
+          },
+        });
+        emitProjectEvent(projectId, "repairing", {
+          status: "repairing",
+          errors,
+        });
+      },
     });
 
     console.log(`[Background AI] Successfully generated project ${projectId}`);

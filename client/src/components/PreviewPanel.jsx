@@ -196,12 +196,16 @@ const PreviewPanel = ({
         width: '375px',
         maxWidth: '100%',
         height: '92%',
+        maxHeight: '844px',
         margin: 'auto',
         borderRadius: '32px',
         border: '10px solid #18181b',
         boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)',
         overflow: 'hidden',
         position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       };
     }
@@ -210,26 +214,38 @@ const PreviewPanel = ({
         width: '768px',
         maxWidth: '100%',
         height: '95%',
+        maxHeight: '1024px',
         margin: 'auto',
         borderRadius: '20px',
         border: '8px solid #27272a',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
         overflow: 'hidden',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       };
     }
     return {
       width: '100%',
       height: '100%',
+      minWidth: 0,
+      minHeight: 0,
       borderRadius: '0px',
       border: 'none',
       boxShadow: 'none',
+      display: 'flex',
+      flexDirection: 'column',
+      flex: 1,
+      overflow: 'hidden',
+      position: 'relative',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     };
   }, [deviceViewport]);
 
   return (
-    <div className="h-full w-full flex flex-col bg-zinc-950 overflow-hidden">
+    <div className="h-full w-full flex flex-col min-w-0 min-h-0 bg-zinc-950 overflow-hidden">
       <SandpackProvider
         key={`${project._id}-${refreshKey}`}
         template="react"
@@ -408,20 +424,26 @@ const PreviewPanel = ({
         )}
 
         {/* Sandpack Layout Area */}
-        <div className="flex-1 w-full overflow-hidden flex bg-zinc-950">
+        <div className="flex-1 w-full min-h-0 min-w-0 overflow-hidden flex bg-zinc-950">
           <SandpackLayout
             style={{
               height: '100%',
               width: '100%',
+              minWidth: 0,
+              minHeight: 0,
               border: 'none',
               borderRadius: 0,
               background: 'transparent',
               display: 'flex',
+              flexDirection: 'row',
+              flexWrap: 'nowrap',
+              flex: 1,
+              gap: 0,
             }}
           >
             {/* Code Editor Panel */}
             {showCode && (
-              <div className="h-full flex-1 min-w-[280px] border-r border-zinc-800 overflow-hidden bg-zinc-950">
+              <div className="h-full flex-1 min-w-[280px] min-h-0 border-r border-zinc-800 overflow-hidden bg-zinc-950 flex flex-col">
                 <SandpackCodeEditor
                   showTabs={false}
                   showLineNumbers
@@ -438,12 +460,12 @@ const PreviewPanel = ({
 
             {/* Preview Canvas Area */}
             <div
-              className={`h-full flex items-center justify-center overflow-auto ${
-                showCode ? 'flex-1' : 'w-full'
+              className={`h-full min-w-0 min-h-0 flex flex-col ${
+                showCode ? 'flex-1' : 'w-full flex-1'
               } ${
                 deviceViewport !== 'desktop'
-                  ? 'bg-zinc-925 p-4 sm:p-6 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px]'
-                  : 'bg-zinc-950'
+                  ? 'overflow-auto bg-zinc-925 p-4 sm:p-6 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px]'
+                  : 'overflow-hidden bg-zinc-950'
               }`}
             >
               <div style={viewportStyles}>
@@ -463,6 +485,8 @@ const PreviewPanel = ({
                     height: '100%',
                     width: '100%',
                     minWidth: 0,
+                    minHeight: 0,
+                    flex: 1,
                     backgroundColor: '#ffffff',
                   }}
                 />

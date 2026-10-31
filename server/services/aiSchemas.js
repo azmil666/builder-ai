@@ -205,17 +205,32 @@ export const RevisionResultSchema = z.object({
     description: z.string().default('Applied revisions')
 });
 
+export const PlannedFileItemSchema = z.object({
+    path: z.string(),
+    description: z.string(),
+    isEntry: z.boolean().default(false),
+    mandatory: z.boolean().default(true),
+    responsibilities: z.array(z.string()).default([]),
+    expectedExports: z.array(z.string()).default([]),
+    exports: z.string().optional().default(""), // backward compatibility
+    localImports: z.array(z.string()).default([]),
+    imports: z.array(z.string()).optional().default([]), // backward compatibility
+    dependencies: z.array(z.string()).default([]), // external npm packages needed (e.g. ["lucide-react"])
+    generationOrder: z.number().default(1),
+});
+
+export const ManifestSchema = z.object({
+    entryPoint: z.string().default("/App.js"),
+    totalFiles: z.number().default(0),
+    requiredFeatures: z.array(z.string()).default([]),
+    generationOrder: z.array(z.string()).default([]),
+});
+
 export const FilePlanSchema = z.object({
-    files: z.array(
-        z.object({
-            path: z.string(),
-            description: z.string(),
-            exports: z.string().optional().default(""),
-            imports: z.array(z.string()).optional().default([]),
-        })
-    ),
+    files: z.array(PlannedFileItemSchema),
     projectName: z.string().default('Generated Project'),
-    projectDescription: z.string().default('A React project')
+    projectDescription: z.string().default('A React project'),
+    manifest: ManifestSchema.optional(),
 });
 
 export const FileCodeSchema = z.object({

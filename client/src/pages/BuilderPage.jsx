@@ -112,6 +112,8 @@ const BuilderPage = () => {
   const isOngoingBuild =
     activeProject.status === 'pending' ||
     activeProject.status === 'generating' ||
+    activeProject.status === 'validating' ||
+    activeProject.status === 'repairing' ||
     activeProject.status === 'failed';
 
   return (
@@ -134,7 +136,7 @@ const BuilderPage = () => {
       />
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {/* Left Activity Rail (Icon Bar) */}
         <div className="w-12 shrink-0 bg-zinc-950 border-r border-zinc-850 flex flex-col items-center justify-between py-3 z-20 select-none">
           <div className="flex flex-col items-center gap-1.5 w-full px-1">
@@ -270,7 +272,7 @@ const BuilderPage = () => {
         )}
 
         {/* Center Preview & Editor Canvas */}
-        <div className="flex-1 h-full overflow-hidden flex flex-col bg-zinc-950">
+        <div className="flex-1 h-full min-w-0 min-h-0 overflow-hidden flex flex-col bg-zinc-950">
           {isOngoingBuild ? (
             <AgentProgressDashboard project={activeProject} />
           ) : (
