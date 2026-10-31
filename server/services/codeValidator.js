@@ -1,277 +1,568 @@
-// Post-generation code validator and auto-fixer
-// Repairs common AI code generation errors before saving to DB using regex checks
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Post-generation code validator, AST parser, and auto-fixer
+// Combines safe pre-normalization repairs with rigorous AST-based syntax and semantic validation.
 
 // Void HTML elements that must be self-closed in JSX
-const VOID_ELEMENTS = ["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"];
+const VOID_ELEMENTS = [
+  "area", "base", "br", "col", "embed", "hr", "img", "input",
+  "link", "meta", "param", "source", "track", "wbr"
+];
 
-// Validate and auto-fix common AI-generated code issues
-export function validateAndFixCode(code, filePath, context) {
-    const warnings = [];
-    const isCSS = filePath.endsWith(".css");
-    const isJS = filePath.endsWith(".js") || filePath.endsWith(".jsx");
+// Node.js built-in modules and server-only packages that break in browser/Sandpack
+const FORBIDDEN_CLIENT_MODULES = new Set([
+  "fs", "node:fs", "path", "node:path", "child_process", "node:child_process",
+  "os", "node:os", "crypto", "node:crypto", "http", "node:http",
+  "https", "node:https", "net", "node:net", "dns", "node:dns",
+  "stream", "node:stream", "buffer", "node:buffer", "process", "node:process",
+  "express", "mongoose", "dotenv", "bcrypt", "jsonwebtoken",
+  "@ai-sdk/openai", "ai"
+]);
 
-    // 1. Strip markdown code fences that some models wrap around code
-    const fencePattern = /^```(?:jsx?|javascript|css|html|tsx?|react)?\s*\n([\s\S]*?)\n```\s*$/;
-    const fenceMatch = code.match(fencePattern);
-    if (fenceMatch) {
-        code = fenceMatch[1];
-        warnings.push(`${filePath}: Stripped markdown code fences`);
-    }
+// Dynamically locate the lightweight AST parser (provided by rolldown/oxc)
+let _parseAst = null;
+let _parserLoaded = false;
 
-    // Also handle cases where fences appear at the very start/end with other content
-    code = code.replace(/^```(?:jsx?|javascript|css|html|tsx?|react)?\s*\n/, "");
-    code = code.replace(/\n```\s*$/, "");
+async function getParser() {
+  if (_parserLoaded) return _parseAst;
+  try {
+    const candidates = [
+      path.resolve(process.cwd(), "client/node_modules/rolldown/dist/parse-ast-index.mjs"),
+      path.resolve(process.cwd(), "../client/node_modules/rolldown/dist/parse-ast-index.mjs"),
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/node_modules/rolldown/dist/parse-ast-index.mjs"),
+    ];
 
-    if (isCSS) {
-        // CSS-specific fixes — minimal, just trim and return
-        return { code: code.trim() + "\n", warnings };
-    }
-
-    if (!isJS) {
-        return { code, warnings };
-    }
-
-    // --- JS/JSX-specific fixes ---
-
-    // 2. Fix `class=` → `className=` in JSX (but not inside strings or comments)
-    // Match class= that appears inside JSX tags (after < and before >)
-    const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
-    if (classFixRegex.test(code)) {
-        code = code.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
-        warnings.push(`${filePath}: Fixed 'class=' → 'className='`);
-    }
-
-    // 3. Fix `for=` → `htmlFor=` in JSX labels
-    const forFixRegex = /(<label[^>]*?)\bfor=/gi;
-    if (forFixRegex.test(code)) {
-        code = code.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
-        warnings.push(`${filePath}: Fixed 'for=' → 'htmlFor='`);
-    }
-
-    // 4. Self-close void elements that aren't self-closed
-    for (const tag of VOID_ELEMENTS) {
-        // Match <tag ... > that is NOT already self-closed (no / before >)
-        const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
-        if (voidRegex.test(code)) {
-            code = code.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
-            warnings.push(`${filePath}: Self-closed <${tag}> elements`);
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        const mod = await import(candidate);
+        if (mod && mod.parseAst) {
+          _parseAst = mod.parseAst;
+          break;
         }
+      }
     }
-
-    // 5. Ensure exactly one default export exists
-    const defaultExportCount = (code.match(/export\s+default\s+/g) || []).length;
-    if (defaultExportCount === 0 && !filePath.endsWith(".css")) {
-        // Try to find the main function/component and add default export
-        const funcMatch = code.match(/^function\s+([A-Z]\w*)\s*\(/m);
-        const constMatch = code.match(/^const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
-        const componentName = funcMatch?.[1] || constMatch?.[1];
-
-        if (componentName) {
-            // Check if there's already a named export
-            const namedExportRegex = new RegExp(`export\\s+(function|const)\\s+${componentName}`);
-            if (namedExportRegex.test(code)) {
-                // Convert `export function X` → `export default function X`
-                code = code.replace(new RegExp(`export\\s+(function|const)\\s+${componentName}`), `export default $1 ${componentName}`);
-            } else {
-                // Add default export at the end
-                code = code.trimEnd() + `\n\nexport default ${componentName};\n`;
-            }
-            warnings.push(`${filePath}: Added missing default export for '${componentName}'`);
-        }
-    }
-
-    // 6. Remove stray HTML comments inside JSX return blocks
-    // Pattern: <!-- comment --> which is invalid in JSX
-    const htmlCommentRegex = /<!--[\s\S]*?-->/g;
-    if (htmlCommentRegex.test(code)) {
-        code = code.replace(htmlCommentRegex, "");
-        warnings.push(`${filePath}: Removed HTML comments (invalid in JSX)`);
-    }
-
-    // 7. Fix common TypeScript syntax that slips in
-    // Remove `: React.FC` or `: FC` type annotations from function declarations
-    code = code.replace(/:\s*React\.FC(?:<[^>]*>)?\s*=/g, (match) => {
-        warnings.push(`${filePath}: Removed TypeScript React.FC annotation`);
-        return " =";
-    });
-
-    // Remove simple type annotations from function parameters like (props: any)
-    // But be careful not to break destructured defaults like { name = 'default' }
-    code = code.replace(/(\([^)]*?)\s*:\s*(?:string|number|boolean|any|object|void)\s*([,)])/g, (match, before, after) => {
-        warnings.push(`${filePath}: Removed TypeScript type annotation`);
-        return `${before}${after}`;
-    });
-
-    // 8. Ensure React import exists if JSX is used
-    const hasJSX = /<[A-Za-z]/.test(code);
-    const hasReactImport = /import\s+React/.test(code);
-    if (hasJSX && !hasReactImport) {
-        code = `import React from 'react';\n${code}`;
-        warnings.push(`${filePath}: Added missing React import`);
-    }
-
-    // 9. Fix import paths that point to incorrect folders/paths compared to what was planned
-    if (context?.allPlannedFiles) {
-        const fixResult = fixImportPaths(code, filePath, context.allPlannedFiles);
-        code = fixResult.code;
-        warnings.push(...fixResult.warnings);
-    }
-
-    return { code: code.trim() + "\n", warnings };
+  } catch (err) {
+    console.warn(`[Validator] Note: AST parser could not be loaded (${err.message}). Using regex validation fallback.`);
+  }
+  _parserLoaded = true;
+  return _parseAst;
 }
 
-// Validate and fix code specifically for revision operations
-export function validateRevisionContent(content, filePath, op) {
-    if (op === "delete") return { content, warnings: [] };
+// Pre-load parser asynchronously at module initialization
+const parserPromise = getParser();
 
-    if (op === "create") {
-        const result = validateAndFixCode(content, filePath);
-        return { content: result.code, warnings: result.warnings };
+/**
+ * Parses JavaScript / JSX code into an AST.
+ * Throws a syntax error with line/column/codeframe if syntax is invalid.
+ */
+export async function parseModuleAst(code, filePath = "file.jsx") {
+  const parseFn = await parserPromise;
+  if (!parseFn) {
+    // Basic regex-based fallback if AST parser is not loaded
+    return { type: "Program", body: [], fallback: true };
+  }
+  return parseFn(code, { lang: "jsx" }, filePath);
+}
+
+/**
+ * Synchronous parser wrapper if parser is already loaded.
+ */
+function parseModuleAstSync(code, filePath = "file.jsx") {
+  if (!_parseAst) return null;
+  return _parseAst(code, { lang: "jsx" }, filePath);
+}
+
+/**
+ * Validates and repairs common AI-generated code issues.
+ * Returns structured validation result: { code, valid, errors, warnings, ast }
+ */
+export function validateAndFixCode(code, filePath, context = {}) {
+  const warnings = [];
+  const errors = [];
+  const isCSS = filePath.endsWith(".css");
+  const isJS = filePath.endsWith(".js") || filePath.endsWith(".jsx");
+
+  // 1. Strip markdown code fences that some models wrap around code
+  const fencePattern = /^```(?:jsx?|javascript|css|html|tsx?|react)?\s*\n([\s\S]*?)\n```\s*$/;
+  const fenceMatch = code.match(fencePattern);
+  if (fenceMatch) {
+    code = fenceMatch[1];
+    warnings.push(`${filePath}: Stripped markdown code fences`);
+  }
+
+  code = code.replace(/^```(?:jsx?|javascript|css|html|tsx?|react)?\s*\n/, "");
+  code = code.replace(/\n```\s*$/, "");
+
+  if (isCSS) {
+    return {
+      code: code.trim() + "\n",
+      valid: true,
+      errors: [],
+      warnings,
+      ast: null,
+    };
+  }
+
+  if (!isJS) {
+    return {
+      code,
+      valid: true,
+      errors: [],
+      warnings,
+      ast: null,
+    };
+  }
+
+  // --- Safe Pre-Normalization Repairs ---
+
+  // 2. Fix class= -> className= in JSX tags
+  const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
+  if (classFixRegex.test(code)) {
+    code = code.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
+    warnings.push(`${filePath}: Fixed 'class=' -> 'className='`);
+  }
+
+  // 3. Fix for= -> htmlFor= in JSX labels
+  const forFixRegex = /(<label[^>]*?)\bfor=/gi;
+  if (forFixRegex.test(code)) {
+    code = code.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
+    warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor='`);
+  }
+
+  // 4. Self-close void elements that aren't self-closed
+  for (const tag of VOID_ELEMENTS) {
+    const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
+    if (voidRegex.test(code)) {
+      code = code.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
+      warnings.push(`${filePath}: Self-closed <${tag}> elements`);
     }
+  }
 
-    // For update ops (search/replace content), only apply safe fixes
-    // that won't break the partial context
-    const warnings = [];
+  // 5. Remove stray HTML comments inside JSX return blocks
+  const htmlCommentRegex = /<!--[\s\S]*?-->/g;
+  if (htmlCommentRegex.test(code)) {
+    code = code.replace(htmlCommentRegex, "");
+    warnings.push(`${filePath}: Removed HTML comments (invalid in JSX)`);
+  }
 
-    // Fix class → className
-    const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
-    if (classFixRegex.test(content)) {
-        content = content.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
-        warnings.push(`${filePath}: Fixed 'class=' → 'className=' in replacement`);
-    }
+  // 6. Fix common TypeScript annotations
+  code = code.replace(/:\s*React\.FC(?:<[^>]*>)?\s*=/g, () => {
+    warnings.push(`${filePath}: Removed TypeScript React.FC annotation`);
+    return " =";
+  });
 
-    // Fix for → htmlFor
-    const forFixRegex = /(<label[^>]*?)\bfor=/gi;
-    if (forFixRegex.test(content)) {
-        content = content.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
-        warnings.push(`${filePath}: Fixed 'for=' → 'htmlFor=' in replacement`);
-    }
+  code = code.replace(/(\([^)]*?)\s*:\s*(?:string|number|boolean|any|object|void)\s*([,)])/g, (match, before, after) => {
+    warnings.push(`${filePath}: Removed TypeScript type annotation`);
+    return `${before}${after}`;
+  });
 
-    // Self-close void elements
-    for (const tag of VOID_ELEMENTS) {
-        const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
-        if (voidRegex.test(content)) {
-            content = content.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
-            warnings.push(`${filePath}: Self-closed <${tag}> in replacement`);
+  // 7. Ensure React import exists if JSX is used
+  const hasJSX = /<[A-Za-z]/.test(code);
+  const hasReactImport = /import\s+React\b/.test(code);
+  if (hasJSX && !hasReactImport) {
+    code = `import React from 'react';\n${code}`;
+    warnings.push(`${filePath}: Added missing React import`);
+  }
+
+  // 8. Fix and validate relative import paths against planned/existing files
+  if (context?.allPlannedFiles || context?.existingFiles) {
+    const plannedList = context.allPlannedFiles || (context.existingFiles || []).map((p) => ({ path: p }));
+    const fixResult = fixImportPaths(code, filePath, plannedList);
+    code = fixResult.code;
+    warnings.push(...fixResult.warnings);
+  }
+
+  // 9. AST-based Syntax & Semantic Validation
+  let ast = null;
+  try {
+    ast = parseModuleAstSync(code, filePath);
+  } catch (parseErr) {
+    errors.push({
+      type: "syntax",
+      file: filePath,
+      message: parseErr.message || "Syntax error parsing JSX",
+      pos: parseErr.pos,
+      codeframe: parseErr.message,
+    });
+  }
+
+  if (ast && ast.body) {
+    // A. Verify and count default exports
+    const defaultExports = ast.body.filter((n) => n.type === "ExportDefaultDeclaration");
+    const namedExports = ast.body.filter((n) => n.type === "ExportNamedDeclaration");
+
+    if (defaultExports.length > 1) {
+      errors.push({
+        type: "export",
+        file: filePath,
+        message: `Multiple default exports (${defaultExports.length}) found in '${filePath}'. React components must have exactly one default export.`,
+      });
+    } else if (defaultExports.length === 0) {
+      // Attempt safe auto-repair: find top-level component function/const and export it
+      const funcMatch = code.match(/^function\s+([A-Z]\w*)\s*\(/m);
+      const constMatch = code.match(/^const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
+      const componentName = funcMatch?.[1] || constMatch?.[1];
+
+      if (componentName) {
+        const namedExportRegex = new RegExp(`export\\s+(function|const)\\s+${componentName}`);
+        if (namedExportRegex.test(code)) {
+          code = code.replace(new RegExp(`export\\s+(function|const)\\s+${componentName}`), `export default $1 ${componentName}`);
+        } else {
+          code = code.trimEnd() + `\n\nexport default ${componentName};\n`;
         }
+        warnings.push(`${filePath}: Added missing default export for '${componentName}'`);
+      } else {
+        errors.push({
+          type: "export",
+          file: filePath,
+          message: `Component file '${filePath}' does not contain a default export.`,
+        });
+      }
     }
 
-    return { content, warnings };
+    // B. Verify imports (detect forbidden node builtins and unresolvable targets)
+    const importNodes = ast.body.filter((n) => n.type === "ImportDeclaration");
+    for (const imp of importNodes) {
+      const source = imp.source?.value;
+      if (!source) continue;
+
+      if (!source.startsWith(".")) {
+        // Package import: check forbidden Node.js or server-only packages
+        const pkgName = source.startsWith("@") ? source.split("/").slice(0, 2).join("/") : source.split("/")[0];
+        if (FORBIDDEN_CLIENT_MODULES.has(pkgName) || FORBIDDEN_CLIENT_MODULES.has(source)) {
+          errors.push({
+            type: "dependency",
+            file: filePath,
+            message: `Unsupported server/Node.js module '${source}' imported in client component.`,
+          });
+        }
+      } else if (context?.allPlannedFiles || context?.existingFiles) {
+        // Relative import: verify target exists in planned/existing files
+        const currentDir = getDir(filePath);
+        const resolvedTarget = resolvePath(currentDir, source);
+        const resolvedClean = cleanExtension(resolvedTarget);
+
+        const availablePaths = [
+          ...(context.allPlannedFiles || []).map((f) => (f.path.startsWith("/") ? f.path : "/" + f.path)),
+          ...(context.existingFiles || []).map((p) => (p.startsWith("/") ? p : "/" + p)),
+        ];
+
+        const targetExists = availablePaths.some((p) => cleanExtension(p) === resolvedClean);
+        if (!targetExists && availablePaths.length > 0) {
+          errors.push({
+            type: "import",
+            file: filePath,
+            message: `Unresolvable relative import '${source}' in '${filePath}'. Target file does not exist in planned files.`,
+          });
+        }
+      }
+    }
+  } else if (!ast) {
+    // Fallback export check if AST parser is inactive
+    const defaultExportCount = (code.match(/export\s+default\s+/g) || []).length;
+    if (defaultExportCount === 0) {
+      const funcMatch = code.match(/^function\s+([A-Z]\w*)\s*\(/m);
+      const constMatch = code.match(/^const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
+      const componentName = funcMatch?.[1] || constMatch?.[1];
+
+      if (componentName) {
+        code = code.trimEnd() + `\n\nexport default ${componentName};\n`;
+        warnings.push(`${filePath}: Added missing default export for '${componentName}'`);
+      } else {
+        errors.push({
+          type: "export",
+          file: filePath,
+          message: `Missing default export in component file '${filePath}'`,
+        });
+      }
+    } else if (defaultExportCount > 1) {
+      errors.push({
+        type: "export",
+        file: filePath,
+        message: `Multiple default exports found in '${filePath}'`,
+      });
+    }
+  }
+
+  return {
+    code: code.trim() + "\n",
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    ast,
+  };
+}
+
+/**
+ * Validates and fixes code for conversational revision operations.
+ */
+export function validateRevisionContent(content, filePath, op) {
+  if (op === "delete") return { content, warnings: [], valid: true, errors: [] };
+
+  if (op === "create") {
+    const result = validateAndFixCode(content, filePath);
+    return {
+      content: result.code,
+      warnings: result.warnings,
+      valid: result.valid,
+      errors: result.errors,
+    };
+  }
+
+  // For update ops (search/replace), apply safe partial fixes
+  const warnings = [];
+  const errors = [];
+
+  const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
+  if (classFixRegex.test(content)) {
+    content = content.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
+    warnings.push(`${filePath}: Fixed 'class=' -> 'className=' in replacement`);
+  }
+
+  const forFixRegex = /(<label[^>]*?)\bfor=/gi;
+  if (forFixRegex.test(content)) {
+    content = content.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
+    warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor=' in replacement`);
+  }
+
+  for (const tag of VOID_ELEMENTS) {
+    const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
+    if (voidRegex.test(content)) {
+      content = content.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
+      warnings.push(`${filePath}: Self-closed <${tag}> in replacement`);
+    }
+  }
+
+  return { content, warnings, valid: true, errors };
+}
+
+/**
+ * Validates an entire multi-file project for cross-file integrity,
+ * missing components, import contracts, and entry point completeness.
+ */
+export function validateProject(files, plannedFiles = []) {
+  const errors = [];
+  const warnings = [];
+
+  if (!files || typeof files !== "object") {
+    return {
+      valid: false,
+      errors: [{ type: "missing_file", file: "/", message: "Project files object is empty or invalid" }],
+      warnings: [],
+    };
+  }
+
+  const filePaths = Object.keys(files);
+
+  // 1. Mandatory Entry Point /App.js
+  if (!files["/App.js"]) {
+    errors.push({
+      type: "missing_file",
+      file: "/App.js",
+      message: "Project is missing required entry point '/App.js'",
+    });
+  }
+
+  // 2. Recommended Global CSS /styles.css
+  if (!files["/styles.css"]) {
+    warnings.push("Project is missing '/styles.css' stylesheet");
+  }
+
+  // 3. Verify planned files exist
+  if (Array.isArray(plannedFiles)) {
+    for (const planned of plannedFiles) {
+      const pPath = planned.path.startsWith("/") ? planned.path : "/" + planned.path;
+      if (!files[pPath]) {
+        errors.push({
+          type: "missing_file",
+          file: pPath,
+          message: `Planned file '${pPath}' was not generated.`,
+        });
+      }
+    }
+  }
+
+  // 4. Validate each file individually
+  const fileExports = new Map();
+
+  for (const [filePath, fileData] of Object.entries(files)) {
+    const content = typeof fileData === "string" ? fileData : fileData?.content || "";
+    const result = validateAndFixCode(content, filePath, {
+      allPlannedFiles: plannedFiles,
+      existingFiles: filePaths,
+    });
+
+    if (!result.valid) {
+      errors.push(...result.errors);
+    }
+    warnings.push(...result.warnings);
+
+    // Track exports for contract verification
+    if (result.ast && result.ast.body) {
+      const defaultExport = result.ast.body.find((n) => n.type === "ExportDefaultDeclaration");
+      const namedExports = result.ast.body
+        .filter((n) => n.type === "ExportNamedDeclaration")
+        .map((n) => n.declaration?.id?.name || n.declaration?.declarations?.[0]?.id?.name)
+        .filter(Boolean);
+
+      fileExports.set(filePath, {
+        hasDefault: Boolean(defaultExport),
+        named: new Set(namedExports),
+      });
+    }
+  }
+
+  // 5. Cross-file component contracts
+  for (const [filePath, fileData] of Object.entries(files)) {
+    if (!filePath.endsWith(".js") && !filePath.endsWith(".jsx")) continue;
+    const content = typeof fileData === "string" ? fileData : fileData?.content || "";
+    const currentDir = getDir(filePath);
+
+    let ast = null;
+    try {
+      ast = parseModuleAstSync(content, filePath);
+    } catch {
+      // Syntax error already captured above
+    }
+
+    if (ast && ast.body) {
+      const imports = ast.body.filter((n) => n.type === "ImportDeclaration");
+      for (const imp of imports) {
+        const source = imp.source?.value;
+        if (!source || !source.startsWith(".")) continue;
+
+        const resolved = resolvePath(currentDir, source);
+        const resolvedPath = filePaths.find((p) => cleanExtension(p) === cleanExtension(resolved));
+
+        if (resolvedPath && fileExports.has(resolvedPath)) {
+          const targetExports = fileExports.get(resolvedPath);
+          for (const spec of imp.specifiers || []) {
+            if (spec.type === "ImportDefaultSpecifier" && !targetExports.hasDefault) {
+              errors.push({
+                type: "contract",
+                file: filePath,
+                message: `File '${filePath}' imports default from '${source}', but '${resolvedPath}' has no default export.`,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
 }
 
 // --- Import Path Resolution Helpers ---
 
 function getDir(p) {
-    const parts = p.split("/");
-    parts.pop();
-    return parts.join("/") || "/";
+  const parts = p.split("/");
+  parts.pop();
+  return parts.join("/") || "/";
 }
 
 function resolvePath(baseDir, relativePath) {
-    const baseParts = baseDir.split("/").filter(Boolean);
-    const relParts = relativePath.split("/").filter(Boolean);
+  const baseParts = baseDir.split("/").filter(Boolean);
+  const relParts = relativePath.split("/").filter(Boolean);
 
-    for (const part of relParts) {
-        if (part === ".") {
-            continue;
-        } else if (part === "..") {
-            baseParts.pop();
-        } else {
-            baseParts.push(part);
-        }
+  for (const part of relParts) {
+    if (part === ".") {
+      continue;
+    } else if (part === "..") {
+      baseParts.pop();
+    } else {
+      baseParts.push(part);
     }
-    return "/" + baseParts.join("/");
+  }
+  return "/" + baseParts.join("/");
 }
 
 function getRelativePath(fromDir, toPath) {
-    const fromParts = fromDir.split("/").filter(Boolean);
-    const toParts = toPath.split("/").filter(Boolean);
+  const fromParts = fromDir.split("/").filter(Boolean);
+  const toParts = toPath.split("/").filter(Boolean);
 
-    let commonLength = 0;
-    while (commonLength < fromParts.length && commonLength < toParts.length && fromParts[commonLength] === toParts[commonLength]) {
-        commonLength++;
-    }
+  let commonLength = 0;
+  while (commonLength < fromParts.length && commonLength < toParts.length && fromParts[commonLength] === toParts[commonLength]) {
+    commonLength++;
+  }
 
-    const upCount = fromParts.length - commonLength;
-    const remainingTo = toParts.slice(commonLength);
+  const upCount = fromParts.length - commonLength;
+  const remainingTo = toParts.slice(commonLength);
 
-    const relParts = [];
-    for (let i = 0; i < upCount; i++) {
-        relParts.push("..");
-    }
-    if (relParts.length === 0) {
-        relParts.push(".");
-    }
-    relParts.push(...remainingTo);
-    return relParts.join("/");
+  const relParts = [];
+  for (let i = 0; i < upCount; i++) {
+    relParts.push("..");
+  }
+  if (relParts.length === 0) {
+    relParts.push(".");
+  }
+  relParts.push(...remainingTo);
+  return relParts.join("/");
 }
 
 function cleanExtension(p) {
-    return p.replace(/\.(js|jsx|css|ts|tsx)$/, "");
+  return p.replace(/\.(js|jsx|css|ts|tsx)$/, "");
 }
 
 function fixImportPaths(code, filePath, allPlannedFiles) {
-    const warnings = [];
-    if (!allPlannedFiles || allPlannedFiles.length === 0) {
-        return { code, warnings };
+  const warnings = [];
+  if (!allPlannedFiles || allPlannedFiles.length === 0) {
+    return { code, warnings };
+  }
+
+  const currentDir = getDir(filePath);
+  const plannedPaths = allPlannedFiles.map((f) => (f.path.startsWith("/") ? f.path : "/" + f.path));
+
+  const importRegex = /(from\s+['"]|import\s+['"])([^'"]+)(['"])/g;
+
+  const newCode = code.replace(importRegex, (match, prefix, importTarget, suffix) => {
+    if (!importTarget.startsWith(".")) {
+      return match;
     }
 
-    const currentDir = getDir(filePath);
-    const plannedPaths = allPlannedFiles.map((f) => (f.path.startsWith("/") ? f.path : "/" + f.path));
+    const resolvedTarget = resolvePath(currentDir, importTarget);
+    const resolvedClean = cleanExtension(resolvedTarget);
 
-    // Matches lines like: import Header from './components/Header';
-    // or import '../styles.css'; or require('./components/Header')
-    const importRegex = /(from\s+['"]|import\s+['"])([^'"]+)(['"])/g;
+    const exactExists = plannedPaths.some((p) => cleanExtension(p) === resolvedClean);
+    if (exactExists) {
+      return match;
+    }
 
-    const newCode = code.replace(importRegex, (match, prefix, importTarget, suffix) => {
-        // Skip absolute imports (non-relative packages like 'react')
-        if (!importTarget.startsWith(".")) {
-            return match;
-        }
+    const importFilename = resolvedClean.split("/").pop();
+    if (!importFilename) {
+      return match;
+    }
 
-        // 1. Resolve relative import target path
-        const resolvedTarget = resolvePath(currentDir, importTarget);
-        const resolvedClean = cleanExtension(resolvedTarget);
-
-        // Check if it already matches a planned file path exactly (with or without extension)
-        const exactExists = plannedPaths.some((p) => cleanExtension(p) === resolvedClean);
-        if (exactExists) {
-            return match;
-        }
-
-        // 2. Mismatch! Try to find a planned file with the same filename
-        const importFilename = resolvedClean.split("/").pop();
-        if (!importFilename) {
-            return match;
-        }
-
-        const foundPlannedPath = plannedPaths.find((p) => {
-            const plannedClean = cleanExtension(p);
-            const plannedFilename = plannedClean.split("/").pop();
-            return plannedFilename === importFilename;
-        });
-
-        if (foundPlannedPath) {
-            // Calculate relative path from current directory to actual planned file path
-            const newRelative = getRelativePath(currentDir, foundPlannedPath);
-            // Prefix relative prefix if missing
-            const finalRelative = newRelative.startsWith(".") ? newRelative : "./" + newRelative;
-
-            // Retain file extension if the original import target had it
-            const hasExt = /\.(js|jsx|css|ts|tsx)$/.test(importTarget);
-            const ext = hasExt ? "." + importTarget.split(".").pop() : "";
-
-            const rewrittenTarget = cleanExtension(finalRelative) + ext;
-            if (rewrittenTarget !== importTarget) {
-                warnings.push(
-                    `${filePath}: Corrected import '${importTarget}' to '${rewrittenTarget}' (file planned at '${foundPlannedPath}')`,
-                );
-                return `${prefix}${rewrittenTarget}${suffix}`;
-            }
-        }
-
-        return match;
+    const foundPlannedPath = plannedPaths.find((p) => {
+      const plannedClean = cleanExtension(p);
+      const plannedFilename = plannedClean.split("/").pop();
+      return plannedFilename === importFilename;
     });
 
-    return { code: newCode, warnings };
+    if (foundPlannedPath) {
+      const newRelative = getRelativePath(currentDir, foundPlannedPath);
+      const finalRelative = newRelative.startsWith(".") ? newRelative : "./" + newRelative;
+
+      const hasExt = /\.(js|jsx|css|ts|tsx)$/.test(importTarget);
+      const ext = hasExt ? "." + importTarget.split(".").pop() : "";
+
+      const rewrittenTarget = cleanExtension(finalRelative) + ext;
+      if (rewrittenTarget !== importTarget) {
+        warnings.push(
+          `${filePath}: Corrected import '${importTarget}' to '${rewrittenTarget}' (file planned at '${foundPlannedPath}')`,
+        );
+        return `${prefix}${rewrittenTarget}${suffix}`;
+      }
+    }
+
+    return match;
+  });
+
+  return { code: newCode, warnings };
 }

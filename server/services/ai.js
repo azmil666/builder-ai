@@ -4,7 +4,7 @@ import pMap from "p-map";
 import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema } from './aiSchemas.js';
 import { buildFileCodeSystem, buildFilePlanSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
-import { validateAndFixCode, validateRevisionContent } from './codeValidator.js';
+import { validateAndFixCode, validateRevisionContent, validateProject } from './codeValidator.js';
 
 // --- OpenRouter Model Client Setup ---
 const MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
@@ -39,12 +39,41 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles,
      }
 
      // Apply post-generation validation and auto-fixing
-     const validation = validateAndFixCode(code, file.path, {allPlannedFiles: allFiles});
+     let validation = validateAndFixCode(code, file.path, {allPlannedFiles: allFiles});
 
      code = validation.code;
 
      if(validation.warnings.length > 0){
         console.log(`[Validator] Code adjustments for ${file.path}:\n  - ${validation.warnings.join("\n  - ")}`);
+     }
+
+     // If validation failed with syntax, import, or export errors, attempt ONE targeted correction
+     if(!validation.valid && validation.errors && validation.errors.length > 0){
+        console.warn(`[Validator] ${file.path} has ${validation.errors.length} validation errors. Attempting targeted correction...`);
+        const errorList = validation.errors.map(e => `- [${e.type.toUpperCase()}] ${e.message}`).join("\n");
+        try {
+            const repairMsg = `Project: ${prompt}\n\nThe generated code for ${file.path} failed validation with these errors:\n${errorList}\n\nCurrent code:\n\`\`\`javascript\n${code}\n\`\`\`\n\nPlease fix the syntax, import, or export errors and return the corrected complete code.`;
+            const { object: repairedObj } = await generateObject({
+                model,
+                schema: FileCodeSchema,
+                system,
+                prompt: repairMsg,
+                maxRetries: 1,
+            });
+            const repairedCode = normalizeContent(repairedObj.code);
+            const revalidation = validateAndFixCode(repairedCode, file.path, {allPlannedFiles: allFiles});
+            if(revalidation.valid){
+                console.log(`[Validator] Targeted correction SUCCEEDED for ${file.path}`);
+                code = revalidation.code;
+                validation = revalidation;
+            } else {
+                console.warn(`[Validator] Targeted correction for ${file.path} did not resolve all errors.`);
+                throw new Error(`Validation failed for ${file.path}: ${validation.errors[0]?.message}`);
+            }
+        } catch (repairErr) {
+            console.warn(`[Validator] Targeted repair failed for ${file.path}: ${repairErr.message}`);
+            throw new Error(`Validation failed for ${file.path}: ${validation.errors[0]?.message}`);
+        }
      }
 
      console.log(`[AI] Created file: ${file.path} (${code.length} chars)`);
@@ -211,6 +240,12 @@ export async function generateProject(prompt, callbacks){
 
     if(!files["/App.js"]){
         throw new Error("AI did not generate /App.js entry point");
+    }
+
+    // Phase 4: Final project-level semantic & cross-file validation
+    const projectValidation = validateProject(files, plan.files);
+    if (!projectValidation.valid) {
+        console.warn(`[Validator] Project validation found ${projectValidation.errors.length} cross-file issues:\n  - ${projectValidation.errors.map(e => `[${e.type}] ${e.file}: ${e.message}`).join("\n  - ")}`);
     }
 
     return {files, description: plan.projectDescription, designSpec}
