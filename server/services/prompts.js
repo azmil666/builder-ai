@@ -71,17 +71,50 @@ Great pages are carried by intentional media. Never output ugly grey placeholder
    - Dark Luxury / Ambient glow: \`https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4\`
    - Ocean / Calm Nature: \`https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204221_5339e40b-e73d-4ab0-9c65-79c18c66fd50.mp4\`
    Usage: \`<video autoPlay muted loop playsInline className='absolute inset-0 w-full h-full object-cover pointer-events-none' />\`
-2. **Context-Specific Photography**:
-   Use valid, topic-aligned Unsplash image URLs:
-   - Architecture: \`https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80\`
-   - Restaurant / Culinary: \`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80\`
-   - Dining / Food plating: \`https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80\`
-   - Fashion / Editorial: \`https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80\`
-   - Technology / Workspace: \`https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80\`
-   - Modern Product / Ecommerce: \`https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80\`
-3. **Type-Led / Graphic Fallback**:
+2. **Context-Specific Photography & Diverse Curated Image Bank**:
+   Use valid, high-resolution, topic-aligned Unsplash image URLs.
+   **CRITICAL DIVERSE IMAGERY RULE**: Every single product or card in a catalog, grid, or list MUST use a DISTINCT, context-relevant image URL. NEVER repeat the same image URL across multiple items in the same catalog or grid!
+   
+   Curated photography image bank:
+   - **Apparel / Trench / Outerwear**: \`https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80\`
+   - **Apparel / Knitwear / Cashmere**: \`https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=1200&q=80\`
+   - **Apparel / Minimalist Tee & Denim**: \`https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80\`
+   - **Apparel / Tailored Trousers & Suit**: \`https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=1200&q=80\`
+   - **Leather Bags / Minimalist Tote**: \`https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=1200&q=80\`
+   - **Footwear / Leather Derbies & Loafers**: \`https://images.unsplash.com/photo-1533867617858-e7b97e060509?auto=format&fit=crop&w=1200&q=80\`
+   - **Footwear / Suede Boots & Sneakers**: \`https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=1200&q=80\`
+   - **Objects / Sculptural Ceramic Vase**: \`https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=1200&q=80\`
+   - **Objects / Brass Monolith Lighting**: \`https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80\`
+   - **Accessories / Titanium Watch & Timepiece**: \`https://images.unsplash.com/photo-1524805444758-089113d48a6d?auto=format&fit=crop&w=1200&q=80\`
+   - **Accessories / Optical Frames & Eyewear**: \`https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=1200&q=80\`
+   - **Jewelry / Minimalist Gold Ring & Pendant**: \`https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=1200&q=80\`
+   - **Architecture & Interiors**: \`https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80\`
+   - **Culinary & Plated Gastronomy**: \`https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80\`
+   - **Hospitality & Intimate Dining Room**: \`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80\`
+   - **Technology & Workspace**: \`https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80\`
+3. **Responsive Image Composition & Aspect Ratios**:
+   All image containers must declare explicit, standardized aspect-ratio utility classes (\`aspect-[4/5]\` for apparel, \`aspect-square\` for objects/footwear/accessories, \`aspect-[16/9]\` for wide editorial banners) with \`w-full h-full object-cover object-center\` and container background fallback (\`bg-neutral-100\` or \`bg-neutral-900\`) to prevent layout shifts during image loading.
+4. **Configurable Store Settings & Business Rules (Prop Contract Standard)**:
+   Never hardcode business logic values (such as free shipping thresholds, shipping fees, tax rates, currency symbol) as magic numbers directly inside deeply nested JSX templates!
+   Establish a consistent contract between parent and child components:
+   - **Central Definition in /App.js or /data/config.js**: Always define the shared configuration object:
+     \`export const STORE_CONFIG = { freeShippingThreshold: 150, standardShippingFee: 15, currency: '$' };\`
+   - **Parent Passing**: Parent components (like \`/App.js\`) MUST explicitly pass the configuration and all handler props to child components:
+     \`<CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} onUpdateQuantity={updateQuantity} onRemoveItem={removeItem} config={STORE_CONFIG} />\`
+   - **Child Defensive Fallback & Optional Chaining**: Child components MUST declare a default parameter fallback matching the contract (e.g. \`config = STORE_CONFIG\` or \`config = {}\`), AND use safe optional chaining with defaults:
+     \`const freeShippingThreshold = config?.freeShippingThreshold ?? 150;\`
+     \`const shippingFee = config?.standardShippingFee ?? 15;\`
+   - **Shared Component Props Consistency**: Ensure all child components declare default parameters for destructured props to prevent runtime TypeError crashes:
+     * \`Navbar({ cartCount = 0, categories = [], onOpenCart, onSelectCategory, activeCategory = 'All' })\`
+     * \`ProductGrid({ products = [], activeCategory = 'All', searchQuery = '', onAddToCart })\`
+     * \`ProductCard({ product = {}, onAddToCart, onToggleWishlist, isWishlisted = false })\`
+     * \`CartDrawer({ isOpen = false, onClose, cart = [], onUpdateQuantity, onRemoveItem, onCheckout, config = STORE_CONFIG })\`
+   - **Prop Name Alignment**: Prop names between parent and child MUST match identically. Never pass \`config\` if child expects \`storeConfig\`, or pass \`items\` if child expects \`products\`.
+5. **Ultra-Compact Mobile Layout Resilience (<360px)**:
+   On ultra-small screens (such as 320px–360px iPhone SE or narrow fold outer displays), ensure search inputs, filter buttons, sort dropdowns, and button groups wrap cleanly (\`flex-wrap gap-2\` or \`w-full\`). Never use rigid fixed widths like \`w-[320px]\` or non-wrapping horizontal flexbars that force text truncation or horizontal viewport scrolling.
+6. **Type-Led / Graphic Fallback**:
    If photography is not required by the concept, design a stunning typography-led layout, subtle CSS radial glow, or inline SVG geometric illustration. Never leave empty blank spaces.
-4. **Accessibility**:
+7. **Accessibility**:
    Meaningful images MUST have descriptive \`alt\` text. Purely decorative elements must carry \`alt=""\` or \`aria-hidden="true"\`.
 
 ---
@@ -1078,5 +1111,9 @@ Rules:
 - Import other project files using their exact paths (e.g. import Header from './components/Header')
 - The /styles.css file MUST include the DesignSpec font @import URL and declared keyframe animations
 - Icons: Use lucide-react components (e.g. import { ... } from 'lucide-react')
+- Prop Contract & Configuration: Parent components (like /App.js) MUST explicitly pass all expected props to children (e.g. config={STORE_CONFIG}, cart={cart}, categories={categories}). Child components MUST declare sensible default parameter values (e.g. config = STORE_CONFIG, cart = [], categories = []) and use safe optional chaining (config?.freeShippingThreshold) to prevent runtime TypeError exceptions.
+- Diverse product imagery: Every product in a grid or list MUST have a unique image URL. Never repeat the exact same image URL across multiple products.
+- Ultra-compact mobile resilience: Ensure buttons, search bars, and filter pills wrap cleanly (e.g. flex-wrap gap-2 or w-full) on screens below 360px without clipping or horizontal overflow.
+- Standardized aspect ratios: Use explicit aspect ratio classes (aspect-[4/5], aspect-square, aspect-[16/9]) with object-cover on all card images.
 - Apply the full design system defined in the design specification — consistent typography, generous spacing, and smooth hover micro-interactions`;
 }

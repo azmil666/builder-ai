@@ -15,6 +15,7 @@ export function sanitizeError(error) {
   return str
     .replace(/Bearer\s+[a-zA-Z0-9_\.\-]+/gi, "Bearer [REDACTED_TOKEN]")
     .replace(/sk-[a-zA-Z0-9_\-]+/g, "[REDACTED_API_KEY]")
+    .replace(/AIza[0-9A-Za-z\-_]{35}/g, "[REDACTED_GEMINI_KEY]")
     .replace(/mongodb(\+srv)?:\/\/[^@]+@/gi, "mongodb$1://[REDACTED_AUTH]@");
 }
 

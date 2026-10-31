@@ -1,7 +1,7 @@
 {
   "prompt": "Create a premium modern e-commerce storefront for a lifestyle and fashion brand. Include a responsive navigation bar, hero section, product categories, product grid, product cards, product filtering, shopping cart, quantity controls, subtotal and total calculations, and a professional footer. Make the interactions functional.",
   "model": "cohere/north-mini-code:free",
-  "startTime": "2026-10-31T15:22:44.421Z",
+  "startTime": "2026-10-31T16:34:02.078Z",
   "designSpec": {
     "purpose": "Atmospheric culinary & dining destination website",
     "targetAudience": "Guests seeking memorable culinary dining experiences and reservations",
@@ -102,7 +102,7 @@
   "validationErrorsFinal": [],
   "featureChecklistReport": null,
   "finalStatus": "failed",
-  "error": "OpenAI API key is missing. Pass it using the 'apiKey' parameter or the OPENAI_API_KEY environment variable.",
+  "error": "Failed after 3 attempts. Last error: AI_APICallError: Cannot connect to API: getaddrinfo ENOTFOUND openrouter.ai",
   "generatedFiles": {},
-  "endTime": "2026-10-31T15:22:44.500Z"
+  "endTime": "2026-10-31T16:34:14.211Z"
 }

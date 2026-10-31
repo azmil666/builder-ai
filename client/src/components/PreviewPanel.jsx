@@ -7,6 +7,7 @@ import {
   useSandpack,
 } from '@codesandbox/sandpack-react';
 import {
+  AlertTriangleIcon,
   CheckIcon,
   CopyIcon,
   FileCodeIcon,
@@ -104,6 +105,8 @@ const PreviewPanel = ({
   } = useAppContext();
 
   const [showErrorOverlay, setShowErrorOverlay] = useState(true);
+  const [detailedError, setDetailedError] = useState(null);
+  const [ignoredPackages, setIgnoredPackages] = useState(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
   const [copiedCode, setCopiedCode] = useState(false);
   const [isQuickOpen, setIsQuickOpen] = useState(false);
@@ -171,10 +174,28 @@ const PreviewPanel = ({
     return spFiles;
   }, [liveFiles, activeFile]);
 
-  // Detect dependencies from import statements using liveFiles
+  // Detect dependencies from import statements using liveFiles, filtering out ignored packages
   const dependencies = useMemo(() => {
-    return detectDependencies(liveFiles);
-  }, [liveFiles]);
+    const deps = detectDependencies(liveFiles);
+    for (const p of ignoredPackages) {
+      delete deps[p];
+    }
+    return deps;
+  }, [liveFiles, ignoredPackages]);
+
+  const handleRetryDependencies = () => {
+    setDetailedError(null);
+    setRefreshKey((k) => k + 1);
+    toast.success('Retrying dependency resolution...');
+  };
+
+  const handleIgnorePackage = (pkg) => {
+    if (!pkg) return;
+    setIgnoredPackages((prev) => new Set([...prev, pkg]));
+    setDetailedError(null);
+    setRefreshKey((k) => k + 1);
+    toast.success(`Ignoring '${pkg}' in preview`);
+  };
 
   const handleCopyActiveCode = () => {
     const currentCode =
@@ -290,7 +311,10 @@ const PreviewPanel = ({
           markFileDirty={markFileDirty}
         />
         <SandpackTabController activeFile={activeFile} />
-        <SandpackErrorMonitor onErrorChange={setShowErrorOverlay} />
+        <SandpackErrorMonitor
+          onErrorChange={setShowErrorOverlay}
+          onDetailedErrorChange={setDetailedError}
+        />
 
         {/* Multi-File Tab Bar (When Code is Active) */}
         {showCode && (
@@ -473,6 +497,55 @@ const PreviewPanel = ({
                 {deviceViewport === 'mobile' && (
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-4 bg-zinc-900 rounded-full z-30 pointer-events-none flex items-center justify-center">
                     <div className="size-2 rounded-full bg-black/60" />
+                  </div>
+                )}
+
+                {/* Dependency Error Banner */}
+                {detailedError?.isDependencyError && (
+                  <div className="absolute inset-x-4 top-4 z-40 bg-zinc-900/95 border border-red-500/50 rounded-xl p-4 shadow-2xl backdrop-blur-md">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangleIcon className="size-5 text-red-400 mt-0.5 shrink-0" />
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">Dependency Resolution Error</h4>
+                          <p className="text-xs text-zinc-300 mt-1">
+                            {detailedError.package ? (
+                              <>
+                                Could not resolve package{' '}
+                                <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-amber-300 font-mono font-bold">
+                                  {detailedError.package}
+                                </code>{' '}
+                                from registry.
+                              </>
+                            ) : (
+                              detailedError.reason || 'Unable to download required preview dependencies.'
+                            )}
+                          </p>
+                          <p className="text-xs text-zinc-400 mt-1">
+                            {detailedError.isNetwork
+                              ? 'A network or CDN timeout occurred while contacting the package registry.'
+                              : 'The package name may be invalid, private, or incompatible with the preview environment.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={handleRetryDependencies}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <RotateCwIcon size={13} />
+                          Retry
+                        </button>
+                        {detailedError.package && (
+                          <button
+                            onClick={() => handleIgnorePackage(detailedError.package)}
+                            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                          >
+                            Ignore & Preview
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 

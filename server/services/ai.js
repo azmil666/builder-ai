@@ -5,10 +5,22 @@ import pMap from "p-map";
 import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema } from './aiSchemas.js';
 import { buildFileCodeSystem, buildFilePlanSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
-import { validateAndFixCode, validateRevisionContent, validateProject } from './codeValidator.js';
+import { validateAndFixCode, validateRevisionContent, validateProject, verifyProjectRuntime } from './codeValidator.js';
 import { deriveFeatureChecklist, validateFeatureChecklist } from './featureValidator.js';
+import { generateGeminiObject } from './gemini.js';
 
-// --- OpenRouter Model Client Setup ---
+// --- AI Provider Resolution & Abstraction ---
+export function getActiveAiProvider() {
+    if (process.env.AI_PROVIDER) {
+        return process.env.AI_PROVIDER.toLowerCase();
+    }
+    if (process.env.GEMINI_API_KEY) {
+        return "gemini";
+    }
+    return "openrouter";
+}
+
+// --- OpenRouter Model Client Setup (Fallback) ---
 function getModel() {
     const modelName = process.env.OPENROUTER_MODEL || "openrouter/free";
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -22,23 +34,42 @@ function getModel() {
     return client(modelName);
 }
 
-const MAX_CONCURRENCY = parseInt(process.env.AI_MAX_CONCURRENCY || "6", 10);
+/**
+ * Universal structured object generator.
+ * Automatically delegates to Google Gemini API (primary) or OpenRouter (fallback).
+ * Preserves { object } return structure across all callers.
+ */
+export async function generateStructuredObject({ schema, system, prompt, maxRetries = 2 }) {
+    const provider = getActiveAiProvider();
+    if (provider === "gemini") {
+        return generateGeminiObject({ schema, system, prompt, maxRetries });
+    }
+    const model = getModel();
+    return generateObject({
+        model,
+        schema,
+        system,
+        prompt,
+        maxRetries,
+    });
+}
+
+const defaultConcurrency = getActiveAiProvider() === "gemini" ? "2" : "6";
+const MAX_CONCURRENCY = parseInt(process.env.AI_MAX_CONCURRENCY || defaultConcurrency, 10);
 
 // Generate a single file's code
 async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles, designSpec){
-     const model = getModel();
      const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec);
 
      const userMsg = `Project: ${prompt}\n\nWrite the complete code for: ${file.path}\nPurpose: ${file.description}`;
 
      console.log(`[AI] Creating file: ${file.path}...`);
-     const { object } = await generateObject({
-        model,
+     const { object } = await generateStructuredObject({
         schema: FileCodeSchema,
         system,
         prompt: userMsg,
         maxRetries: 2,
-     })
+     });
 
      let code = normalizeContent(object.code);
 
@@ -61,8 +92,7 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles,
         const errorList = validation.errors.map(e => `- [${e.type.toUpperCase()}] ${e.message}`).join("\n");
         try {
             const repairMsg = `Project: ${prompt}\n\nThe generated code for ${file.path} failed validation with these errors:\n${errorList}\n\nCurrent code:\n\`\`\`javascript\n${code}\n\`\`\`\n\nPlease fix the syntax, import, or export errors and return the corrected complete code.`;
-            const { object: repairedObj } = await generateObject({
-                model,
+            const { object: repairedObj } = await generateStructuredObject({
                 schema: FileCodeSchema,
                 system,
                 prompt: repairMsg,
@@ -102,7 +132,6 @@ export async function repairProjectFiles(
     callbacks = {},
     maxAttempts = 2
 ) {
-    const model = getModel();
     let currentFiles = { ...files };
     let currentErrors = [...errors];
     const repairLogs = [];
@@ -142,8 +171,7 @@ export async function repairProjectFiles(
             const repairPrompt = `Project: ${prompt}\n\nThe file '${filePath}' failed validation with these errors:\n${errorSummary}\n\nCurrent code for ${filePath}:\n\`\`\`javascript\n${currentCode}\n\`\`\`\n\nRepair only the code for '${filePath}'. Fix all syntax, import, export, and contract errors while preserving visual styling and DesignSpec tokens. Return the complete corrected code.`;
 
             try {
-                const { object } = await generateObject({
-                    model,
+                const { object } = await generateStructuredObject({
                     schema: FileCodeSchema,
                     system,
                     prompt: repairPrompt,
@@ -178,14 +206,18 @@ export async function repairProjectFiles(
         }
 
         const recheck = validateProject(currentFiles, allPlannedFiles);
-        currentErrors = recheck.errors;
+        const rerunt = await verifyProjectRuntime(currentFiles);
+        currentErrors = [...recheck.errors, ...rerunt.errors];
     }
 
     const finalCheck = validateProject(currentFiles, allPlannedFiles);
+    const finalRunt = await verifyProjectRuntime(currentFiles);
+    const combinedFinalErrors = [...finalCheck.errors, ...finalRunt.errors];
+
     return {
-        success: finalCheck.valid,
+        success: combinedFinalErrors.length === 0,
         files: currentFiles,
-        errors: finalCheck.errors,
+        errors: combinedFinalErrors,
         warnings: finalCheck.warnings,
         repairLogs,
     };
@@ -193,13 +225,11 @@ export async function repairProjectFiles(
 
 // Generate project files: DesignSpec first, then plan, then build files in order with fallback retries
 export async function generateProject(prompt, callbacks){
-    const model = getModel();
     // Phase 1: Design Intelligence - Establish visual identity and design tokens
     console.log(`[AI] Phase 1: Generating DesignSpec for: "${prompt.slice(0,80)}..."`);
     let designSpec = null;
     try {
-        const { object: spec } = await generateObject({
-            model,
+        const { object: spec } = await generateStructuredObject({
             schema: DesignSpecSchema,
             system: DESIGN_SPEC_SYSTEM,
             prompt: `Create a comprehensive, production-grade DesignSpec for: ${prompt}`,
@@ -218,8 +248,7 @@ export async function generateProject(prompt, callbacks){
     // Phase 2: Technical File Planning informed by DesignSpec
     console.log(`[AI] Phase 2: Planning file structure for: "${prompt.slice(0,80)}..."`);
     const filePlanSystem = buildFilePlanSystem(designSpec);
-    const { object: plan } = await generateObject({
-        model,
+    const { object: plan } = await generateStructuredObject({
         schema: FilePlanSchema,
         system: filePlanSystem,
         prompt: `Plan a React website for: ${prompt}`,
@@ -328,24 +357,26 @@ export async function generateProject(prompt, callbacks){
         throw new Error("AI did not generate /App.js entry point");
     }
 
-    // Phase 4: Final project-level semantic & cross-file validation
+    // Phase 4: Final project-level semantic, contract & active-state runtime validation
     if (callbacks?.onValidationStart) {
         await callbacks.onValidationStart();
     }
     let projectValidation = validateProject(files, plan.files);
+    let runtimeValidation = await verifyProjectRuntime(files);
+    let combinedErrors = [...projectValidation.errors, ...runtimeValidation.errors];
 
     // If validation fails, initiate targeted AI self-repair loop
-    if (!projectValidation.valid) {
-        console.warn(`[Validator] Project validation found ${projectValidation.errors.length} cross-file issues. Starting targeted self-repair loop...`);
+    if (combinedErrors.length > 0) {
+        console.warn(`[Validator] Project validation found ${combinedErrors.length} cross-file and runtime issues. Starting targeted self-repair loop...`);
 
         if (callbacks?.onRepairStart) {
-            await callbacks.onRepairStart(projectValidation.errors);
+            await callbacks.onRepairStart(combinedErrors);
         }
 
         const repairResult = await repairProjectFiles(
             files,
             plan.files,
-            projectValidation.errors,
+            combinedErrors,
             prompt,
             designSpec,
             callbacks,
@@ -353,14 +384,8 @@ export async function generateProject(prompt, callbacks){
         );
 
         files = repairResult.files;
-        projectValidation = {
-            valid: repairResult.success,
-            errors: repairResult.errors,
-            warnings: repairResult.warnings,
-        };
-
-        if (!projectValidation.valid) {
-            const errorSummary = projectValidation.errors.map(e => `[${e.type}] ${e.file}: ${e.message}`).join("; ");
+        if (!repairResult.success) {
+            const errorSummary = repairResult.errors.map(e => `[${e.type}] ${e.file}: ${e.message}`).join("; ");
             throw new Error(`Project validation failed after self-repair attempts: ${errorSummary}`);
         }
     }
@@ -418,14 +443,12 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
 
     console.log("[AI] Revising project...");
 
-    const model = getModel();
-    const { object: rawParsed } = await generateObject({
-        model,
+    const { object: rawParsed } = await generateStructuredObject({
         schema: RevisionResultSchema,
         system: REVISE_SYSTEM,
         prompt: contextParts.join("\n"),
         maxRetries: 2
-    })
+    });
 
     if(rawParsed && Array.isArray(rawParsed.operations)){
         rawParsed.operations = rawParsed.operations.map((op)=>{

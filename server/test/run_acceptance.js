@@ -1,21 +1,27 @@
 import dotenv from "dotenv";
-dotenv.config();
-import fs from "fs";
 import path from "path";
-import { generateProject } from "../services/ai.js";
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+import fs from "fs";
+import { generateProject, getActiveAiProvider } from "../services/ai.js";
 import { validateProject, validateAndFixCode, compileModuleCode } from "../services/codeValidator.js";
 import { deriveFeatureChecklist, validateFeatureChecklist } from "../services/featureValidator.js";
 
 const PROMPT = "Create a premium modern e-commerce storefront for a lifestyle and fashion brand. Include a responsive navigation bar, hero section, product categories, product grid, product cards, product filtering, shopping cart, quantity controls, subtotal and total calculations, and a professional footer. Make the interactions functional.";
 
 async function run() {
-  console.log("=== STARTING REAL OPENROUTER GENERATION TEST ===");
+  const provider = getActiveAiProvider();
+  const model = provider === "gemini" ? (process.env.GEMINI_MODEL || "gemini-3.5-flash") : process.env.OPENROUTER_MODEL;
+  console.log(`=== STARTING REAL ${provider.toUpperCase()} GENERATION ACCEPTANCE TEST ===`);
+  console.log("Provider:", provider);
+  console.log("Model:", model);
   console.log("Prompt:", PROMPT);
-  console.log("Model:", process.env.OPENROUTER_MODEL);
 
   const telemetry = {
+    provider,
+    model,
     prompt: PROMPT,
-    model: process.env.OPENROUTER_MODEL,
     startTime: new Date().toISOString(),
     designSpec: null,
     filesPlanned: [],
@@ -98,9 +104,11 @@ async function run() {
   }
 
   // Save telemetry and generated files to disk for verification
-  const outputPath = "../docs/real_generation_telemetry.json";
-  fs.writeFileSync(outputPath, JSON.stringify(telemetry, null, 2));
-  console.log(`Telemetry saved to ${outputPath}`);
+  const outputPath = path.resolve(process.cwd(), "../docs/gemini_acceptance_telemetry.json");
+  const fallbackOutputPath = path.resolve(process.cwd(), "docs/gemini_acceptance_telemetry.json");
+  const targetPath = fs.existsSync(path.dirname(outputPath)) ? outputPath : fallbackOutputPath;
+  fs.writeFileSync(targetPath, JSON.stringify(telemetry, null, 2));
+  console.log(`Telemetry saved to ${targetPath}`);
   return telemetry;
 }
 
