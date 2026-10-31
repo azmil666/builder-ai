@@ -8,6 +8,7 @@ import {
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   SettingsIcon,
+  ShieldCheckIcon,
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import Loading from '../components/Loading';
@@ -17,6 +18,7 @@ import FileExplorer from '../components/FileExplorer';
 import PreviewPanel from '../components/PreviewPanel';
 import DesignSpecPanel from '../components/DesignSpecPanel';
 import ProjectSettingsPanel from '../components/ProjectSettingsPanel';
+import VisualQAPanel from '../components/VisualQAPanel';
 import AgentProgressDashboard from '../components/AgentProgressDashboard';
 import PublishModal from '../components/PublishModal';
 import ProjectDeleteModal from '../components/dashboard/ProjectDeleteModal';
@@ -164,6 +166,20 @@ const BuilderPage = () => {
               <FolderTreeIcon size={17} />
             </button>
 
+            {/* Visual QA Tab */}
+            <button
+              type="button"
+              onClick={() => handleTabClick('qa')}
+              className={`p-2.5 rounded-xl transition cursor-pointer ${
+                leftTab === 'qa' && !sidebarCollapsed
+                  ? 'bg-zinc-800 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+              title="Visual QA Engine"
+            >
+              <ShieldCheckIcon size={17} />
+            </button>
+
             {/* Design Information Tab */}
             <button
               type="button"
@@ -228,6 +244,14 @@ const BuilderPage = () => {
                 onCreateFile={createFile}
                 onRenameFile={renameFile}
                 onDeleteFile={deleteFile}
+              />
+            )}
+
+            {leftTab === 'qa' && (
+              <VisualQAPanel
+                projectId={activeProject._id}
+                onApplyFix={handleChat}
+                onFileSelect={(path) => openFile(path)}
               />
             )}
 

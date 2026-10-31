@@ -3,6 +3,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  getProjectVisualQA,
   getPublicProject,
   listProjects,
   publishProject,
@@ -27,6 +28,7 @@ projectRouter.use(authMiddleware);
 projectRouter.post("/", aiGenerationRateLimiter, createProject);
 projectRouter.get("/", listProjects);
 projectRouter.get("/:id/stream", streamProjectProgress);
+projectRouter.get("/:id/qa", getProjectVisualQA);
 projectRouter.get("/:id", getProject);
 projectRouter.delete("/:id", deleteProject);
 projectRouter.put("/:id/files", updateProjectFiles);

@@ -3,6 +3,7 @@ import { Project } from "../models/Project.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
 import { emitProjectEvent, formatSSE, subscribeProjectEvents } from "../services/projectEvents.js";
+import { analyzeProjectVisualQuality, buildVisualQAFixPrompt } from "../services/visualQa.js";
 
 function hashContent(content) {
   return crypto.createHash("md5").update(content).digest("hex").slice(0, 12);
@@ -539,5 +540,42 @@ export async function streamProjectProgress(req, res) {
   req.on("close", () => {
     clearInterval(heartbeatTimer);
     unsubscribe();
+  });
+}
+
+// GET /api/projects/:id/qa
+// Run automated Visual QA inspection on a project's codebase
+export async function getProjectVisualQA(req, res) {
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.owner.toString() !== userId.toString()) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  const qaReport = analyzeProjectVisualQuality(project.files, project.designSpec);
+  const fixPrompt = buildVisualQAFixPrompt(qaReport);
+
+  res.json({
+    projectId: project._id,
+    projectName: project.name,
+    qaReport,
+    fixPrompt,
   });
 }
