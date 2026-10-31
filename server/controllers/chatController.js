@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Project } from "../models/Project.js";
 import { reviseProject } from "../services/ai.js";
 import { applyOperations } from "../services/diff.js";
@@ -25,9 +26,16 @@ export async function chat(req, res) {
     return;
   }
 
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+
   const project = await Project.findOne({
     _id: req.params.id,
-    owner: req.user.userId,
+    owner: userId,
   });
 
   if (!project) {
@@ -65,12 +73,13 @@ export async function chat(req, res) {
         `(${manifest.length} files, manifest ~${JSON.stringify(manifest).length} chars)`,
     );
 
-    // Call AI with manifest + relevant files
+    // Call AI with manifest + relevant files + designSpec
     const result = await reviseProject(
       prompt,
       manifest,
       relevantFiles,
       recentMessages,
+      project.designSpec,
     );
 
     console.log(
@@ -126,8 +135,12 @@ export async function chat(req, res) {
     });
   } catch (err) {
     console.error(`[AI Revision Error] ${err.message}`);
-    project.status = "completed";
-    await project.save();
+    try {
+      project.status = "completed";
+      await project.save();
+    } catch (saveErr) {
+      console.error(`[AI Revision Save Error] ${saveErr.message}`);
+    }
     res.status(500).json({
       error: err.message || "Failed to process revision request",
     });

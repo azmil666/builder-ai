@@ -15,12 +15,22 @@ export default function AgentProgressDashboard({ project }) {
                         <h2 className="text-base font-medium text-zinc-800">
                             {isFailed
                                 ? "Generation Failed"
-                                : project.status === "pending"
-                                  ? "Planning Architecture..."
-                                  : "AI Agent is Building..."}
+                                : project.status === "validating"
+                                  ? "Validating Code Quality & Contracts..."
+                                  : project.status === "repairing"
+                                    ? "AI Self-Repairing Code..."
+                                    : project.status === "pending"
+                                      ? "Planning Architecture..."
+                                      : "AI Agent is Building..."}
                         </h2>
                         <p className="text-xs text-zinc-500 mt-0.5">
-                            {isFailed ? "An error occurred during build" : "Writing production-ready React codebase"}
+                            {isFailed
+                                ? "An error occurred during build"
+                                : project.status === "validating"
+                                  ? "Checking AST syntax, imports, exports and component contracts"
+                                  : project.status === "repairing"
+                                    ? `Targeted repair attempt ${project.repairAttempt || 1}...`
+                                    : "Writing production-ready React codebase"}
                         </p>
                     </div>
                 </div>

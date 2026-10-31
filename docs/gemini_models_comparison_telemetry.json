@@ -1,0 +1,570 @@
+{
+  "prompt": "Create a premium, modern e-commerce storefront for a contemporary lifestyle and fashion brand. It should have a distinctive visual identity, refined typography, a responsive navigation bar, a strong hero section, product categories, an attractive product grid, product cards, functional product filtering, a shopping cart drawer, quantity controls, subtotal and total calculations, and a polished footer. Use a cohesive design system, thoughtful spacing, high-quality imagery, subtle animations, and a professional responsive layout. All visible interactions must work.",
+  "timestamp": "2026-10-31T16:53:21.315Z",
+  "results": {
+    "gemini-3.5-flash": {
+      "model": "gemini-3.5-flash",
+      "prompt": "Create a premium, modern e-commerce storefront for a contemporary lifestyle and fashion brand. It should have a distinctive visual identity, refined typography, a responsive navigation bar, a strong hero section, product categories, an attractive product grid, product cards, functional product filtering, a shopping cart drawer, quantity controls, subtotal and total calculations, and a polished footer. Use a cohesive design system, thoughtful spacing, high-quality imagery, subtle animations, and a professional responsive layout. All visible interactions must work.",
+      "startTime": "2026-10-31T16:53:21.316Z",
+      "startMs": 1793465601316,
+      "durationMs": 51433,
+      "designSpec": {
+        "purpose": "A premium, modern e-commerce storefront for a contemporary lifestyle and fashion brand featuring immersive product discovery, interactive filtering, and seamless cart management.",
+        "targetAudience": "Style-conscious modern consumers, design enthusiasts, and urban professionals seeking high-end contemporary apparel and lifestyle objects.",
+        "category": "ecommerce",
+        "visualDirection": "High-touch editorial luxury with razor-sharp modern minimalism, generous whitespace, high-contrast typography, and a refined neutral palette punctuated by a striking accent.",
+        "archetype": "modern_ecommerce",
+        "brandPersonality": [
+          "Sophisticated",
+          "Minimalist",
+          "Contemporary",
+          "Curated",
+          "Luxurious"
+        ],
+        "colorPalette": {
+          "theme": "light",
+          "bg": "#fcfbf7",
+          "fg": "#111111",
+          "muted": "#737373",
+          "line": "#e5e5df",
+          "accent": "#1a1a1a",
+          "accentForeground": "#ffffff",
+          "cardBg": "#ffffff",
+          "cardBorder": "#ebeae4"
+        },
+        "typography": {
+          "heading": {
+            "family": "Syne",
+            "weights": [
+              "700",
+              "800"
+            ],
+            "googleFontsUrl": "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap",
+            "usage": "Hero titles, primary section headers, major price points"
+          },
+          "body": {
+            "family": "Plus Jakarta Sans",
+            "weights": [
+              "400",
+              "500",
+              "600"
+            ],
+            "googleFontsUrl": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+            "usage": "Product descriptions, navigation items, body text, UI controls"
+          },
+          "mono": {
+            "family": "JetBrains Mono",
+            "weights": [
+              "400"
+            ],
+            "googleFontsUrl": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap",
+            "usage": "SKU codes, stock indicators, and cart item calculations"
+          },
+          "fontImportUrl": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap"
+        },
+        "layout": {
+          "containerWidth": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+          "sectionPadding": "py-16 sm:py-24",
+          "gap": "gap-8 lg:gap-12",
+          "structure": "Editorial grid layout with full-bleed hero banners, sticky category navigation, responsive multi-column product grids, and slide-over cart drawer."
+        },
+        "componentStyling": {
+          "cardRadius": "rounded-none",
+          "buttonRadius": "rounded-full",
+          "shadow": "shadow-sm hover:shadow-md transition-shadow duration-300",
+          "borderStyle": "border border-neutral-200",
+          "cardStyle": "bg-white border border-neutral-200 overflow-hidden group"
+        },
+        "navigation": {
+          "type": "sticky_header",
+          "details": "Sticky glassmorphic top navigation bar featuring brand wordmark, category links, search trigger, wishlist counter, and interactive cart drawer toggle with real-time item badge."
+        },
+        "hero": {
+          "composition": "split",
+          "headline": "Form, Function & Future Heritage",
+          "subheadline": "Explore our Autumn/Winter curation of uncompromising contemporary apparel and artisanal objects designed for the modern interior and exterior.",
+          "ctaText": "Explore Collection",
+          "details": "High-impact split layout featuring high-fashion editorial imagery on one side and bold typograhic hierarchy with direct categorical entry points on the other."
+        },
+        "mediaDirection": {
+          "type": "curated_photography",
+          "description": "Monochromatic and warm-toned lifestyle photography with dramatic natural lighting, architectural backdrops, and clean studio product shots on neutral grounds.",
+          "imageTreatment": "Subtle zoom effect on hover with crisp 4:5 aspect ratios for product galleries and 16:9 for hero showcases.",
+          "iconStyle": "Minimalist stroke icons with 1.5px weight for UI controls, arrows, and shopping bags."
+        },
+        "motion": {
+          "strategy": "Smooth, restrained micro-interactions with 200ms ease-out transitions for cart drawers, tab switching, and image zooms.",
+          "keyframes": [
+            "fadeIn",
+            "slideInRight",
+            "scaleUp"
+          ],
+          "reducedMotion": true
+        },
+        "responsive": {
+          "breakpoints": "sm: 640px, md: 768px, lg: 1024px, xl: 1280px",
+          "mobileStrategy": "Single-column product feed with horizontal scroll category chips, collapsible filter drawers, and full-screen mobile cart overlay."
+        },
+        "accessibility": {
+          "contrastRatio": "WCAG AAA compliant dark text (#111111) on warm paper background (#fcfbf7).",
+          "focusRings": "Focus-visible ring-2 ring-neutral-900 ring-offset-2",
+          "semanticElements": true
+        },
+        "signature": "Sticky drawer cart pill with instant item count badge updates and seamless live subtotal calculations."
+      },
+      "filesPlanned": [
+        {
+          "path": "/styles.css",
+          "description": "Global CSS with Google Fonts import (Syne & Plus Jakarta Sans), Tailwind imports, root variables for DesignSpec palette (#fcfbf7 bg, #111111 text, #1a1a1a accent), and custom keyframe animations.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/Header.js",
+          "description": "Sticky navigation header with brand logo, category links, search trigger, wishlist indicator, and interactive cart drawer trigger with item badge.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/Hero.js",
+          "description": "Split composition hero section featuring high-fashion lifestyle photography, bold Syne display typography, and immediate call-to-action buttons.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/Categories.js",
+          "description": "Interactive category showcase allowing users to filter products by curated collections (All, Apparel, Footwear, Accessories, Objects).",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/ProductCard.js",
+          "description": "Individual product card with image hover states, quick add-to-cart button, price display, and wishlist toggle.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/ProductGrid.js",
+          "description": "Responsive multi-column product grid with search query filtering, category filtering, and sorting options.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/CartDrawer.js",
+          "description": "Slide-over shopping cart drawer with quantity increments/decrements, item removal, live subtotal, shipping progress bar, and checkout CTA.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/Footer.js",
+          "description": "Polished footer with newsletter subscription form, brand manifesto, helpful links, and copyright info.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/App.js",
+          "description": "Main application root uniting state management for cart items, active category filters, search keywords, wishlist, and assembling all modular components.",
+          "isEntry": true,
+          "mandatory": true
+        }
+      ],
+      "filesGenerated": [
+        "/styles.css",
+        "/components/Categories.js",
+        "/components/ProductCard.js",
+        "/components/Header.js",
+        "/components/Hero.js",
+        "/components/CartDrawer.js",
+        "/components/ProductGrid.js",
+        "/components/Footer.js",
+        "/App.js"
+      ],
+      "repairAttempts": 0,
+      "repairRounds": [],
+      "validationErrorsInitial": [],
+      "validationErrorsFinal": [],
+      "compilationResults": {
+        "/components/Header.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        },
+        "/components/Hero.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        },
+        "/components/Categories.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        },
+        "/components/ProductCard.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        },
+        "/components/ProductGrid.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        },
+        "/components/CartDrawer.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        },
+        "/components/Footer.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        },
+        "/App.js": {
+          "success": true,
+          "errorCount": 0,
+          "errors": []
+        }
+      },
+      "featureChecklistReport": {
+        "items": [
+          {
+            "id": "navigation",
+            "name": "Navigation Bar with Cart Indicator",
+            "description": "Navbar with branding, navigation links, and cart toggle",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (2/2 pattern matches).",
+            "matchedPatterns": 2,
+            "totalPatterns": 2
+          },
+          {
+            "id": "product_grid",
+            "name": "Product Catalog Grid",
+            "description": "Grid or list rendering catalog products dynamically",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (3/3 pattern matches).",
+            "matchedPatterns": 3,
+            "totalPatterns": 3
+          },
+          {
+            "id": "product_card",
+            "name": "Product Card Component",
+            "description": "Product card displaying image, title, price, and action button",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (3/3 pattern matches).",
+            "matchedPatterns": 3,
+            "totalPatterns": 3
+          },
+          {
+            "id": "cart_state",
+            "name": "Shopping Cart State Management",
+            "description": "React state managing cart items, quantities, or cart visibility",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (2/2 pattern matches).",
+            "matchedPatterns": 2,
+            "totalPatterns": 2
+          },
+          {
+            "id": "add_to_cart",
+            "name": "Add-to-Cart Functionality",
+            "description": "Click handler to add products to the active cart",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (2/2 pattern matches).",
+            "matchedPatterns": 2,
+            "totalPatterns": 2
+          },
+          {
+            "id": "quantity_controls",
+            "name": "Cart Quantity Controls & Item Removal",
+            "description": "Controls to increment, decrement, or remove items from the cart",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (2/2 pattern matches).",
+            "matchedPatterns": 2,
+            "totalPatterns": 2
+          },
+          {
+            "id": "price_calculation",
+            "name": "Cart Price Calculation",
+            "description": "Mathematical computation of subtotal, tax, or total amount",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (2/2 pattern matches).",
+            "matchedPatterns": 2,
+            "totalPatterns": 2
+          },
+          {
+            "id": "responsive_layout",
+            "name": "Responsive Mobile/Desktop Layout",
+            "description": "Mobile-first grid and flex responsive breakpoints",
+            "mandatory": true,
+            "status": "implemented",
+            "evidence": "Found strong evidence (2/2 pattern matches).",
+            "matchedPatterns": 2,
+            "totalPatterns": 2
+          }
+        ],
+        "score": 100,
+        "allMandatoryPassed": true
+      },
+      "visualQaReport": {
+        "timestamp": "2026-10-31T16:54:12.766Z",
+        "status": "passed",
+        "summary": {
+          "totalIssues": 0,
+          "critical": 0,
+          "warnings": 0,
+          "categories": {
+            "overflow": 0,
+            "responsive": 0,
+            "assets": 0,
+            "typography": 0,
+            "accessibility": 0,
+            "runtime": 0
+          }
+        },
+        "issues": [],
+        "archetypeCompliance": {
+          "archetype": "modern_ecommerce",
+          "compliant": true
+        }
+      },
+      "finalStatus": "completed",
+      "error": null,
+      "generatedFiles": {
+        "/styles.css": "@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap');\n\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n:root {\n  --bg: #fcfbf7;\n  --fg: #111111;\n  --muted: #737373;\n  --line: #e5e5df;\n  --accent: #1a1a1a;\n  --card-bg: #ffffff;\n  --card-border: #ebeae4;\n}\n\nbody {\n  background-color: var(--bg);\n  color: var(--fg);\n  font-family: 'Plus Jakarta Sans', sans-serif;\n  overflow-x: hidden;\n}\n\nh1, h2, h3, h4, h5, h6, .font-heading {\n  font-family: 'Syne', sans-serif;\n}\n\n@keyframes fadeIn {\n  from { opacity: 0; transform: translateY(8px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n\n@keyframes float {\n  0%, 100% { transform: translateY(0); }\n  50% { transform: translateY(-6px); }\n}\n\n.animate-fade-in {\n  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;\n}\n\n.animate-float {\n  animation: float 4s ease-in-out infinite;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  *, ::before, ::after {\n    animation-duration: 0.01ms !important;\n    animation-iteration-count: 1 !important;\n    transition-duration: 0.01ms !important;\n  }\n}\n",
+        "/components/Header.js": "import React, { useState, useEffect } from 'react';\nimport { Search, Heart, ShoppingBag, Menu, X } from 'lucide-react';\n\nexport default function Header({\n  cartCount,\n  wishlistCount,\n  onOpenCart,\n  onOpenSearch,\n  activeCategory,\n  onSelectCategory\n}) {\n  const [isScrolled, setIsScrolled] = useState(false);\n  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);\n\n  useEffect(() => {\n    const handleScroll = () => {\n      setIsScrolled(window.scrollY > 20);\n    };\n    window.addEventListener('scroll', handleScroll);\n    return () => window.removeEventListener('scroll', handleScroll);\n  }, []);\n\n  const navLinks = [\n    { name: 'All', id: 'All' },\n    { name: 'Apparel', id: 'Apparel' },\n    { name: 'Footwear', id: 'Footwear' },\n    { name: 'Accessories', id: 'Accessories' },\n    { name: 'Objects', id: 'Objects' }\n  ];\n\n  return (\n    <header\n      className={`sticky top-0 z-40 transition-all duration-300 ${\n        isScrolled\n          ? 'bg-[#fcfbf7]/90 backdrop-blur-md border-b border-[#e5e5df] shadow-sm py-3'\n          : 'bg-[#fcfbf7] py-5 border-b border-transparent'\n      }`}\n    >\n      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between'>\n        {/* Mobile Menu Toggle */} \n        <button\n          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}\n          className='md:hidden p-2 text-[#111111] hover:text-[#737373] transition-colors'\n          aria-label='Toggle Menu'\n        >\n          {mobileMenuOpen ? <X className='w-5 h-5' /> : <Menu className='w-5 h-5' />}\n        </button>\n\n        {/* Brand Logo */} \n        <div className='flex items-center space-x-2'>\n          <a\n            href='#'\n            onClick={(e) => {\n              e.preventDefault();\n              onSelectCategory('All');\n            }}\n            className='font-heading text-2xl sm:text-3xl font-extrabold tracking-tight text-[#111111]'\n          >\n            ATELIER<span className='text-[#737373]'>.</span>\n          </a>\n        </div>\n\n        {/* Desktop Navigation Links */} \n        <nav className='hidden md:flex items-center space-x-8'>\n          {navLinks.map((link) => (\n            <button\n              key={link.id}\n              onClick={() => onSelectCategory(link.id)}\n              className={`text-sm font-medium transition-colors relative py-1 ${\n                activeCategory === link.id\n                  ? 'text-[#111111] font-semibold' \n                  : 'text-[#737373] hover:text-[#111111]' \n              }`}\n            >\n              {link.name}\n              {activeCategory === link.id && (\n                <span className='absolute bottom-0 left-0 w-full h-[2px] bg-[#111111] rounded-full animate-fade-in' />\n              )}\n            </button>\n          ))}\n        </nav>\n\n        {/* Right Action Icons */} \n        <div className='flex items-center space-x-3 sm:space-x-4'>\n          <button\n            onClick={onOpenSearch}\n            className='p-2 rounded-full text-[#111111] hover:bg-[#e5e5df]/50 transition-all'\n            aria-label='Search products'\n          >\n            <Search className='w-5 h-5' />\n          </button>\n\n          <div className='relative hidden sm:block'>\n            <button\n              onClick={() => {}}\n              className='p-2 rounded-full text-[#111111] hover:bg-[#e5e5df]/50 transition-all relative'\n              aria-label='Wishlist'\n            >\n              <Heart className='w-5 h-5' />\n              {wishlistCount > 0 && (\n                <span className='absolute top-1 right-1 w-4 h-4 bg-[#111111] text-white text-[10px] font-bold rounded-full flex items-center justify-center'>\n                  {wishlistCount}\n                </span>\n              )}\n            </button>\n          </div>\n\n          {/* Cart Drawer Trigger / Signature Pill Badge */} \n          <button\n            onClick={onOpenCart}\n            className='flex items-center space-x-2 bg-[#1a1a1a] text-white px-4 py-2 rounded-full hover:bg-[#333333] transition-all transform active:scale-95 shadow-sm'\n            aria-label='Open Cart'\n          >\n            <ShoppingBag className='w-4 h-4' />\n            <span className='text-xs font-semibold tracking-wide'>\n              {cartCount > 0 ? `${cartCount} items` : 'Bag'} \n            </span>\n            {cartCount > 0 && (\n              <span className='bg-white text-[#111111] text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1'>\n                {cartCount}\n              </span>\n            )}\n          </button>\n        </div>\n      </div>\n\n      {/* Mobile Menu Dropdown */} \n      {mobileMenuOpen && (\n        <div className='md:hidden absolute top-full left-0 w-full bg-[#fcfbf7] border-b border-[#e5e5df] shadow-lg py-6 px-6 animate-fade-in'>\n          <div className='flex flex-col space-y-4'>\n            {navLinks.map((link) => (\n              <button\n                key={link.id}\n                onClick={() => {\n                  onSelectCategory(link.id);\n                  setMobileMenuOpen(false);\n                }}\n                className={`text-left text-lg font-medium py-2 transition-colors ${\n                  activeCategory === link.id\n                    ? 'text-[#111111] font-bold border-l-2 border-[#111111] pl-3'\n                    : 'text-[#737373] hover:text-[#111111]'\n                }`}\n              >\n                {link.name}\n              </button>\n            ))}\n          </div>\n        </div>\n      )}\n    </header>\n  );\n}\n",
+        "/components/Hero.js": "import React from 'react';\nimport { ArrowRight, Sparkles, ShieldCheck, Truck } from 'lucide-react';\n\nexport default function Hero({ onShopClick }) {\n  return (\n    <section className='relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24 border-b border-[#e5e5df]'>\n      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>\n        <div className='grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center'>\n          \n          {/* Left Text Composition */}\n          <div className='lg:col-span-7 flex flex-col justify-center space-y-8 animate-fade-in'>\n            <div className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neutral-100 border border-neutral-200 w-fit text-xs font-semibold uppercase tracking-widest text-[#1a1a1a]'>\n              <Sparkles className='w-3.5 h-3.5 text-[#1a1a1a]' />\n              <span>Autumn / Winter 2025 Collection</span>\n            </div>\n\n            <h1 className='text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#111111] leading-[1.08]'>\n              Quiet Luxury, <br />\n              <span className='italic font-normal font-heading'>Radically Refined.</span>\n            </h1>\n\n            <p className='text-base sm:text-lg text-[#737373] max-w-xl font-normal leading-relaxed'>\n              Discover understated garments and artisanal everyday objects crafted from exceptional natural fibers and timeless silhouettes.\n            </p>\n\n            <div className='flex flex-wrap items-center gap-4 pt-2'>\n              <button \n                onClick={onShopClick}\n                className='inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-[#1a1a1a] text-[#fcfbf7] font-semibold text-sm hover:bg-neutral-800 transition-all duration-300 shadow-sm active:scale-[0.98] group'\n              >\n                <span>Explore Collection</span>\n                <ArrowRight className='w-4 h-4 transition-transform duration-300 group-hover:translate-x-1' />\n              </button>\n\n              <a \n                href='#categories'\n                className='inline-flex items-center justify-center px-8 py-4 rounded-full bg-transparent border border-neutral-300 text-[#111111] font-semibold text-sm hover:border-[#111111] transition-all duration-300 active:scale-[0.98]'\n              >\n                View Categories\n              </a>\n            </div>\n\n            <div className='grid grid-cols-2 sm:grid-cols-3 gap-6 pt-8 border-t border-[#e5e5df] text-xs font-medium text-[#737373]'>\n              <div className='flex items-center gap-2.5'>\n                <div className='w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-[#111111]'>\n                  <Truck className='w-4 h-4' />\n                </div>\n                <span>Complimentary Global Shipping</span>\n              </div>\n              <div className='flex items-center gap-2.5'>\n                <div className='w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-[#111111]'>\n                  <ShieldCheck className='w-4 h-4' />\n                </div>\n                <span>2-Year Artisan Warranty</span>\n              </div>\n            </div>\n          </div>\n\n          {/* Right Image Composition */}\n          <div className='lg:col-span-5 relative'>\n            <div className='relative mx-auto max-w-md lg:max-w-none'>\n              <div className='relative aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl bg-neutral-200 group'>\n                <img \n                  src='https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80' \n                  alt='High fashion editorial lifestyle portrait' \n                  className='w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105'\n                />\n                <div className='absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-80' />\n                \n                <div className='absolute bottom-6 left-6 right-6 p-6 rounded-2xl bg-white/90 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-between'>\n                  <div>\n                    <p className='text-xs font-bold uppercase tracking-wider text-[#737373]'>Featured Item</p>\n                    <p className='text-base font-bold text-[#111111]'>Merino Wool Trench Coat</p>\n                  </div>\n                  <span className='text-sm font-semibold text-[#111111] px-3 py-1 rounded-full bg-neutral-100'>$420</span>\n                </div>\n              </div>\n\n              {/* Floating aesthetic badge */}\n              <div className='absolute -top-6 -right-6 w-28 h-28 rounded-full bg-[#1a1a1a] text-white flex flex-col items-center justify-center text-center p-2 shadow-xl animate-float hidden sm:flex'>\n                <span className='text-[10px] uppercase tracking-widest text-neutral-400 font-medium'>Limited</span>\n                <span className='text-xs font-bold tracking-tight'>100% ORGANIC</span>\n              </div>\n            </div>\n          </div>\n\n        </div>\n      </div>\n    </section>\n  );\n}\n",
+        "/components/Categories.js": "import React from 'react';\nimport { Sparkles, Shirt, Footprints, Watch, Package } from 'lucide-react';\n\nexport default function Categories({ activeCategory, onSelectCategory }) {\n  const categories = [\n    { id: 'All', label: 'All Collection', icon: Sparkles, count: '12' },\n    { id: 'Apparel', label: 'Apparel', icon: Shirt, count: '4' },\n    { id: 'Footwear', label: 'Footwear', icon: Footprints, count: '3' },\n    { id: 'Accessories', label: 'Accessories', icon: Watch, count: '3' },\n    { id: 'Objects', label: 'Objects', icon: Package, count: '2' }\n  ];\n\n  return (\n    <div className='w-full py-8 border-b border-[#e5e5df] bg-[#fcfbf7]'>\n      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>\n        <div className='flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4'>\n          <div>\n            <span className='text-xs uppercase tracking-widest text-[#737373] font-semibold mb-2 block'>Curated Discovery</span>\n            <h2 className='text-3xl font-heading font-bold tracking-tight text-[#111111]'>Explore Collections</h2>\n          </div>\n          <p className='text-sm text-[#737373] max-w-sm'>\n            Handcrafted everyday objects and timeless garments designed for modern living.\n          </p>\n        </div>\n\n        <div className='flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none'>\n          {categories.map((cat) => {\n            const IconComponent = cat.icon;\n            const isActive = activeCategory === cat.id;\n            return (\n              <button\n                key={cat.id}\n                onClick={() => onSelectCategory(cat.id)}\n                className={`flex items-center gap-2.5 px-6 py-3.5 rounded-full text-sm font-medium transition-all duration-300 shrink-0 ${\n                  isActive\n                    ? 'bg-[#1a1a1a] text-[#fcfbf7] shadow-md scale-[1.02]'\n                    : 'bg-white text-[#111111] border border-[#ebeae4] hover:border-[#1a1a1a] hover:bg-neutral-50'\n                }`}\n              >\n                <IconComponent className={`w-4 h-4 ${isActive ? 'text-[#fcfbf7]' : 'text-[#737373]'}`} />\n                <span>{cat.label}</span>\n                <span className={`text-xs px-2 py-0.5 rounded-full ${isActive ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-[#737373]'}`}>\n                  {cat.count}\n                </span>\n              </button>\n            );\n          })}\n        </div>\n      </div>\n    </div>\n  );\n}\n",
+        "/components/ProductCard.js": "import React, { useState } from 'react';\nimport { ShoppingBag, Heart, Check, Star } from 'lucide-react';\n\nexport default function ProductCard({ product, onAddToCart, onToggleWishlist, isWishlisted }) {\n  const [isHovered, setIsHovered] = useState(false);\n  const [added, setAdded] = useState(false);\n\n  const handleAdd = (e) => {\n    e.stopPropagation();\n    onAddToCart(product);\n    setAdded(true);\n    setTimeout(() => setAdded(false), 1500);\n  };\n\n  return (\n    <div \n      className='group relative bg-white border border-[#ebeae4] rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col'\n      onMouseEnter={() => setIsHovered(true)}\n      onMouseLeave={() => setIsHovered(false)}\n    >\n      {/* Image Container */}\n      <div className='relative w-full aspect-[4/5] bg-[#fcfbf7] overflow-hidden'>\n        <img \n          src={isHovered && product.hoverImage ? product.hoverImage : product.image}\n          alt={product.name}\n          className='w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105'\n        />\n\n        {/* Top Badges */}\n        <div className='absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-none'>\n          {product.badge ? (\n            <span className='px-3 py-1 bg-[#111111] text-white text-xs font-medium rounded-full tracking-wide shadow-sm'>\n              {product.badge}\n            </span>\n          ) : <div />}\n\n          {/* Wishlist Button */}\n          <button\n            onClick={(e) => {\n              e.stopPropagation();\n              onToggleWishlist(product);\n            }}\n            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all pointer-events-auto shadow-sm ${\n              isWishlisted \n                ? 'bg-[#111111] text-white' \n                : 'bg-white/90 backdrop-blur-sm text-[#111111] hover:bg-white'\n            }`}\n            aria-label='Toggle wishlist'\n          >\n            <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current text-rose-500' : ''}`} />\n          </button>\n        </div>\n\n        {/* Quick Add Overlay Button */}\n        <div className='absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-150 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0'>\n          <button\n            onClick={handleAdd}\n            className={`w-full py-3 px-4 rounded-full font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg transition-all ${\n              added \n                ? 'bg-emerald-600 text-white' \n                : 'bg-[#111111] text-white hover:bg-[#333333]'\n            }`}\n          >\n            {added ? (\n              <>\n                <Check className='w-4 h-4' />\n                Added to Cart\n              </>\n            ) : (\n              <>\n                <ShoppingBag className='w-4 h-4' />\n                Quick Add — ${product.price}\n              </>\n            )}\n          </button>\n        </div>\n      </div>\n\n      {/* Content Section */}\n      <div className='p-5 flex flex-col flex-grow justify-between bg-white'>\n        <div>\n          <div className='flex items-center justify-between text-xs text-[#737373] mb-1.5 uppercase tracking-wider font-medium'>\n            <span>{product.category}</span>\n            {product.rating && (\n              <div className='flex items-center gap-1 text-[#111111]'>\n                <Star className='w-3.5 h-3.5 fill-[#111111]' />\n                <span>{product.rating}</span>\n              </div>\n            )}\n          </div>\n\n          <h3 className='font-heading font-bold text-base text-[#111111] group-hover:text-neutral-600 transition-colors line-clamp-1'>\n            {product.name}\n          </h3>\n          \n          <p className='text-xs text-[#737373] mt-1 line-clamp-1'>\n            {product.subtitle || 'Crafted for the contemporary wardrobe'}\n          </p>\n        </div>\n\n        <div className='mt-4 pt-3 border-t border-[#ebeae4] flex items-center justify-between'>\n          <span className='font-heading font-bold text-base text-[#111111]'>\n            ${product.price}\n          </span>\n          \n          <span className='text-xs font-medium text-[#737373] group-hover:text-[#111111] transition-colors flex items-center gap-1'>\n            Explore &rarr;\n          </span>\n        </div>\n      </div>\n    </div>\n  );\n}\n",
+        "/components/ProductGrid.js": "import React, { useState } from 'react';\nimport { Search, SlidersHorizontal, ArrowUpDown } from 'lucide-react';\nimport ProductCard from './ProductCard';\n\nconst ALL_PRODUCTS = [\n  {\n    id: 1,\n    name: 'Architectural Cashmere Coat',\n    category: 'Apparel',\n    price: 480,\n    rating: 4.9,\n    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',\n    badge: 'New'\n  },\n  {\n    id: 2,\n    name: 'Maison Leather Tote',\n    category: 'Accessories',\n    price: 320,\n    rating: 4.8,\n    image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80',\n    badge: 'Bestseller'\n  },\n  {\n    id: 3,\n    name: 'Minimalist Ceramic Vase',\n    category: 'Objects',\n    price: 140,\n    rating: 4.7,\n    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80',\n    badge: 'Limited'\n  },\n  {\n    id: 4,\n    name: 'Structured Wool Blazer',\n    category: 'Apparel',\n    price: 390,\n    rating: 4.9,\n    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',\n    badge: null\n  },\n  {\n    id: 5,\n    name: 'Handcrafted Derbies',\n    category: 'Footwear',\n    price: 450,\n    rating: 4.6,\n    image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80',\n    badge: 'Exclusive'\n  },\n  {\n    id: 6,\n    name: 'Brushed Brass Lamp',\n    category: 'Objects',\n    price: 260,\n    rating: 4.8,\n    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80',\n    badge: null\n  },\n  {\n    id: 7,\n    name: 'Silk Organza Shirt',\n    category: 'Apparel',\n    price: 220,\n    rating: 4.7,\n    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',\n    badge: 'Trending'\n  },\n  {\n    id: 8,\n    name: 'Suede Ankle Boots',\n    category: 'Footwear',\n    price: 380,\n    rating: 4.9,\n    image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80',\n    badge: 'New'\n  }\n];\n\nexport default function ProductGrid({ activeCategory, searchQuery, setSearchQuery, onAddToCart, wishlist, onToggleWishlist }) {\n  const [sortBy, setSortBy] = useState('featured');\n  const [localSearch, setLocalSearch] = useState(searchQuery || '');\n\n  // Filter by category and search\n  const filtered = ALL_PRODUCTS.filter(item => {\n    const matchesCategory = activeCategory === 'All' || item.category === activeCategory;\n    const q = (searchQuery !== undefined ? searchQuery : localSearch).toLowerCase();\n    const matchesSearch = item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);\n    return matchesCategory && matchesSearch;\n  });\n\n  // Sort products\n  const sorted = [...filtered].sort((a, b) => {\n    if (sortBy === 'price-low') return a.price - b.price;\n    if (sortBy === 'price-high') return b.price - a.price;\n    if (sortBy === 'rating') return b.rating - a.rating;\n    return 0; // featured\n  });\n\n  return (\n    <section id='shop' className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16'>\n      <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10 pb-6 border-b border-[#e5e5df]'>\n        <div>\n          <h2 className='text-3xl font-heading font-bold text-[#111111]'>Curated Catalog</h2>\n          <p className='text-[#737373] text-sm mt-1'>Showing {sorted.length} refined essentials</p>\n        </div>\n\n        <div className='flex flex-wrap items-center gap-3 w-full md:w-auto'>\n          {/* Search input if not passed from hero/header */}\n          <div className='relative flex-1 md:w-64'>\n            <Search className='absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]' />\n            <input\n              type='text'\n              placeholder='Search collection...'\n              value={searchQuery !== undefined ? searchQuery : localSearch}\n              onChange={(e) => {\n                if (setSearchQuery) setSearchQuery(e.target.value);\n                setLocalSearch(e.target.value);\n              }}\n              className='w-full pl-10 pr-4 py-2 text-sm bg-white border border-[#e5e5df] rounded-full focus:outline-none focus:border-[#1a1a1a] transition-all'\n            />\n          </div>\n\n          {/* Sort dropdown */}\n          <div className='relative'>\n            <div className='flex items-center gap-2 px-4 py-2 bg-white border border-[#e5e5df] rounded-full text-sm text-[#111111] cursor-pointer hover:border-[#1a1a1a] transition-all'>\n              <ArrowUpDown className='w-4 h-4 text-[#737373]' />\n              <select\n                value={sortBy}\n                onChange={(e) => setSortBy(e.target.value)}\n                className='bg-transparent border-none focus:outline-none cursor-pointer'\n              >\n                <option value='featured'>Sort: Featured</option>\n                <option value='price-low'>Price: Low to High</option>\n                <option value='price-high'>Price: High to Low</option>\n                <option value='rating'>Highest Rated</option>\n              </select>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      {sorted.length === 0 ? (\n        <div className='text-center py-24 bg-white border border-[#e5e5df] rounded-3xl p-8'>\n          <SlidersHorizontal className='w-12 h-12 text-[#737373] mx-auto mb-4 stroke-1' />\n          <h3 className='text-xl font-heading font-bold text-[#111111]'>No pieces found</h3>\n          <p className='text-[#737373] text-sm mt-2 max-w-sm mx-auto'>We couldn't find any products matching your search criteria. Try adjusting your filters.</p>\n          <button\n            onClick={() => {\n              if (setSearchQuery) setSearchQuery('');\n              setLocalSearch('');\n            }}\n            className='mt-6 px-6 py-2.5 bg-[#1a1a1a] text-white text-sm font-medium rounded-full hover:bg-neutral-800 transition-all'\n          >\n            Reset Filters\n          </button>\n        </div>\n      ) : (\n        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8'>\n          {sorted.map(product => (\n            <ProductCard\n              key={product.id}\n              product={product}\n              onAddToCart={onAddToCart}\n              isWishlisted={wishlist ? wishlist.includes(product.id) : false}\n              onToggleWishlist={onToggleWishlist}\n            />\n          ))}\n        </div>\n      )}\n    </section>\n  );\n}\n",
+        "/components/CartDrawer.js": "import React from 'react';\nimport { X, Plus, Minus, Trash2, ArrowRight, ShoppingBag, Check } from 'lucide-react';\n\nexport default function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemoveItem, onCheckout }) {\n  if (!isOpen) return null;\n\n  const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);\n  const freeShippingThreshold = 200;\n  const progress = Math.min(100, (subtotal / freeShippingThreshold) * 100);\n  const remaining = Math.max(0, freeShippingThreshold - subtotal);\n\n  return (\n    <div className='fixed inset-0 z-50 overflow-hidden'>\n      <div className='absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity' onClick={onClose} />\n      \n      <div className='absolute inset-y-0 right-0 max-w-full flex pl-10'>\n        <div className='w-screen max-w-md bg-[#fcfbf7] shadow-2xl flex flex-col'>\n          \n          {/* Header */}\n          <div className='flex items-center justify-between px-6 py-5 border-b border-[#e5e5df]'>\n            <div className='flex items-center gap-2'>\n              <ShoppingBag className='w-5 h-5 text-[#111111]' />\n              <h2 className='font-heading text-lg font-bold text-[#111111]'>Your Shopping Bag</h2>\n              <span className='ml-1 px-2 py-0.5 text-xs font-semibold bg-[#1a1a1a] text-white rounded-full'>\n                {cart.reduce((acc, item) => acc + item.quantity, 0)}\n              </span>\n            </div>\n            <button \n              onClick={onClose}\n              className='p-2 text-[#737373] hover:text-[#111111] hover:bg-[#e5e5df]/50 rounded-full transition-colors'\n            >\n              <X className='w-5 h-5' />\n            </button>\n          </div>\n\n          {/* Free Shipping Progress */}\n          <div className='px-6 py-4 bg-white border-b border-[#e5e5df]'>\n            <div className='flex justify-between text-xs mb-2 font-medium text-[#737373]'>\n              {remaining > 0 ? (\n                <span>Add <strong className='text-[#111111]'>${remaining}</strong> more for free shipping</span>\n              ) : (\n                <span className='text-emerald-600 flex items-center gap-1 font-semibold'>\n                  <Check className='w-3.5 h-3.5' /> You've unlocked free shipping!\n                </span>\n              )}\n              <span>{Math.round(progress)}%</span>\n            </div>\n            <div className='w-full h-1.5 bg-[#e5e5df] rounded-full overflow-hidden'>\n              <div \n                className='h-full bg-[#1a1a1a] transition-all duration-500 ease-out'\n                style={{ width: `${progress}%` }}\n              />\n            </div>\n          </div>\n\n          {/* Cart Items List */}\n          <div className='flex-1 overflow-y-auto px-6 py-4 divide-y divide-[#e5e5df]'>\n            {cart.length === 0 ? (\n              <div className='h-full flex flex-col items-center justify-center text-center py-12'>\n                <div className='w-16 h-16 rounded-full bg-[#e5e5df]/50 flex items-center justify-center text-[#737373] mb-4'>\n                  <ShoppingBag className='w-8 h-8' />\n                </div>\n                <h3 className='font-heading text-lg font-bold text-[#111111] mb-1'>Your bag is empty</h3>\n                <p className='text-sm text-[#737373] max-w-xs mb-6'>Discover our latest curated collections and add your favorite pieces.</p>\n                <button\n                  onClick={onClose}\n                  className='px-6 py-3 bg-[#1a1a1a] text-white text-sm font-medium rounded-full hover:bg-neutral-800 transition-colors'\n                >\n                  Explore Collection\n                </button>\n              </div>\n            ) : (\n              cart.map((item) => (\n                <div key={item.id} className='py-4 flex gap-4 items-center group'>\n                  <img \n                    src={item.image} \n                    alt={item.name} \n                    className='w-20 h-24 object-cover rounded-md bg-[#e5e5df] shrink-0'\n                  />\n                  <div className='flex-1 min-w-0'>\n                    <div className='flex justify-between items-start mb-1'>\n                      <h4 className='font-medium text-sm text-[#111111] truncate'>{item.name}</h4>\n                      <button \n                        onClick={() => onRemoveItem(item.id)}\n                        className='text-[#737373] hover:text-red-600 transition-colors p-1'\n                        title='Remove item'\n                      >\n                        <Trash2 className='w-4 h-4' />\n                      </button>\n                    </div>\n                    <p className='text-xs text-[#737373] mb-3'>{item.category}</p>\n                    \n                    <div className='flex justify-between items-center'>\n                      <div className='flex items-center border border-[#e5e5df] rounded-full overflow-hidden bg-white'>\n                        <button \n                          onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}\n                          className='p-1.5 text-[#737373] hover:text-[#111111] transition-colors'\n                        >\n                          <Minus className='w-3 h-3' />\n                        </button>\n                        <span className='px-3 text-xs font-semibold text-[#111111]'>{item.quantity}</span>\n                        <button \n                          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}\n                          className='p-1.5 text-[#737373] hover:text-[#111111] transition-colors'\n                        >\n                          <Plus className='w-3 h-3' />\n                        </button>\n                      </div>\n                      <span className='font-heading text-sm font-bold text-[#111111]'>\n                        ${(item.price * item.quantity).toLocaleString()}\n                      </span>\n                    </div>\n                  </div>\n                </div>\n              ))\n            )}\n          </div>\n\n          {/* Footer Subtotal & Checkout */}\n          {cart.length > 0 && (\n            <div className='p-6 bg-white border-t border-[#e5e5df] space-y-4'>\n              <div className='space-y-2'>\n                <div className='flex justify-between text-sm text-[#737373]'>\n                  <span>Subtotal</span>\n                  <span className='font-semibold text-[#111111]'>${subtotal.toLocaleString()}</span>\n                </div>\n                <div className='flex justify-between text-sm text-[#737373]'>\n                  <span>Estimated Shipping</span>\n                  <span className='font-semibold text-[#111111]'>{remaining === 0 ? 'FREE' : '$15'}</span>\n                </div>\n                <div className='pt-2 border-t border-[#e5e5df] flex justify-between items-baseline'>\n                  <span className='font-heading font-bold text-[#111111]'>Total</span>\n                  <span className='font-heading text-xl font-extrabold text-[#111111]'>\n                    ${(subtotal + (remaining === 0 ? 0 : 15)).toLocaleString()}\n                  </span>\n                </div>\n              </div>\n\n              <button\n                onClick={onCheckout}\n                className='w-full py-4 bg-[#1a1a1a] text-white font-medium rounded-full hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-neutral-900/10'\n              >\n                <span>Proceed to Checkout</span>\n                <ArrowRight className='w-4 h-4 group-hover:translate-x-1 transition-transform' />\n              </button>\n              <p className='text-center text-[11px] text-[#737373]'>\n                Taxes and shipping calculated at checkout. 30-day returns.\n              </p>\n            </div>\n          )}\n\n        </div>\n      </div>\n    </div>\n  );\n}\n",
+        "/components/Footer.js": "import React, { useState } from 'react';\nimport { ArrowRight, Check, Sparkles } from 'lucide-react';\n\nexport default function Footer() {\n  const [email, setEmail] = useState('');\n  const [subscribed, setSubscribed] = useState(false);\n\n  const handleSubmit = (e) => {\n    e.preventDefault();\n    if (email.trim()) {\n      setSubscribed(true);\n      setEmail('');\n    }\n  };\n\n  return (\n    <footer className='bg-[#111111] text-[#fcfbf7] pt-20 pb-12 border-t border-[#222222]'>\n      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>\n        <div className='grid grid-cols-1 lg:grid-cols-12 gap-12 pb-16 border-b border-[#222222]'>\n          {/* Brand Manifesto */}\n          <div className='lg:col-span-5 space-y-6'>\n            <div className='flex items-center gap-2'>\n              <span className='w-3 h-3 rounded-full bg-[#fcfbf7] inline-block animate-pulse' />\n              <span className='font-heading text-2xl font-bold tracking-tight'>ATELIER</span>\n            </div>\n            <p className='text-neutral-400 max-w-sm text-sm leading-relaxed font-sans'>\n              Curating intentional objects and contemporary garments designed for mindful living. We champion uncompromising craftsmanship, sustainable materials, and timeless silhouettes.\n            </p>\n            <div className='flex items-center gap-3 text-xs text-neutral-400 font-mono uppercase tracking-widest pt-2'>\n              <span>Est. 2026</span>\n              <span>•</span>\n              <span>Paris / Tokyo / New York</span>\n            </div>\n          </div>\n\n          {/* Quick Links */}\n          <div className='lg:col-span-3 grid grid-cols-2 gap-8'>\n            <div>\n              <h4 className='font-heading font-semibold text-sm tracking-wider uppercase mb-5 text-neutral-200'>\n                Navigation\n              </h4>\n              <ul className='space-y-3 text-sm text-neutral-400'>\n                <li><a href='#collection' className='hover:text-white transition-colors'>All Products</a></li>\n                <li><a href='#apparel' className='hover:text-white transition-colors'>Apparel</a></li>\n                <li><a href='#footwear' className='hover:text-white transition-colors'>Footwear</a></li>\n                <li><a href='#accessories' className='hover:text-white transition-colors'>Accessories</a></li>\n                <li><a href='#objects' className='hover:text-white transition-colors'>Objects</a></li>\n              </ul>\n            </div>\n            <div>\n              <h4 className='font-heading font-semibold text-sm tracking-wider uppercase mb-5 text-neutral-200'>\n                Client Care\n              </h4>\n              <ul className='space-y-3 text-sm text-neutral-400'>\n                <li><a href='#shipping' className='hover:text-white transition-colors'>Shipping Info</a></li>\n                <li><a href='#returns' className='hover:text-white transition-colors'>Returns & Exchanges</a></li>\n                <li><a href='#care' className='hover:text-white transition-colors'>Garment Care</a></li>\n                <li><a href='#stores' className='hover:text-white transition-colors'>Flagship Stores</a></li>\n                <li><a href='#contact' className='hover:text-white transition-colors'>Concierge</a></li>\n              </ul>\n            </div>\n          </div>\n\n          {/* Newsletter Subscription */}\n          <div className='lg:col-span-4 space-y-5'>\n            <div className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs text-neutral-300 font-mono'>\n              <Sparkles className='w-3.5 h-3.5 text-amber-300' />\n              <span>The Private Journal</span>\n            </div>\n            <h3 className='font-heading text-xl font-bold tracking-tight'>\n              Join our inner circle.\n            </h3>\n            <p className='text-sm text-neutral-400 leading-relaxed'>\n              Receive early access to seasonal drops, private invitations, and editorial essays.\n            </p>\n            \n            {subscribed ? (\n              <div className='flex items-center gap-3 p-4 rounded-full bg-neutral-900 border border-neutral-800 text-sm text-emerald-400 animate-fade-in'>\n                <Check className='w-4 h-4 text-emerald-400 flex-shrink-0' />\n                <span>Welcome to our journal. You are on the list.</span>\n              </div>\n            ) : (\n              <form onSubmit={handleSubmit} className='flex items-center gap-2'>\n                <input\n                  type='email'\n                  required\n                  value={email}\n                  onChange={(e) => setEmail(e.target.value)}\n                  placeholder='Enter your email address'\n                  className='bg-neutral-900 border border-neutral-800 text-sm text-white placeholder-neutral-500 px-5 py-3.5 rounded-full focus:outline-none focus:border-neutral-600 flex-grow transition-colors'\n                />\n                <button\n                  type='submit'\n                  className='bg-white text-black font-medium text-sm px-6 py-3.5 rounded-full hover:bg-neutral-200 transition-colors flex items-center gap-2 flex-shrink-0'\n                >\n                  <span>Subscribe</span>\n                  <ArrowRight className='w-4 h-4' />\n                </button>\n              </form>\n            )}\n          </div>\n        </div>\n\n        {/* Bottom Bar */}\n        <div className='pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500 font-mono'>\n          <p>© 2026 ATELIER STUDIOS INC. ALL RIGHTS RESERVED.</p>\n          <div className='flex items-center gap-6'>\n            <a href='#privacy' className='hover:text-neutral-300 transition-colors'>PRIVACY POLICY</a>\n            <a href='#terms' className='hover:text-neutral-300 transition-colors'>TERMS OF SERVICE</a>\n            <a href='#cookies' className='hover:text-neutral-300 transition-colors'>COOKIE PREFERENCES</a>\n          </div>\n        </div>\n      </div>\n    </footer>\n  );\n}\n",
+        "/App.js": "import React, { useState } from 'react';\nimport './styles.css';\nimport Header from './components/Header';\nimport Hero from './components/Hero';\nimport Categories from './components/Categories';\nimport ProductGrid from './components/ProductGrid';\nimport CartDrawer from './components/CartDrawer';\nimport Footer from './components/Footer';\n\nconst PRODUCTS_DATA = [\n  {\n    id: '1',\n    name: 'Minimalist Cashmere Overcoat',\n    category: 'Apparel',\n    price: 480,\n    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',\n    description: 'Expertly tailored from sustainably sourced Mongolian cashmere. Features structured shoulders and a clean concealed placket.'\n  },\n  {\n    id: '2',\n    name: 'Architectural Leather Derby',\n    category: 'Footwear',\n    price: 320,\n    image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80',\n    description: 'Handcrafted in Milan from full-grain calfskin leather with a signature stacked heel and sculpted silhouette.'\n  },\n  {\n    id: '3',\n    name: 'Oversized Organic Cotton Tee',\n    category: 'Apparel',\n    price: 110,\n    image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80',\n    description: 'Heavyweight 300GSM organic cotton jersey with a relaxed, boxy drape and reinforced neckline.'\n  },\n  {\n    id: '4',\n    name: 'Structured Brass Monolith Lamp',\n    category: 'Objects',\n    price: 260,\n    image: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80',\n    description: 'Solid brushed brass desk sculpture with dimmable warm LED illumination and tactile toggle switch.'\n  },\n  {\n    id: '5',\n    name: 'Sculpted Titanium Chronograph',\n    category: 'Accessories',\n    price: 650,\n    image: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?auto=format&fit=crop&w=1200&q=80',\n    description: 'Aerospace-grade titanium housing sapphire crystal glass and Japanese automatic movement.'\n  },\n  {\n    id: '6',\n    name: 'Pleated Wool Trousers',\n    category: 'Apparel',\n    price: 290,\n    image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=1200&q=80',\n    description: 'High-waisted wide-leg trousers tailored from virgin wool gabardine with crisp permanent creases.'\n  },\n  {\n    id: '7',\n    name: 'Hand-Thrown Ceramic Vessel',\n    category: 'Objects',\n    price: 180,\n    image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=1200&q=80',\n    description: 'Individually wheel-thrown stoneware finished with a tactile reactive matte white glaze.'\n  },\n  {\n    id: '8',\n    name: 'Minimalist Leather Tote',\n    category: 'Accessories',\n    price: 390,\n    image: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80',\n    description: 'Vegetable-tanned saddle leather tote designed to age gracefully with a rich patina over time.'\n  }\n];\n\nexport default function App() {\n  const [activeCategory, setActiveCategory] = useState('All');\n  const [searchQuery, setSearchQuery] = useState('');\n  const [sortBy, setSortBy] = useState('featured');\n  const [cartOpen, setCartOpen] = useState(false);\n  const [cartItems, setCartItems] = useState([\n    {\n      product: PRODUCTS_DATA[0],\n      quantity: 1\n    }\n  ]);\n  const [wishlist, setWishlist] = useState(['2', '5']);\n\n  const handleAddToCart = (product) => {\n    setCartItems(prev => {\n      const existing = prev.find(item => item.product.id === product.id);\n      if (existing) {\n        return prev.map(item =>\n          item.product.id === product.id\n            ? { ...item, quantity: item.quantity + 1 }\n            : item\n        );\n      }\n      return [...prev, { product, quantity: 1 }];\n    });\n    setCartOpen(true);\n  };\n\n  const handleUpdateQuantity = (productId, delta) => {\n    setCartItems(prev => {\n      return prev.map(item => {\n        if (item.product.id === productId) {\n          const newQty = item.quantity + delta;\n          return newQty > 0 ? { ...item, quantity: newQty } : null;\n        }\n        return item;\n      }).filter(Boolean);\n    });\n  };\n\n  const handleRemoveItem = (productId) => {\n    setCartItems(prev => prev.filter(item => item.product.id !== productId));\n  };\n\n  const handleToggleWishlist = (productId) => {\n    setWishlist(prev =>\n      prev.includes(productId)\n        ? prev.filter(id => id !== productId)\n        : [...prev, productId]\n    );\n  };\n\n  return (\n    <div className='min-h-screen bg-[#fcfbf7] text-[#111111] flex flex-col selection:bg-[#1a1a1a] selection:text-[#fcfbf7]'>\n      <Header\n        cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)}\n        wishlistCount={wishlist.length}\n        onOpenCart={() => setCartOpen(true)}\n        searchQuery={searchQuery}\n        setSearchQuery={setSearchQuery}\n      />\n\n      <main className='flex-1'>\n        <Hero />\n\n        <div id='shop-section'>\n          <Categories\n            activeCategory={activeCategory}\n            setActiveCategory={setActiveCategory}\n          />\n\n          <ProductGrid\n            products={PRODUCTS_DATA}\n            activeCategory={activeCategory}\n            searchQuery={searchQuery}\n            sortBy={sortBy}\n            setSortBy={setSortBy}\n            onAddToCart={handleAddToCart}\n            wishlist={wishlist}\n            onToggleWishlist={handleToggleWishlist}\n          />\n        </div>\n      </main>\n\n      <CartDrawer\n        isOpen={cartOpen}\n        onClose={() => setCartOpen(false)}\n        cartItems={cartItems}\n        onUpdateQuantity={handleUpdateQuantity}\n        onRemoveItem={handleRemoveItem}\n      />\n\n      <Footer />\n    </div>\n  );\n}\n"
+      },
+      "endTime": "2026-10-31T16:54:12.749Z"
+    },
+    "gemini-3.8-flash": {
+      "model": "gemini-3.8-flash",
+      "prompt": "Create a premium, modern e-commerce storefront for a contemporary lifestyle and fashion brand. It should have a distinctive visual identity, refined typography, a responsive navigation bar, a strong hero section, product categories, an attractive product grid, product cards, functional product filtering, a shopping cart drawer, quantity controls, subtotal and total calculations, and a polished footer. Use a cohesive design system, thoughtful spacing, high-quality imagery, subtle animations, and a professional responsive layout. All visible interactions must work.",
+      "startTime": "2026-10-31T16:54:22.769Z",
+      "startMs": 1793465662769,
+      "durationMs": 581722,
+      "designSpec": {
+        "purpose": "A premium, modern e-commerce storefront for a contemporary lifestyle and fashion brand offering apparel, accessories, and home objects.",
+        "targetAudience": "Design-conscious consumers, urban professionals, and lifestyle enthusiasts who appreciate minimalist luxury, sustainable fabrics, and timeless aesthetics.",
+        "category": "ecommerce",
+        "visualDirection": "High-end editorial aesthetic with generous whitespace, crisp grid structures, delicate borders, and immersive product photography.",
+        "archetype": "modern_ecommerce",
+        "brandPersonality": [
+          "Sophisticated",
+          "Minimalist",
+          "Tactile",
+          "Contemporary",
+          "Curated"
+        ],
+        "colorPalette": {
+          "theme": "light",
+          "bg": "#f9f8f6",
+          "fg": "#1c1917",
+          "muted": "#78716c",
+          "line": "#e7e5e4",
+          "accent": "#1c1917",
+          "accentForeground": "#f9f8f6",
+          "cardBg": "#ffffff",
+          "cardBorder": "#e7e5e4"
+        },
+        "typography": {
+          "heading": {
+            "family": "Syne",
+            "weights": [
+              "700",
+              "800"
+            ],
+            "googleFontsUrl": "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap",
+            "usage": "Brand logo, hero headers, section titles, and key numeric callouts."
+          },
+          "body": {
+            "family": "Plus Jakarta Sans",
+            "weights": [
+              "400",
+              "500",
+              "600"
+            ],
+            "googleFontsUrl": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+            "usage": "Product descriptions, navigation items, filtering controls, and body copy."
+          },
+          "mono": {
+            "family": "JetBrains Mono",
+            "weights": [
+              "400"
+            ],
+            "googleFontsUrl": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap",
+            "usage": "SKU numbers, order identifiers, and price tags."
+          },
+          "fontImportUrl": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap"
+        },
+        "layout": {
+          "containerWidth": "max-w-7xl mx-auto px-6",
+          "sectionPadding": "py-16 md:py-24",
+          "gap": "gap-8 md:gap-12",
+          "structure": "Editorial grid layout with full-bleed hero banners, sticky category navigation, 3-column responsive product grids, and a slide-over cart drawer."
+        },
+        "componentStyling": {
+          "cardRadius": "rounded-none",
+          "buttonRadius": "rounded-full",
+          "shadow": "shadow-none",
+          "borderStyle": "border border-stone-200",
+          "cardStyle": "bg-white border border-stone-200 transition-all duration-300 hover:border-stone-400"
+        },
+        "navigation": {
+          "type": "sticky_header",
+          "details": "Fixed top navigation with brand logo centered or left-aligned, category links, search trigger, wishlist counter, and animated shopping bag pill showing live item count."
+        },
+        "hero": {
+          "composition": "split",
+          "headline": "Form, Fabric, and Function.",
+          "subheadline": "Explore the Autumn/Winter collection crafted from organic fibers and uncompromising tailoring.",
+          "ctaText": "Shop Collection",
+          "details": "Asymmetric editorial split screen featuring high-resolution lifestyle imagery on the right and typographic emphasis with quick category jump links on the left."
+        },
+        "mediaDirection": {
+          "type": "curated_photography",
+          "description": "Studio and outdoor editorial lookbooks featuring neutral earth tones, dramatic natural lighting, and sharp macro textures of woven fabrics.",
+          "imageTreatment": "Clean rectangles with subtle zoom on hover and quick-add overlay buttons.",
+          "iconStyle": "Minimalist stroke icons (lucide-react) with 1.5px stroke width."
+        },
+        "motion": {
+          "strategy": "Smooth, restrained micro-interactions including fade-in page transitions, slide-over drawer animations, and seamless image swaps on card hover.",
+          "keyframes": [
+            "transition-all duration-300 ease-out",
+            "transform hover:scale-[1.02]"
+          ],
+          "reducedMotion": true
+        },
+        "responsive": {
+          "breakpoints": "sm: 640px, md: 768px, lg: 1024px, xl: 1280px",
+          "mobileStrategy": "Single-column product feed, collapsible filter drawer, sticky bottom checkout bar on mobile, and full-screen slide-over cart."
+        },
+        "accessibility": {
+          "contrastRatio": "WCAG AAA compliant dark text on light stone backgrounds.",
+          "focusRings": "Focus-visible ring-2 ring-stone-900 ring-offset-2",
+          "semanticElements": true
+        },
+        "signature": "Sticky drawer cart pill with instant badge updates and tactile quantity controls coupled with seamless live subtotal calculations."
+      },
+      "filesPlanned": [
+        {
+          "path": "/styles.css",
+          "description": "Global stylesheets with Google Fonts imports (Syne & Plus Jakarta Sans), DesignSpec CSS variables, smooth scroll behavior, custom drawer transitions, and micro-interaction animations.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/data/products.js",
+          "description": "Comprehensive product catalog for contemporary lifestyle and fashion items, containing IDs, titles, categories, prices, high-resolution Unsplash imagery, descriptions, tags, and variant options.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/Navbar.js",
+          "description": "Sticky luxury navigation bar featuring editorial brand monogram, category quick-links, search trigger, saved wishlist indicator, and interactive cart button with live item counter badge.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/Hero.js",
+          "description": "Split-composition editorial hero section featuring bold Syne display typography, seasonal campaign badge, high-fashion imagery, and quick call-to-actions to browse new arrivals.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/CategoryFilter.js",
+          "description": "Sticky pill navigation and controls bar allowing seamless category selection, sort ordering (price, featured, newest), and active item count indicators.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/ProductCard.js",
+          "description": "Interactive product card featuring image hover transitions, category tag, price display, quick-view modal trigger, and one-click quick add-to-cart button.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/ProductGrid.js",
+          "description": "Responsive 3-column product grid container rendering filtered products, empty state handling, and layout count summaries.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/ProductModal.js",
+          "description": "Quick-view overlay modal providing detailed product photography, variant selection (size, finish), detailed material narrative, and direct add-to-cart flow.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/CartDrawer.js",
+          "description": "Slide-over shopping cart drawer featuring instant badge count, tactile item quantity increments/decrements, item removal, free shipping threshold bar, discount code application, and calculated subtotal & estimated checkout breakdown.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/EditorialStory.js",
+          "description": "Editorial monograph section focusing on ethical ateliers, mindful material provenance, and contemporary architectural aesthetic underpinning the brand.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/NewsletterSection.js",
+          "description": "Contemporary newsletter subscription banner with first-order discount perk, instant form validation, and feedback state.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/components/Footer.js",
+          "description": "Comprehensive modern e-commerce footer including category links, customer care, store locators, currency selector, and copyright info.",
+          "isEntry": false,
+          "mandatory": true
+        },
+        {
+          "path": "/App.js",
+          "description": "Main application component orchestrating global cart state, filter states, modal states, sticky cart drawer trigger, notification toasts, and assembling all UI sections.",
+          "isEntry": true,
+          "mandatory": true
+        }
+      ],
+      "filesGenerated": [
+        "/styles.css",
+        "/components/ProductCard.js",
+        "/components/Navbar.js",
+        "/components/Hero.js",
+        "/components/ProductGrid.js",
+        "/components/NewsletterSection.js",
+        "/components/Footer.js"
+      ],
+      "repairAttempts": 0,
+      "repairRounds": [],
+      "validationErrorsInitial": [],
+      "validationErrorsFinal": [],
+      "compilationResults": {},
+      "featureChecklistReport": null,
+      "visualQaReport": null,
+      "finalStatus": "failed",
+      "error": "Failed to generate mandatory planned file(s): /data/products.js, /components/CategoryFilter.js, /components/ProductModal.js, /components/CartDrawer.js, /components/EditorialStory.js, /App.js",
+      "generatedFiles": {
+        "/styles.css": "@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap');\n\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n:root {\n  --bg-canvas: #f9f8f6;\n  --fg-primary: #1c1917;\n  --fg-muted: #78716c;\n  --border-line: #e7e5e4;\n  --accent: #1c1917;\n  --card-bg: #ffffff;\n  --card-border: #e7e5e4;\n}\n\nhtml {\n  scroll-behavior: smooth;\n  background-color: var(--bg-canvas);\n  color: var(--fg-primary);\n}\n\nbody {\n  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n  background-color: var(--bg-canvas);\n  color: var(--fg-primary);\n  margin: 0;\n  padding: 0;\n  overflow-x: hidden;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n}\n\nh1, h2, h3, h4, .font-syne {\n  font-family: 'Syne', sans-serif;\n  letter-spacing: -0.03em;\n}\n\n::selection {\n  background-color: #1c1917;\n  color: #f9f8f6;\n}\n\n/* Subtle Minimalist Scrollbar */\n::-webkit-scrollbar {\n  width: 6px;\n  height: 6px;\n}\n\n::-webkit-scrollbar-track {\n  background: #f9f8f6;\n}\n\n::-webkit-scrollbar-thumb {\n  background: #d6d3d1;\n  border-radius: 9999px;\n}\n\n::-webkit-scrollbar-thumb:hover {\n  background: #a8a29e;\n}\n\n/* Custom Cart Drawer Animations */\n@keyframes drawerSlideIn {\n  from {\n    transform: translateX(100%);\n    opacity: 0.8;\n  }\n  to {\n    transform: translateX(0);\n    opacity: 1;\n  }\n}\n\n@keyframes drawerSlideOut {\n  from {\n    transform: translateX(0);\n    opacity: 1;\n  }\n  to {\n    transform: translateX(100%);\n    opacity: 0;\n  }\n}\n\n@keyframes backdropFadeIn {\n  from {\n    opacity: 0;\n  }\n  to {\n    opacity: 1;\n  }\n}\n\n@keyframes fadeInUp {\n  from {\n    opacity: 0;\n    transform: translateY(16px);\n  }\n  to {\n    opacity: 1;\n    transform: translateY(0);\n  }\n}\n\n@keyframes badgePop {\n  0% {\n    transform: scale(0.8);\n  }\n  50% {\n    transform: scale(1.25);\n  }\n  100% {\n    transform: scale(1);\n  }\n}\n\n.animate-drawer-in {\n  animation: drawerSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;\n}\n\n.animate-backdrop-in {\n  animation: backdropFadeIn 0.25s ease-out forwards;\n}\n\n.animate-fade-up {\n  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;\n}\n\n.animate-badge-pop {\n  animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;\n}\n\n/* Interactive Image Zoom & Card Transitions */\n.product-image-container img {\n  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);\n}\n\n.product-card:hover .product-image-container img {\n  transform: scale(1.05);\n}\n\n/* Clean input styling */\ninput[type='search']::-webkit-search-cancel-button {\n  -webkit-appearance: none;\n}\n\n/* Accessibility: Reduced Motion Support */\n@media (prefers-reduced-motion: reduce) {\n  *, ::before, ::after {\n    animation-duration: 0.01ms !important;\n    animation-iteration-count: 1 !important;\n    transition-duration: 0.01ms !important;\n    scroll-behavior: auto !important;\n  }\n}\n",
+        "/components/ProductCard.js": "import React from 'react';\nimport { Eye, ShoppingBag, Plus } from 'lucide-react';\n\nexport default function ProductCard({ product, onQuickView, onAddToCart }) {\n  return (\n    <div className='group product-card bg-white border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300 hover:border-stone-400 hover:shadow-lg flex flex-col'>\n      {/* Image Container with Quick View & Add to Cart triggers */}\n      <div className='relative aspect-[4/5] bg-stone-100 overflow-hidden product-image-container'>\n        <img\n          src={product.image}\n          alt={product.title}\n          className='w-full h-full object-cover object-center'\n        />\n        \n        {/* Category Tag Pill */}\n        <div className='absolute top-3 left-3 z-10'>\n          <span className='px-3 py-1 bg-white/90 backdrop-blur-md text-[11px] font-medium tracking-wider uppercase text-stone-900 rounded-full border border-stone-200/60 shadow-sm'>\n            {product.category}\n          </span>\n        </div>\n\n        {/* Quick View Button overlay on hover */}\n        <div className='absolute inset-0 bg-stone-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 p-4'>\n          <button\n            onClick={() => onQuickView(product)}\n            className='px-4 py-2.5 bg-white text-stone-900 rounded-full font-medium text-xs tracking-wide shadow-lg hover:bg-stone-900 hover:text-white transition-all duration-200 flex items-center gap-2 transform translate-y-2 group-hover:translate-y-0'\n          >\n            <Eye className='w-3.5 h-3.5' />\n            Quick View\n          </button>\n          \n          <button\n            onClick={() => onAddToCart(product)}\n            className='p-2.5 bg-stone-900 text-white rounded-full shadow-lg hover:bg-stone-800 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0'\n            title='Quick Add to Cart'\n          >\n            <ShoppingBag className='w-4 h-4' />\n          </button>\n        </div>\n      </div>\n\n      {/* Product Metadata & Info */}\n      <div className='p-5 flex flex-col flex-grow justify-between bg-white'>\n        <div>\n          <div className='flex items-center justify-between mb-1.5'>\n            <span className='text-[11px] font-medium uppercase tracking-wider text-stone-400'>\n              {product.tags && product.tags[0] ? product.tags[0] : 'Essential'}\n            </span>\n            <span className='text-xs font-semibold text-stone-900'>\n              ${product.price.toFixed(2)}\n            </span>\n          </div>\n          <h3 \n            onClick={() => onQuickView(product)}\n            className='font-syne font-bold text-base text-stone-900 line-clamp-1 cursor-pointer hover:text-stone-600 transition-colors'\n          >\n            {product.title}\n          </h3>\n          <p className='text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed'>\n            {product.description}\n          </p>\n        </div>\n\n        <div className='mt-5 pt-4 border-t border-stone-100 flex items-center justify-between'>\n          <span className='text-[11px] text-stone-400 font-medium'>\n            {product.variants ? `${product.variants.sizes.length} sizes available` : 'In Stock'}\n          </span>\n          <button\n            onClick={() => onAddToCart(product)}\n            className='inline-flex items-center gap-1.5 text-xs font-semibold text-stone-900 hover:text-stone-600 transition-colors py-1 px-2.5 rounded-full hover:bg-stone-50'\n          >\n            <Plus className='w-3.5 h-3.5' />\n            Add\n          </button>\n        </div>\n      </div>\n    </div>\n  );\n}\n",
+        "/components/Navbar.js": "import React, { useState, useEffect } from 'react';\nimport { ShoppingBag, Search, Heart, Menu, X, Sparkles } from 'lucide-react';\n\nexport default function Navbar({ cartCount, onOpenCart, onOpenSearch, activeCategory, onSelectCategory, categories }) {\n  const [isScrolled, setIsScrolled] = useState(false);\n  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);\n\n  useEffect(() => {\n    const handleScroll = () => {\n      if (window.scrollY > 20) {\n        setIsScrolled(true);\n      } else {\n        setIsScrolled(false);\n      }\n    };\n    window.addEventListener('scroll', handleScroll);\n    return () => window.removeEventListener('scroll', handleScroll);\n  }, []);\n\n  return (\n    <header \n      className={`sticky top-0 z-40 transition-all duration-300 w-full ${\n        isScrolled \n          ? 'bg-[#f9f8f6]/90 backdrop-blur-md border-b border-[#e7e5e4] shadow-sm py-4'\n          : 'bg-[#f9f8f6] py-6 border-b border-transparent'\n      }`}\n    >\n      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>\n        <div className='flex items-center justify-between'>\n          \n          {/* Left: Mobile Menu & Category Links */}\n          <div className='flex items-center space-x-6 lg:space-x-8'>\n            <button \n              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}\n              className='lg:hidden p-2 text-[#1c1917] hover:text-[#78716c] transition-colors focus:outline-none'\n              aria-label='Toggle menu'\n            >\n              {mobileMenuOpen ? <X className='w-6 h-6' /> : <Menu className='w-6 h-6' />}\n            </button>\n\n            <nav className='hidden lg:flex items-center space-x-6'>\n              {categories.map((cat) => (\n                <button\n                  key={cat.id}\n                  onClick={() => onSelectCategory(cat.id)}\n                  className={`text-sm font-medium tracking-wide transition-colors relative py-1 ${\n                    activeCategory === cat.id \n                      ? 'text-[#1c1917] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#1c1917]'\n                      : 'text-[#78716c] hover:text-[#1c1917]'\n                  }`}\n                >\n                  {cat.name}\n                </button>\n              ))}\n            </nav>\n          </div>\n\n          {/* Center: Editorial Monogram */}\n          <div className='absolute left-1/2 transform -translate-x-1/2 text-center'>\n            <a \n              href='#' \n              onClick={(e) => { e.preventDefault(); onSelectCategory('all'); }}\n              className='group inline-block'\n            >\n              <span className='font-syne text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1c1917] group-hover:opacity-95 transition-opacity'>\n                ATELIER\n              </span>\n              <span className='block text-[9px] uppercase tracking-[0.25em] text-[#78716c] font-medium'>\n                Contemporary Living\n              </span>\n            </a>\n          </div>\n\n          {/* Right: Actions */}\n          <div className='flex items-center space-x-3 sm:space-x-5'>\n            <button \n              onClick={onOpenSearch}\n              className='p-2 text-[#1c1917] hover:text-[#78716c] transition-colors rounded-full hover:bg-[#e7e5e4]/40 flex items-center gap-1.5'\n              aria-label='Search products'\n            >\n              <Search className='w-5 h-5' />\n              <span className='hidden md:inline text-xs font-medium text-[#78716c]'>Search</span>\n            </button>\n\n            <button \n              onClick={() => alert('Wishlist feature: You have saved items in your curated collection.')}\n              className='hidden sm:flex p-2 text-[#1c1917] hover:text-[#78716c] transition-colors rounded-full hover:bg-[#e7e5e4]/40 relative'\n              aria-label='Wishlist'\n            >\n              <Heart className='w-5 h-5' />\n              <span className='absolute top-1 right-1 w-2 h-2 bg-[#1c1917] rounded-full'></span>\n            </button>\n\n            <button \n              onClick={onOpenCart}\n              className='group flex items-center space-x-2 bg-[#1c1917] text-[#f9f8f6] px-4 py-2.5 rounded-full hover:bg-stone-800 transition-all duration-300 shadow-sm hover:shadow active:scale-95'\n              aria-label='Shopping Cart'\n            >\n              <ShoppingBag className='w-4 h-4 transition-transform group-hover:-translate-y-0.5' />\n              <span className='text-xs font-medium uppercase tracking-wider hidden sm:inline'>Bag</span>\n              {cartCount > 0 && (\n                <span className='ml-1 bg-[#f9f8f6] text-[#1c1917] text-[11px] font-bold px-2 py-0.5 rounded-full animate-badge-pop'>\n                  {cartCount}\n                </span>\n              )}\n            </button>\n          </div>\n        </div>\n      </div>\n\n      {/* Mobile Drawer Navigation */}\n      {mobileMenuOpen && (\n        <div className='lg:hidden absolute top-full left-0 w-full bg-[#f9f8f6] border-b border-[#e7e5e4] shadow-lg animate-backdrop-in py-6 px-6'>\n          <div className='flex flex-col space-y-4'>\n            <div className='text-xs font-semibold uppercase tracking-widest text-[#78716c] mb-1'>\n              Collections\n            </div>\n            {categories.map((cat) => (\n              <button\n                key={cat.id}\n                onClick={() => {\n                  onSelectCategory(cat.id);\n                  setMobileMenuOpen(false);\n                }}\n                className={`text-left text-lg font-syne py-2 transition-colors ${\n                  activeCategory === cat.id \n                    ? 'text-[#1c1917] font-bold pl-2 border-l-2 border-[#1c1917]'\n                    : 'text-[#78716c] hover:text-[#1c1917]'\n                }`}\n              >\n                {cat.name}\n              </button>\n            ))}\n            <div className='pt-4 border-t border-[#e7e5e4] flex items-center justify-between text-xs text-[#78716c]'>\n              <span>Complimentary shipping over $150</span>\n              <span className='font-semibold text-[#1c1917]'>USD / EN</span>\n            </div>\n          </div>\n        </div>\n      )}\n    </header>\n  );\n}\n",
+        "/components/Hero.js": "import React from 'react';\nimport { ArrowRight, Sparkles, ShieldCheck, Truck, RefreshCw } from 'lucide-react';\n\nexport default function Hero({ onShopNow }) {\n  return (\n    <section className='relative bg-[#f9f8f6] pt-12 pb-20 md:pt-20 md:pb-32 overflow-hidden border-b border-[#e7e5e4]'>\n      {/* Subtle background ambient mesh */} \n      <div className='absolute top-0 right-0 w-96 h-96 bg-stone-200/40 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20' />\n      <div className='absolute bottom-0 left-10 w-80 h-80 bg-stone-200/30 rounded-full blur-3xl pointer-events-none -mb-20' />\n\n      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'>\n        <div className='grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center'>\n          \n          {/* Left Column: Editorial Typography & Actions */} \n          <div className='lg:col-span-7 flex flex-col justify-center space-y-8 text-left'>\n            \n            {/* Seasonal Campaign Badge */} \n            <div className='inline-flex items-center space-x-2 bg-stone-100 border border-stone-200 px-4 py-1.5 rounded-full w-fit shadow-xs animate-fade-up'>\n              <Sparkles className='w-4 h-4 text-stone-700' />\n              <span className='text-xs uppercase tracking-widest font-semibold text-stone-800'>\n                Autumn / Winter 2025 Monograph\n              </span>\n            </div>\n\n            {/* Main Headline */} \n            <h1 className='text-4xl sm:text-6xl lg:text-7xl font-syne font-extrabold text-[#1c1917] tracking-tight leading-[1.08]'>\n              Architectural forms for the <span className='italic font-normal text-stone-600'>modern</span> wardrobe.\n            </h1>\n\n            {/* Subtitle Narrative */} \n            <p className='text-stone-600 text-base sm:text-lg max-w-xl font-normal leading-relaxed'>\n              Designed in minimalist ateliers with uncompromising material provenance. Explore tactile organic wools, brushed silken silhouettes, and structural leather accessories.\n            </p>\n\n            {/* CTA Buttons */} \n            <div className='flex flex-wrap items-center gap-4 pt-2'>\n              <button\n                onClick={onShopNow}\n                className='inline-flex items-center justify-center space-x-3 bg-[#1c1917] text-[#f9f8f6] px-8 py-4 rounded-full font-medium hover:bg-stone-800 transition-all duration-300 shadow-sm hover:shadow-md group active:scale-[0.98]'\n              >\n                <span>Explore Collection</span>\n                <ArrowRight className='w-4 h-4 group-hover:translate-x-1 transition-transform duration-300' />\n              </button>\n\n              <a\n                href='#story'\n                className='inline-flex items-center justify-center px-8 py-4 rounded-full font-medium text-[#1c1917] bg-transparent border border-stone-300 hover:border-stone-500 hover:bg-stone-100/50 transition-all duration-300 active:scale-[0.98]'\n              >\n                Our Philosophy\n              </a>\n            </div>\n\n            {/* Trust & Guarantee Micro-Bar */} \n            <div className='grid grid-cols-3 gap-4 pt-8 border-t border-stone-200/80 mt-4 max-w-lg'>\n              <div className='flex items-center space-x-2.5 text-stone-600'>\n                <Truck className='w-4 h-4 text-stone-800 shrink-0' />\n                <span className='text-xs font-medium tracking-tight'>Complimentary Express Shipping</span>\n              </div>\n              <div className='flex items-center space-x-2.5 text-stone-600'>\n                <RefreshCw className='w-4 h-4 text-stone-800 shrink-0' />\n                <span className='text-xs font-medium tracking-tight'>30-Day Conscious Returns</span>\n              </div>\n              <div className='flex items-center space-x-2.5 text-stone-600'>\n                <ShieldCheck className='w-4 h-4 text-stone-800 shrink-0' />\n                <span className='text-xs font-medium tracking-tight'>Ethically Sourced Ateliers</span>\n              </div>\n            </div>\n\n          </div>\n\n          {/* Right Column: High-Fashion Editorial Imagery Composition */} \n          <div className='lg:col-span-5 relative'>\n            <div className='relative mx-auto max-w-md lg:max-w-none'>\n              \n              {/* Main Img */} \n              <div className='relative rounded-3xl overflow-hidden shadow-2xl border border-stone-200 aspect-[4/5] bg-stone-200 group'>\n                <img\n                  src='https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80'\n                  alt='Contemporary fashion editorial model'\n                  className='w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-700 ease-out'\n                />\n                <div className='absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60' />\n                \n                {/* Floating Caption Tag */} \n                <div className='absolute bottom-6 left-6 right-6 backdrop-blur-md bg-white/80 border border-white/20 p-4 rounded-2xl shadow-lg flex items-center justify-between'>\n                  <div>\n                    <span className='block text-xs uppercase tracking-widest text-stone-500 font-semibold'>Featured Piece</span>\n                    <span className='block text-sm font-syne font-bold text-stone-900'>The Structural Cashmere Overcoat</span>\n                  </div>\n                  <span className='text-sm font-semibold text-stone-900 bg-stone-100 px-3 py-1.5 rounded-full'>$480</span>\n                </div>\n              </div>\n\n              {/* Secondary Floating Aesthetic Badge */} \n              <div className='absolute -top-6 -left-6 hidden sm:flex flex-col items-center justify-center w-28 h-28 bg-[#1c1917] text-[#f9f8f6] rounded-full p-4 shadow-xl text-center transform -rotate-12 hover:rotate-0 transition-transform duration-300'>\n                <span className='text-[10px] uppercase tracking-widest text-stone-400 font-medium'>Limited</span>\n                <span className='text-xs font-syne font-bold tracking-tight'>EDITION</span>\n                <span className='text-[10px] text-stone-300'>100 Pieces</span>\n              </div>\n\n            </div>\n          </div>\n\n        </div>\n      </div>\n    </section>\n  );\n}\n",
+        "/components/ProductGrid.js": "import React from 'react';\nimport { PackageOpen, RotateCcw, Sparkles } from 'lucide-react';\nimport ProductCard from './ProductCard.js';\n\nexport default function ProductGrid({\n  products = [],\n  onAddToCart,\n  onQuickView,\n  onToggleWishlist,\n  wishlist = new Set(),\n  activeCategory = 'All',\n  searchQuery = '',\n  onResetFilters\n}) {\n  const hasActiveFilters = activeCategory !== 'All' || (searchQuery && searchQuery.trim().length > 0);\n\n  if (products.length === 0) {\n    return (\n      <section className='w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center animate-fade-up'>\n        <div className='max-w-md mx-auto bg-white border border-stone-200 rounded-2xl p-10 shadow-sm'>\n          <div className='w-16 h-16 mx-auto mb-5 rounded-full bg-stone-100 flex items-center justify-center text-stone-700'>\n            <PackageOpen className='w-8 h-8 stroke-[1.5]' />\n          </div>\n          <h3 className='font-syne text-2xl font-bold text-stone-900 mb-2'>\n            No Artifacts Found\n          </h3>\n          <p className='text-stone-500 text-sm leading-relaxed mb-6'>\n            {searchQuery\n              ? `No objects matched \"${searchQuery}\" within the selected filters.`\n              : 'There are currently no items matching this criteria in our atelier catalog.'}\n          </p>\n          {hasActiveFilters && onResetFilters && (\n            <button\n              type='button'\n              onClick={onResetFilters}\n              className='inline-flex items-center gap-2 px-6 py-3 rounded-full bg-stone-900 text-stone-50 text-sm font-medium hover:bg-stone-800 transition-colors duration-200 active:scale-95'\n            >\n              <RotateCcw className='w-4 h-4' />\n              <span>Reset Search & Filters</span>\n            </button>\n          )}\n        </div>\n      </section>\n    );\n  }\n\n  return (\n    <section className='w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24'>\n      {/* Grid Meta Header */}\n      <div className='flex items-center justify-between pb-6 mb-8 border-b border-stone-200/80'>\n        <div className='flex items-center gap-3'>\n          <span className='w-2 h-2 rounded-full bg-stone-900'></span>\n          <p className='text-xs font-semibold tracking-wider uppercase text-stone-500'>\n            Curated Selection\n          </p>\n        </div>\n        <div className='flex items-center gap-2 text-xs font-medium text-stone-600 bg-stone-100/70 px-3 py-1.5 rounded-full border border-stone-200/60'>\n          <Sparkles className='w-3.5 h-3.5 text-stone-700' />\n          <span>\n            Showing <strong className='text-stone-900 font-semibold'>{products.length}</strong> {products.length === 1 ? 'Design' : 'Designs'}\n          </span>\n        </div>\n      </div>\n\n      {/* 3-Column Responsive Product Grid */}\n      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8'>\n        {products.map((product) => (\n          <ProductCard\n            key={product.id}\n            product={product}\n            onAddToCart={onAddToCart}\n            onQuickView={onQuickView}\n            onToggleWishlist={onToggleWishlist}\n            isWishlisted={wishlist.has ? wishlist.has(product.id) : Array.isArray(wishlist) && wishlist.includes(product.id)}\n          />\n        ))}\n      </div>\n    </section>\n  );\n}\n",
+        "/components/NewsletterSection.js": "import React, { useState } from 'react';\nimport { Mail, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';\n\nexport default function NewsletterSection() {\n  const [email, setEmail] = useState('');\n  const [status, setStatus] = useState('idle'); // 'idle' | 'success' | 'error'\n  const [errorMsg, setErrorMsg] = useState('');\n\n  const handleSubmit = (e) => {\n    e.preventDefault();\n    if (!email || !email.includes('@') || !email.includes('.')) {\n      setStatus('error');\n      setErrorMsg('Please enter a valid email address.');\n      return;\n    }\n\n    setStatus('success');\n    setErrorMsg('');\n  };\n\n  return (\n    <section className='relative bg-[#1c1917] text-[#f9f8f6] py-24 px-6 md:px-12 overflow-hidden'>\n      {/* Background Decorative Glow */}\n      <div className='absolute -top-32 -left-32 w-96 h-96 bg-stone-800/40 rounded-full blur-3xl pointer-events-none' />\n      <div className='absolute -bottom-32 -right-32 w-96 h-96 bg-stone-700/30 rounded-full blur-3xl pointer-events-none' />\n\n      <div className='max-w-4xl mx-auto relative z-10 text-center'>\n        {/* Tag badge */}\n        <div className='inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-stone-800/80 border border-stone-700 text-stone-300 text-xs font-medium tracking-wider uppercase mb-8 shadow-sm'>\n          <Sparkles className='w-3.5 h-3.5 text-stone-300' />\n          Exclusive Member Benefit\n        </div>\n\n        <h2 className='font-syne text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[#f9f8f6] mb-6'>\n          Receive 15% off your first curation.\n        </h2>\n\n        <p className='text-stone-400 text-base sm:text-lg max-w-xl mx-auto mb-10 leading-relaxed font-normal'>\n          Join our private atelier circle for early access to limited seasonal drops, private invitations, and material provenance notes.\n        </p>\n\n        {status === 'success' ? (\n          <div className='bg-stone-800/90 border border-stone-700 text-[#f9f8f6] p-6 rounded-2xl max-w-md mx-auto flex items-center justify-center gap-3 animate-fade-up shadow-xl'>\n            <CheckCircle2 className='w-6 h-6 text-emerald-400 flex-shrink-0' />\n            <div className='text-left'>\n              <p className='font-medium text-sm'>Welcome to the inner circle.</p>\n              <p className='text-stone-400 text-xs mt-0.5'>Check your inbox for your 15% welcome code.</p>\n            </div>\n          </div>\n        ) : (\n          <form onSubmit={handleSubmit} className='max-w-md mx-auto'>\n            <div className='flex flex-col sm:flex-row items-center gap-3 bg-stone-900/90 p-2 rounded-2xl border border-stone-800 shadow-2xl focus-within:border-stone-600 transition-all'>\n              <div className='relative w-full flex items-center pl-3'>\n                <Mail className='w-5 h-5 text-stone-500 absolute left-3' />\n                <input\n                  type='email'\n                  value={email}\n                  onChange={(e) => {\n                    setEmail(e.target.value);\n                    if (status === 'error') setStatus('idle');\n                  }}\n                  placeholder='Enter your email address...' \n                  className='w-full bg-transparent pl-10 pr-4 py-3 text-sm text-[#f9f8f6] placeholder-stone-500 focus:outline-none'\n                />\n              </div>\n              <button\n                type='submit'\n                className='w-full sm:w-auto px-6 py-3 bg-[#f9f8f6] hover:bg-stone-200 text-[#1c1917] font-medium text-sm rounded-xl transition-all duration-300 flex items-center justify-center gap-2 group flex-shrink-0 active:scale-95'\n              >\n                <span>Subscribe</span>\n                <ArrowRight className='w-4 h-4 transition-transform group-hover:translate-x-1' />\n              </button>\n            </div>\n            {status === 'error' && (\n              <p className='text-rose-400 text-xs mt-3 text-center animate-fade-up'>\n                {errorMsg}\n              </p>\n            )}\n            <p className='text-stone-500 text-xs mt-4'>\n              By subscribing you agree to our Terms & Privacy Policy. Unsubscribe anytime.\n            </p>\n          </form>\n        )}\n      </div>\n    </section>\n  );\n}\n",
+        "/components/Footer.js": "import React, { useState } from 'react';\nimport { ArrowRight, Globe, ShieldCheck, RefreshCw, Truck, Heart, ExternalLink, Share2, MessageCircle } from 'lucide-react';\n\nexport default function Footer() {\n  const [email, setEmail] = useState('');\n  const [subscribed, setSubscribed] = useState(false);\n  const [currency, setCurrency] = useState('USD ($)');\n  const [currencyOpen, setCurrencyOpen] = useState(false);\n\n  const currencies = [\n    'USD ($)',\n    'EUR (€)',\n    'GBP (£)',\n    'JPY (¥)',\n    'AUD ($)'\n  ];\n\n  const handleSubscribe = (e) => {\n    e.preventDefault();\n    if (email.trim()) {\n      setSubscribed(true);\n      setEmail('');\n    }\n  };\n\n  return (\n    <footer className='bg-[#1c1917] text-[#f9f8f6] pt-20 pb-12 border-t border-stone-800 relative overflow-hidden'>\n      {/* Subtle ambient glow */}\n      <div className='absolute bottom-0 right-1/4 w-96 h-96 bg-stone-800/20 rounded-full blur-3xl pointer-events-none' />\n\n      <div className='max-w-7xl mx-auto px-6 lg:px-12'>\n        {/* Top Assurance Bar */}\n        <div className='grid grid-cols-1 md:grid-cols-3 gap-8 pb-16 border-b border-stone-800/80 mb-16'>\n          <div className='flex items-start space-x-4'>\n            <div className='w-12 h-12 rounded-full bg-stone-800 flex items-center justify-center shrink-0 text-stone-300'>\n              <Truck className='w-5 h-5' />\n            </div>\n            <div>\n              <h4 className='font-syne font-bold text-base mb-1 tracking-tight text-white'>Complimentary Shipping</h4>\n              <p className='text-sm text-stone-400 font-normal leading-relaxed'>On all global orders above $150 with insured courier tracking.</p>\n            </div>\n          </div>\n\n          <div className='flex items-start space-x-4'>\n            <div className='w-12 h-12 rounded-full bg-stone-800 flex items-center justify-center shrink-0 text-stone-300'>\n              <RefreshCw className='w-5 h-5' />\n            </div>\n            <div>\n              <h4 className='font-syne font-bold text-base mb-1 tracking-tight text-white'>Seamless Returns</h4>\n              <p className='text-sm text-stone-400 font-normal leading-relaxed'>30-day effortless return window in original packaging.</p>\n            </div>\n          </div>\n\n          <div className='flex items-start space-x-4'>\n            <div className='w-12 h-12 rounded-full bg-stone-800 flex items-center justify-center shrink-0 text-stone-300'>\n              <ShieldCheck className='w-5 h-5' />\n            </div>\n            <div>\n              <h4 className='font-syne font-bold text-base mb-1 tracking-tight text-white'>Secure Transactions</h4>\n              <p className='text-sm text-stone-400 font-normal leading-relaxed'>End-to-end encrypted checkout with multi-factor verification.</p>\n            </div>\n          </div>\n        </div>\n\n        {/* Main Footer Links & Newsletter Grid */}\n        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 lg:gap-8 pb-16 border-b border-stone-800/80'>\n          \n          {/* Brand Col */}\n          <div className='lg:col-span-2 space-y-6'>\n            <div className='flex items-center space-x-2'>\n              <span className='font-syne text-2xl font-extrabold tracking-tighter text-white'>ATELIER</span>\n              <span className='w-2 h-2 rounded-full bg-stone-400'></span>\n            </div>\n            <p className='text-stone-400 text-sm max-w-sm leading-relaxed'>\n              Redefining contemporary lifestyle through uncompromising material integrity, mindful architectural tailoring, and enduring objects of desire.\n            </p>\n\n            {/* Currency Selector Dropdown */}\n            <div className='relative inline-block pt-2'>\n              <button\n                onClick={() => setCurrencyOpen(!currencyOpen)}\n                className='flex items-center space-x-2 bg-stone-900 border border-stone-800 text-stone-300 px-4 py-2 rounded-full text-xs font-medium hover:border-stone-700 transition-all'\n              >\n                <Globe className='w-3.5 h-3.5 text-stone-400' />\n                <span>{currency}</span>\n              </button>\n              {currencyOpen && (\n                <div className='absolute bottom-full mb-2 left-0 w-36 bg-stone-900 border border-stone-800 rounded-xl shadow-2xl py-2 z-20 animate-fade-up'>\n                  {currencies.map((c) => (\n                    <button\n                      key={c}\n                      onClick={() => {\n                        setCurrency(c);\n                        setCurrencyOpen(false);\n                      }}\n                      className={`w-full text-left px-4 py-2 text-xs transition-colors ${currency === c ? 'text-white bg-stone-800/50 font-semibold' : 'text-stone-400 hover:text-white hover:bg-stone-800/30'}`}\n                    >\n                      {c}\n                    </button>\n                  ))}\n                </div>\n              )}\n            </div>\n          </div>\n\n          {/* Col 1: Shop Categories */}\n          <div>\n            <h5 className='font-syne font-bold text-xs uppercase tracking-widest text-stone-300 mb-6'>Collections</h5>\n            <ul className='space-y-3.5 text-sm'>\n              <li><a href='#collection' className='text-stone-400 hover:text-white transition-colors'>All Objects</a></li>\n              <li><a href='#collection' className='text-stone-400 hover:text-white transition-colors'>Apparel & Tailoring</a></li>\n              <li><a href='#collection' className='text-stone-400 hover:text-white transition-colors'>Footwear & Leather</a></li>\n              <li><a href='#collection' className='text-stone-400 hover:text-white transition-colors'>Accessories & Bags</a></li>\n              <li><a href='#collection' className='text-stone-400 hover:text-white transition-colors'>Home & Artifacts</a></li>\n            </ul>\n          </div>\n\n          {/* Col 2: Customer Care */}\n          <div>\n            <h5 className='font-syne font-bold text-xs uppercase tracking-widest text-stone-300 mb-6'>Customer Care</h5>\n            <ul className='space-y-3.5 text-sm'>\n              <li><a href='#care' className='text-stone-400 hover:text-white transition-colors'>Client Concierge</a></li>\n              <li><a href='#care' className='text-stone-400 hover:text-white transition-colors'>Shipping & Logistics</a></li>\n              <li><a href='#care' className='text-stone-400 hover:text-white transition-colors'>Returns & Exchanges</a></li>\n              <li><a href='#care' className='text-stone-400 hover:text-white transition-colors'>Product Care Guide</a></li>\n              <li><a href='#care' className='text-stone-400 hover:text-white transition-colors'>Store Locator</a></li>\n            </ul>\n          </div>\n\n          {/* Col 3: Journal & Brand */}\n          <div>\n            <h5 className='font-syne font-bold text-xs uppercase tracking-widest text-stone-300 mb-6'>The House</h5>\n            <ul className='space-y-3.5 text-sm'>\n              <li><a href='#story' className='text-stone-400 hover:text-white transition-colors'>Our Philosophy</a></li>\n              <li><a href='#story' className='text-stone-400 hover:text-white transition-colors'>Sustainable Atelier</a></li>\n              <li><a href='#story' className='text-stone-400 hover:text-white transition-colors'>Press & Publications</a></li>\n              <li><a href='#story' className='text-stone-400 hover:text-white transition-colors'>Careers</a></li>\n              <li><a href='#story' className='text-stone-400 hover:text-white transition-colors'>Privacy Policy</a></li>\n            </ul>\n          </div>\n\n        </div>\n\n        {/* Bottom Bar: Copyright & Socials */}\n        <div className='pt-8 flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-stone-500'>\n          <div className='flex items-center space-x-6'>\n            <p>© {new Date().getFullYear()} ATELIER Contemporary Lifestyle Inc. All rights reserved.</p>\n          </div>\n\n          <div className='flex items-center space-x-6'>\n            <a href='https://instagram.com' target='_blank' rel='noreferrer' className='hover:text-stone-300 transition-colors flex items-center space-x-1.5'>\n              <Share2 className='w-4 h-4' />\n              <span>Instagram</span>\n            </a>\n            <a href='https://twitter.com' target='_blank' rel='noreferrer' className='hover:text-stone-300 transition-colors flex items-center space-x-1.5'>\n              <MessageCircle className='w-4 h-4' />\n              <span>Twitter</span>\n            </a>\n            <a href='https://facebook.com' target='_blank' rel='noreferrer' className='hover:text-stone-300 transition-colors flex items-center space-x-1.5'>\n              <ExternalLink className='w-4 h-4' />\n              <span>Facebook</span>\n            </a>\n          </div>\n        </div>\n      </div>\n    </footer>\n  );\n}\n"
+      },
+      "endTime": "2026-10-31T17:04:04.491Z"
+    }
+  }
+}

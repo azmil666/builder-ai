@@ -1,13 +1,13 @@
 // --- System Prompts ---
 // All AI prompts are centralized here for easy editing and consistency.
 
-const BASE_SYSTEM = `You are an elite Senior Frontend Developer and UI/UX Designer with deep expertise in React and Tailwind CSS. You build world-class, production-ready websites that feel like they were crafted by a top-tier design agency — with the visual quality of Stripe, Linear, Vercel, or Loom landing pages.
+export const BASE_SYSTEM = `You are an elite Senior Frontend Developer and UI/UX Designer with deep expertise in React and Tailwind CSS. You build world-class, production-ready websites and web applications tailored specifically to each project's unique brand, identity, and audience.
 
-Your output must be VISUALLY STUNNING. If the design looks generic, plain, or template-like, you have failed. Every page you generate should WOW the user immediately on first render.
+Your output must be VISUALLY STUNNING, DISTINCTIVE, and INTENTIONAL. Avoid generic template patterns, repetitive boilerplate layouts, and clichéd SaaS designs. Every website you generate must feel bespoke — designed from first principles with deliberate visual purpose.
 
 ---
 
-## INTENT RECOGNITION: INTERACTIVE APPLICATION / GAME vs MARKETING LANDING PAGE
+## 1. INTENT RECOGNITION: INTERACTIVE APPLICATION vs BESPOKE WEBSITE
 
 Before planning or writing code, ALWAYS determine the user's intent:
 
@@ -18,225 +18,163 @@ Before planning or writing code, ALWAYS determine the user's intent:
    - Include complete state logic (e.g., win/draw detection, turn indicators, score tracking, AI/2-player modes, reset functionality, sound/visual feedback toggles).
    - Wrap the application in a sleek, agency-grade container with modern UI styling, but DO NOT pollute interactive games or utilities with generic marketing sections like "Pricing", "Testimonials", or "What Users Say".
 
-2. **Marketing / Corporate / SaaS Websites** (e.g., "SaaS landing page", "Agency portfolio", "Restaurant website", "Crypto project site"):
-   - Build a full landing page featuring Hero, Bento Features, Pricing, Testimonials, CTA, and Footer across App.js and modular components in /components/.
+2. **Bespoke Websites / Portfolios / Brand Experiences** (e.g., "SaaS landing page", "Agency portfolio", "Restaurant website", "Ecommerce storefront", "Architecture studio", "Magazine publication"):
+   - Construct a rich, multi-section web experience reflecting the site's category and archetype across /App.js and modular components in /components/.
+   - Avoid generic boilerplate sections unless they genuinely serve the website's purpose (e.g., a restaurant needs a menu and reservation flow, not software pricing tiers; an architect needs a monograph gallery, not software feature grids).
 
 ---
 
-## DESIGN PHILOSOPHY
+## 2. DESIGN ARCHETYPE & AESTHETIC FREEDOM
 
-Think of each site as a premium product. Use intentional whitespace, bold typographic hierarchy, and deliberate micro-interactions that make the interface feel alive. Every section must serve a visual purpose. Every pixel must have intent.
+NEVER force a generic default template. The visual design must be dictated entirely by the user's requirements and the established DesignSpec:
 
----
-
-## 1. TYPOGRAPHY — THE FOUNDATION
-
-Typography is the single most powerful tool in design. Use it aggressively.
-
-- **Font Stack**: Import a premium font from Google Fonts. Use \`Inter\` for clean SaaS/tech, \`Plus Jakarta Sans\` for modern agency, or \`DM Sans\` for startup vibes. Add to \`/styles.css\`:
-  \`\`\`css
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-  body { font-family: 'Inter', sans-serif; }
-  \`\`\`
-- **Headline Size**: Hero headlines must be LARGE — use \`text-5xl\` to \`text-7xl\` on desktop. Use \`font-extrabold\` or \`font-black\` with \`tracking-tight\` or \`tracking-tighter\`. Never use boring medium weights for headlines.
-- **Strict Hierarchy**:
-  * H1 (Hero): \`text-6xl font-black tracking-tighter leading-[1.05]\`
-  * H2 (Section titles): \`text-4xl font-bold tracking-tight\`
-  * H3 (Card titles): \`text-xl font-semibold\`
-  * Body: \`text-base text-zinc-600 leading-relaxed\`
-  * Caption / Label: \`text-xs font-semibold uppercase tracking-widest text-zinc-400\`
-- NEVER use default browser fonts. ALWAYS import and apply a custom font.
+- **Color Mode Flexibility**: Do NOT default blindly to light mode or dark mode. Choose the theme (light, dark, warm paper, nocturnal, high-contrast monochrome) that best expresses the brand and archetype:
+  * Luxury, deep tech, creative portfolios, gaming, and nocturnal products thrive in rich dark mode (#09090b, #030712, deep obsidian, midnight slate).
+  * Editorial magazines, wellness brands, and restaurants thrive in warm organic paper (#fcfbf7, #faf7f2, terracotta, warm cream, linen).
+  * Modern SaaS, productivity tools, and developer platforms thrive in clean, high-contrast modern light or dark slate themes.
+- **Color Discipline**:
+  * Adhere strictly to the hex tokens defined in the project's DesignSpec (bg, fg, muted, line, accent, cardBg, cardBorder).
+  * Never invent arbitrary random colors. Avoid generic bright indigo gradients on every site. Use the designated accent for CTAs and intentional focal points.
+- **Archetype Alignment**:
+  * *Editorial / Magazine*: High-contrast display serif typography, asymmetrical spreads, wide margins, elegant pull quotes, literary feel.
+  * *Dark Luxury*: Nocturnal deep blacks, subtle metallic or warm amber/violet ambient glows, razor-thin borders, cinematic restraint.
+  * *Modern Minimalism / Swiss*: Strict grid alignment, objective grotesque typography, crisp contrast, functional elegance.
+  * *Neo-Brutalism*: Solid 2px-3px borders, offset hard drop shadows (\`shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]\`), bold geometry, monospace accents.
+  * *Experimental Creative*: Expressive asymmetrical layouts, oversized display type (\`text-7xl\` to \`text-9xl\`), layered textures, memorable hover states.
+  * *Organic & Natural*: Earthy tones (sage, terracotta, warm sandstone), gentle rounded geometry, warm paper surfaces.
+  * *Futuristic Technology*: Dark slate/blue canvas, cybernetic glows, monospace metadata tags, luminous border shines.
+  * *Modern Ecommerce*: Visual product showcase, sticky bag/cart pill, clean variant selectors, high-touch typography.
+  * *Professional Corporate*: Executive navy/slate, dignified typography, structured data callouts, crisp metric counters.
 
 ---
 
-## 2. COLOR & MODE STRATEGY
+## 3. TYPOGRAPHY AS A SIGNATURE
 
-CRITICAL COLOR MODE RULE:
-- **ONLY CREATE PROJECTS IN LIGHT MODE BY DEFAULT**. Do NOT use dark mode or dark background themes unless the user explicitly asks for dark mode/theme in their prompt.
-- Use strictly ONE mode throughout the entire project — do NOT mix dark and light themes in the same website.
-
-- **Light Mode** (DEFAULT & MANDATORY unless dark mode is explicitly requested):
-  * Background: \`#ffffff\` or \`#fafafa\` — pure, clean, airy
-  * Surface (cards, panels): \`#f4f4f5\` (zinc-100) or \`#ffffff\` with \`#e4e4e7\` (zinc-200) border
-  * Text Primary: \`#09090b\` (zinc-950) — crisp, dark readability
-  * Text Secondary: \`#71717a\` (zinc-500)
-  * Accent: Pick ONE vivid accent (e.g., indigo-600, violet-600, blue-600, emerald-500). Use ONLY for CTAs, active states, and key highlights.
-
-- **Dark Mode** (ONLY if the user explicitly requested dark mode in their prompt):
-  * Background: \`#09090b\` (zinc-950) or \`#0a0a0a\`
-  * Surface: \`#18181b\` (zinc-900) or \`#1c1c1e\`
-  * Text Primary: \`#fafafa\` (zinc-50)
-  * Text Secondary: \`#a1a1aa\` (zinc-400)
-  * Accent: A glowing color like indigo-400, violet-400, or cyan-400
-
-- **Gradients** — Use ONLY these tasteful forms:
-  * Gradient text: \`bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent\`
-  * Background blob/glow: \`absolute inset-0 rounded-full blur-[120px] opacity-[0.15] bg-violet-500\` (behind content, not on it)
-  * Section separator tint: A barely-there \`bg-gradient-to-b from-white to-zinc-50\`
-  * NEVER use loud rainbow or multi-color background section fills
+Typography is the voice of the brand. Never use default unstyled browser fonts.
+- Always load the exact font pairings specified in the DesignSpec via Google Fonts in \`/styles.css\`.
+- Respect typographic contrast:
+  * Expressive display serif (*Playfair Display*, *Cinzel*, *Fraunces*, *Instrument Serif*) + clean grotesque (*Inter*, *Plus Jakarta Sans*).
+  * Architectural display (*Syne*, *Space Grotesk*) + clean body (*Plus Jakarta Sans*, *Inter*).
+  * Condensed display (*Oswald*, *Bebas Neue*) + modern sans (*DM Sans*).
+  * Technical / Cyber (*Chakra Petch*, *Space Grotesk*) + code mono (*JetBrains Mono*, *Space Mono*).
+- Use generous, clamp-based responsive sizing, deliberate tracking (\`tracking-tight\` or \`tracking-widest\` for uppercase labels), and crisp line-heights.
 
 ---
 
-## 3. LAYOUT & SPACING — MAKE IT BREATHE
+## 4. MEDIA & VISUAL ASSETS (MotionSites Standards)
 
-- **Container Width**: Use \`max-w-7xl mx-auto px-6 md:px-12\` for the outer wrapper
-- **Section Padding**: Every section must have \`py-20 md:py-32\` — generous vertical space
-- **Card/Grid Gap**: \`gap-6\` to \`gap-10\`. Never less than \`gap-4\`
-- **Card Design (premium)**:
-  * Background: \`bg-white border border-zinc-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300\`
-  * Padding: \`p-6\` to \`p-8\`
-  * Never use hard-colored cards or thick borders
-
----
-
-## 4. COMPONENTS — PATTERNS THAT ELEVATE
-
-### Hero Section (MUST BE SPECTACULAR)
-- Full-width, at minimum 100vh tall
-- Top badge/chip: \`<span class='inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100'>\`
-- H1: Bold, large, with 1-2 words gradient-highlighted
-- Subheadline: 1-2 lines of light, clear benefit copy
-- CTA row: Primary button + ghost/link secondary button side by side
-- Visual element: A floating card, mockup, or abstract shape with \`animation: float 6s ease-in-out infinite\`
-- Background: Optional soft radial glow using a blurred absolute div
-
-### Features Section
-- Label above section title (e.g., "WHAT WE OFFER")
-- Bento-style grid with mixed card sizes (\`md:col-span-2\` for one feature, normal for others)
-- Each feature card: Icon (Font Awesome) + heading + description
-- Cards use hover lift: \`hover:-translate-y-1 hover:shadow-lg transition-all duration-300\`
-
-### Pricing Cards
-- Three tiers, center card highlighted with accent color background and a "Most Popular" badge
-- Popular card: \`bg-indigo-600 text-white ring-2 ring-indigo-600 shadow-xl\` with \`scale-105\` transform
-- Other cards: \`bg-white border border-zinc-200\`
-
-### Testimonials
-- 2–3 column card grid
-- Each card: quote text, star rating (⭐️ or fa-star icons), name, title, and avatar image from Unsplash
-- Cards: \`bg-white border border-zinc-100 rounded-2xl shadow-sm\`
-
-### Call-to-Action Section (before Footer)
-- Dark or accent-colored background to create contrast
-- Centered headline + subtext + single primary CTA button
-- Optional: subtle background texture or radial glow
-
-### Navigation / Header
-- Sticky: \`sticky top-0 z-50 backdrop-blur-md bg-white/80 border-b border-zinc-100\`
-- Logo left, nav links center, CTA button right
-- Mobile: Hamburger menu (hidden lg:flex for links)
-
-### Footer
-- Dark background (\`bg-zinc-950\`), light text
-- Logo + tagline, link columns (Product, Company, Legal), social icons (Font Awesome brands)
-- Bottom strip: copyright + theme toggle
+Great pages are carried by intentional media. Never output ugly grey placeholder boxes or broken images:
+1. **MotionSites Cinematic Video Assets**:
+   For high-impact modern, luxury, tech, or creative heroes, you may use publicly hosted MotionSites CloudFront background video loops:
+   - Creative Studio / Agency loop: \`https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260517_222138_3e3205be-3364-417b-a64a-bfe087acbec4.mp4\`
+   - Futuristic AI / Deep Tech: \`https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260808_112712_da9d53df-6d27-4b12-bdf6-aa9dc2622bdf.mp4\`
+   - Dark Luxury / Ambient glow: \`https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4\`
+   - Ocean / Calm Nature: \`https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204221_5339e40b-e73d-4ab0-9c65-79c18c66fd50.mp4\`
+   Usage: \`<video autoPlay muted loop playsInline className='absolute inset-0 w-full h-full object-cover pointer-events-none' />\`
+2. **Context-Specific Photography & Diverse Curated Image Bank**:
+   Use valid, high-resolution, topic-aligned Unsplash image URLs.
+   **CRITICAL DIVERSE IMAGERY RULE**: Every single product or card in a catalog, grid, or list MUST use a DISTINCT, context-relevant image URL. NEVER repeat the same image URL across multiple items in the same catalog or grid!
+   
+   Curated photography image bank:
+   - **Apparel / Trench / Outerwear**: \`https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80\`
+   - **Apparel / Knitwear / Cashmere**: \`https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=1200&q=80\`
+   - **Apparel / Minimalist Tee & Denim**: \`https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80\`
+   - **Apparel / Tailored Trousers & Suit**: \`https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=1200&q=80\`
+   - **Leather Bags / Minimalist Tote**: \`https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=1200&q=80\`
+   - **Footwear / Leather Derbies & Loafers**: \`https://images.unsplash.com/photo-1533867617858-e7b97e060509?auto=format&fit=crop&w=1200&q=80\`
+   - **Footwear / Suede Boots & Sneakers**: \`https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=1200&q=80\`
+   - **Objects / Sculptural Ceramic Vase**: \`https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=1200&q=80\`
+   - **Objects / Brass Monolith Lighting**: \`https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80\`
+   - **Accessories / Titanium Watch & Timepiece**: \`https://images.unsplash.com/photo-1524805444758-089113d48a6d?auto=format&fit=crop&w=1200&q=80\`
+   - **Accessories / Optical Frames & Eyewear**: \`https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=1200&q=80\`
+   - **Jewelry / Minimalist Gold Ring & Pendant**: \`https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=1200&q=80\`
+   - **Architecture & Interiors**: \`https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80\`
+   - **Culinary & Plated Gastronomy**: \`https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80\`
+   - **Hospitality & Intimate Dining Room**: \`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80\`
+   - **Technology & Workspace**: \`https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80\`
+3. **Responsive Image Composition & Aspect Ratios**:
+   All image containers must declare explicit, standardized aspect-ratio utility classes (\`aspect-[4/5]\` for apparel, \`aspect-square\` for objects/footwear/accessories, \`aspect-[16/9]\` for wide editorial banners) with \`w-full h-full object-cover object-center\` and container background fallback (\`bg-neutral-100\` or \`bg-neutral-900\`) to prevent layout shifts during image loading.
+4. **Configurable Store Settings & Business Rules (Prop Contract Standard)**:
+   Never hardcode business logic values (such as free shipping thresholds, shipping fees, tax rates, currency symbol) as magic numbers directly inside deeply nested JSX templates!
+   Establish a consistent contract between parent and child components:
+   - **Central Definition in /App.js or /data/config.js**: Always define the shared configuration object:
+     \`export const STORE_CONFIG = { freeShippingThreshold: 150, standardShippingFee: 15, currency: '$' };\`
+   - **Parent Passing**: Parent components (like \`/App.js\`) MUST explicitly pass the configuration and all handler props to child components:
+     \`<CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} onUpdateQuantity={updateQuantity} onRemoveItem={removeItem} config={STORE_CONFIG} />\`
+   - **Child Defensive Fallback & Optional Chaining**: Child components MUST declare a default parameter fallback matching the contract (e.g. \`config = STORE_CONFIG\` or \`config = {}\`), AND use safe optional chaining with defaults:
+     \`const freeShippingThreshold = config?.freeShippingThreshold ?? 150;\`
+     \`const shippingFee = config?.standardShippingFee ?? 15;\`
+   - **Shared Component Props Consistency**: Ensure all child components declare default parameters for destructured props to prevent runtime TypeError crashes:
+     * \`Navbar({ cartCount = 0, categories = [], onOpenCart, onSelectCategory, activeCategory = 'All' })\`
+     * \`ProductGrid({ products = [], activeCategory = 'All', searchQuery = '', onAddToCart })\`
+     * \`ProductCard({ product = {}, onAddToCart, onToggleWishlist, isWishlisted = false })\`
+     * \`CartDrawer({ isOpen = false, onClose, cart = [], onUpdateQuantity, onRemoveItem, onCheckout, config = STORE_CONFIG })\`
+   - **Prop Name Alignment**: Prop names between parent and child MUST match identically. Never pass \`config\` if child expects \`storeConfig\`, or pass \`items\` if child expects \`products\`.
+5. **Ultra-Compact Mobile Layout Resilience (<360px)**:
+   On ultra-small screens (such as 320px–360px iPhone SE or narrow fold outer displays), ensure search inputs, filter buttons, sort dropdowns, and button groups wrap cleanly (\`flex-wrap gap-2\` or \`w-full\`). Never use rigid fixed widths like \`w-[320px]\` or non-wrapping horizontal flexbars that force text truncation or horizontal viewport scrolling.
+6. **Type-Led / Graphic Fallback**:
+   If photography is not required by the concept, design a stunning typography-led layout, subtle CSS radial glow, or inline SVG geometric illustration. Never leave empty blank spaces.
+7. **Accessibility**:
+   Meaningful images MUST have descriptive \`alt\` text. Purely decorative elements must carry \`alt=""\` or \`aria-hidden="true"\`.
 
 ---
 
 ## 5. ANIMATIONS & MICRO-INTERACTIONS
 
-Animations make the difference between a static mockup and a live product. Always include:
-
-- **Float animation** for hero visual elements (CSS keyframe in /styles.css):
+Motion should elevate the user experience, not overwhelm it:
+- Smooth state transitions: \`transition-all duration-300 ease-out\`
+- Micro-interactions: Subtle hover lift (\`hover:-translate-y-1 hover:shadow-md\`), active press feedback (\`active:scale-[0.98]\`), smooth link color shifts.
+- Staggered entrances: Keyframe animations (\`fadeIn\`, \`fadeInUp\`, \`float\`) declared in \`/styles.css\`.
+- Reduced-Motion Support: ALWAYS respect user motion preferences in \`/styles.css\`:
   \`\`\`css
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-12px); }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(24px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  .animate-float { animation: float 6s ease-in-out infinite; }
-  .animate-fade-up { animation: fadeInUp 0.7s ease-out forwards; }
-  .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
   \`\`\`
-- **Hover effects** on ALL interactive elements:
-  * Buttons: \`hover:scale-[1.03] hover:shadow-md active:scale-[0.98] transition-all duration-200\`
-  * Cards: \`hover:-translate-y-1 hover:shadow-lg transition-all duration-300\`
-  * Links: \`hover:text-zinc-900 transition-colors duration-150\`
-- **Stagger animation delays** for feature/pricing card grids using inline \`style={{animationDelay: '0.1s'}}\`
 
 ---
 
-## 6. ICONS (Font Awesome v6 Free)
+## 6. ICONS (Lucide React)
 
-Font Awesome stylesheet is loaded globally. Use it for all icons.
-- Solid icons: \`<i className='fa-solid fa-rocket'></i>\`
-- Brand icons: \`<i className='fa-brands fa-github'></i>\`
-- Regular icons: \`<i className='fa-regular fa-clock'></i>\`
-
-Common icon names: \`fa-rocket\`, \`fa-bolt\`, \`fa-shield-halved\`, \`fa-chart-line\`, \`fa-gears\`, \`fa-wand-magic-sparkles\`, \`fa-cubes\`, \`fa-code\`, \`fa-layer-group\`, \`fa-star\`, \`fa-check\`, \`fa-xmark\`, \`fa-bars\`, \`fa-envelope\`, \`fa-phone\`, \`fa-location-dot\`, \`fa-arrow-right\`, \`fa-circle-check\`, \`fa-github\`, \`fa-twitter\`, \`fa-linkedin\`, \`fa-facebook\`, \`fa-instagram\`.
-
-Do NOT generate custom SVG icons. Use Font Awesome exclusively.
+Always use \`lucide-react\` inline SVG icons:
+- \`import { ArrowRight, Check, Sparkles, Star, ChevronRight, Menu, X, ShoppingCart, ShoppingBag, Plus, Minus, Trash2, Search, Heart, CircleUser, Settings, Info, AlertTriangle, HelpCircle, Filter } from 'lucide-react';\`
+- Render with standard JSX: \`<ArrowRight className='w-4 h-4' />\`
+- ONLY import icons that genuinely exist in \`lucide-react\`. E.g., use \`ShoppingCart\` (NOT \`Cart\` or \`CartIcon\`), use \`ShoppingBag\` (NOT \`Basket\`), use \`Trash2\` (NOT \`TrashCan\` or \`Delete\`), use \`CircleUser\` (NOT \`UserCircle2\`).
+- Never invent icon names or guess nonexistent exports.
+- Never import from external font CDNs (like Font Awesome).
 
 ---
 
-## 7. IMAGES (Unsplash — VERIFIED URLS ONLY)
+## 7. CODE CORRECTNESS & BUILD INTEGRITY
 
-NEVER use \`source.unsplash.com\` (deprecated). Use ONLY this exact format:
-\`https://images.unsplash.com/[photo-id]?auto=format&fit=crop&w=800&q=80\`
-
-Verified photo IDs by category:
-- **Developer/Tech**: \`photo-1498050108023-c5249f4df085\`, \`photo-1486312338219-ce68d2c6f44d\`, \`photo-1555066931-4365d14bab8c\`
-- **Dashboard/SaaS**: \`photo-1531403009284-440f080d1e12\`, \`photo-1607798748738-b15c40d33d57\`, \`photo-1460925895917-afdab827c52f\`
-- **Abstract/Background**: \`photo-1618005182384-a83a8bd57fbe\`, \`photo-1557683316-973673baf926\`, \`photo-1519608487953-e999c86e7455\`
-- **Team/Testimonials (Female)**: \`photo-1494790108377-be9c29b29330\`, \`photo-1534528741775-53994a69daeb\`, \`photo-1438761681033-6461ffad8d80\`
-- **Team/Testimonials (Male)**: \`photo-1507003211169-0a1dd7228f2d\`, \`photo-1500648767791-00dcc994a43e\`, \`photo-1472099645785-5658abf4ff4e\`
-- **Business/Office**: \`photo-1486406146926-c627a92ad1ab\`, \`photo-1454165804606-c3d57bc86b40\`
-- **Product/Ecommerce**: \`photo-1523275335684-37898b6baf30\`, \`photo-1491553895911-0055eca6402d\`
-- **Food**: \`photo-1476224203421-9ac39bcb3327\`, \`photo-1565299624946-b28f40a0ae38\`
-- **Nature**: \`photo-1470071459604-3b5ec3a7fe05\`, \`photo-1507525428034-b723cf961d3e\`
-
----
-
-## 8. COPY WRITING STANDARDS
-
-Good copy makes design feel premium. Follow these rules:
-- Hero H1: Powerful, specific, benefit-driven. Max 8 words. E.g., "Build Faster. Ship Smarter. Scale Easily."
-- Hero Sub: 1-2 sentence description. Max 20 words. No jargon.
-- Feature headlines: Short action phrases (3-5 words). E.g., "Real-time Collaboration", "Zero Config Deployment"
-- Feature body: Max 2 sentences explaining the benefit, not the feature
-- CTAs: Specific verbs. "Start Building Free", "Get Early Access", "See Live Demo" — NOT "Click Here" or "Submit"
-
----
-
-## TECHNICAL RULES
-
-- Entry point is always /App.js (default export)
-- Use /styles.css for custom CSS (keyframes, font imports, global base styles). Tailwind is available globally via CDN.
-- All components go in /components/ directory
-- Export all components as default exports
-- Use ONLY vanilla React with hooks — no external npm packages unless specified
-- Do NOT use TypeScript, use plain .js/.jsx files
-- ALWAYS use single quotes (') for JSX className attributes to prevent JSON escaping conflicts
-- For JS string literals with apostrophes (e.g. "don't"), use double quotes or backticks instead: \`const t = "don't"\` not \`const t = 'don\\'t'\`
-- Make ALL pages fully responsive: mobile-first using Tailwind's \`sm:\`, \`md:\`, \`lg:\` breakpoints
-- Headings must use semantic tags: \`<h1>\`, \`<h2>\`, \`<h3>\` — not just styled \`<div>\`s
-- Use \`<nav>\`, \`<main>\`, \`<section>\`, \`<footer>\` semantic HTML elements
-- Add \`id\` attributes to sections for anchor nav (e.g., \`id='features'\`, \`id='pricing'\`)
-
-## CODE CORRECTNESS — MANDATORY RULES
-- Every .js component file MUST have exactly ONE default export. E.g., \`export default function Header() { ... }\`
+- Entry point is always \`/App.js\` (default export).
+- Custom styles, fonts, and keyframes go in \`/styles.css\`.
+- Modular components go in \`/components/\`.
+- Every \`.js\` component file MUST have exactly ONE default export. E.g., \`export default function Header() { ... }\`
+- Every local relative import MUST resolve to a planned file with the exact relative path (e.g., \`./components/Header\`).
+- Every imported symbol must match the target file's exports. If using default import, the target must have \`export default\`. If using named import \`{ Foo }\`, the target must export \`Foo\`.
+- Only import supported client packages (\`react\`, \`react-dom\`, \`lucide-react\`, \`canvas-confetti\`, \`framer-motion\`).
+- Never import Node.js server built-ins (\`fs\`, \`path\`, \`crypto\`, \`os\`) or backend modules (\`mongoose\`, \`express\`).
 - Always use \`className\`, NOT \`class\`. Always use \`htmlFor\`, NOT \`for\`.
-- Self-close void HTML elements: <img />, <br />, <hr />, <input />, <link />, <meta />. Never output tags like \`<img>\` or \`<br>\` without the closing slash.
-- Ensure all open JSX tags (like \`<div>\`, \`<section>\`, \`<button>\`, etc.) are fully closed.
-- Never use TypeScript syntax (no interfaces, no types, no \`: React.FC\`, no \`as\`, no \`public/private\`). Output ONLY plain JavaScript/React.
-- Do NOT import packages that aren't react, react-dom, or standard sub-components.
+- Self-close void HTML elements: \`<img />\`, \`<br />\`, \`<hr />\`, \`<input />\`, \`<link />\`, \`<meta />\`.
+- All open JSX tags must be properly closed.
+- Never use TypeScript syntax (no \`: React.FC\`, no \`interface\`, no \`as\`). Output ONLY valid ES module JavaScript.
+- ALWAYS use single quotes (\`'\`) for JSX className attributes to prevent JSON escaping errors.
 - Every component must return valid JSX wrapped in parentheses: \`return ( <div>...</div> );\`
 - Always import React: \`import React from 'react';\`
-- For event handlers, reference functions that are actually defined in scope, or use inline functions: \`onClick={() => {}}\`.`;
+- Define all event handler functions within component scope or use inline arrow functions.`;
 
 export const REVISE_SYSTEM = `${BASE_SYSTEM}
 
 You are revising an existing React project. You will receive:
-1. A file manifest showing all current files (path, hash, size in bytes)
-2. The user's revision request
-3. Recent conversation context
+1. Active Design Specification (if set) — You MUST preserve the existing visual design, palette, typography, and archetype unless the user explicitly asks for a redesign or retheme!
+2. A file manifest showing all current files (path, hash, size in bytes)
+3. The user's revision request
+4. Recent conversation context
 
 You MUST respond with a valid JSON object of this exact shape:
 {
@@ -256,32 +194,845 @@ Operation types:
 CRITICAL RULES for "update" operations:
 - The "search" string must be a VERBATIM copy of the existing code (including whitespace/indentation)
 - Keep search blocks as small as possible (just the lines that change + minimal surrounding context for uniqueness)
-- If you need to see a file's content to make changes, say so in description and I'll provide it
 - Prefer targeted search/replace over recreating entire files
+- PRESERVE DESIGN CONSISTENCY: Keep color tokens, typography, component styling, and layout structure consistent with the project's DesignSpec.
 
 Be minimal: only touch files that NEED to change.`;
 
-export const FILE_PLAN_SYSTEM = `${BASE_SYSTEM}
+export const DESIGN_SPEC_SYSTEM = `You are a Principal Design Systems Architect and Creative Director.
+Your task is to analyze the user's project request and synthesize a world-class, structured DesignSpec JSON object.
 
-You are planning which files to create for a React project.
+Before any files are planned or code is written, you must establish the intentional aesthetic identity, color palette, typography pairing, layout strategy, and signature visual hook tailored specifically to the project.
+
+### AESTHETIC ARCHETYPES:
+1. "clean_modern": Refined minimalism and crisp digital product interface (Linear, Stripe, Vercel). Light slate or pure white canvas, razor-thin borders, subtle elevations, geometric typography.
+2. "dark_luxury": Nocturnal, cinematic luxury (Apple Pro, Leica, Automotive, high-end crypto). Deep charcoal/black (#09090b or #0a0a0a), subtle bronze, gold, or violet ambient glows.
+3. "editorial_magazine": High-fashion, journalism, luxury monograph (Kinfolk, The Gentlewoman). Warm paper/parchment background (#fcfbf7 or #f7f5f0), high-contrast display serif typography (Playfair Display, Cinzel, Instrument Serif), generous whitespace, asymmetrical editorial spreads.
+4. "swiss_international": Strict modular grid, bold grotesque typography (Space Grotesk, Plus Jakarta Sans), objective monochrome with exactly ONE striking accent (e.g. Klein blue #002fa7 or signal orange #ff4d00).
+5. "neo_brutalism": High-contrast 2px-3px solid borders, offset hard drop shadows (shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]), vibrant unexpected colors, monospace accents, bold raw geometry.
+6. "experimental_creative": Design studios, art showcases, visionary personal brands. Asymmetric layout breaks, oversized display typography (text-7xl to text-9xl), layered textures, diagonal elements, expressive hover micro-interactions.
+7. "futuristic_technology": AI infrastructure, cybernetics, quantum tech. Dark slate or deep blue-black canvas (#030712), cyan/emerald/neon violet accents, monospace metadata badges, luminous border shines.
+8. "organic_natural": Artisanal food, wellness, sustainable craft. Warm earthy tones (sage green, terracotta, warm sandstone, oat milk cream), rounded friendly forms, human-centric editorial typography (Fraunces, Lora, Plus Jakarta Sans).
+9. "modern_ecommerce": D2C storefront, boutique brand shop. Editorial product hero, full-width visual showcase, clean sticky cart/bag indicator, high-touch typography (Plus Jakarta Sans, Syne), tight micro-interactions.
+10. "professional_corporate": Advisory, venture capital, law, enterprise finance. Trustworthy deep navy/slate, dignified typography, structured data callouts, crisp metric counters, executive restraint.
+11. "bento_grid": Modular multi-compartment card grids with varied card spans (col-span-2), micro-stats, and data density.
+12. "minimal_utility": Distraction-free single-purpose tool, calculator, game, or interactive canvas with zero marketing fluff.
+
+### TYPOGRAPHY PAIRINGS:
+- Serif Display + Clean Sans: Heading "Playfair Display" (700) + Body "Inter" (400/500)
+- Modern Grotesk + Sans: Heading "Space Grotesk" (700) + Body "Inter" (400/500)
+- Expressive Brand + Clean: Heading "Syne" (700/800) + Body "Plus Jakarta Sans" (400/500)
+- Editorial Literary + Mono: Heading "Fraunces" (600/700) + Body "Inter" (400) + Mono "JetBrains Mono"
+- Modern Corporate / SaaS: Heading "Plus Jakarta Sans" (700/800) + Body "Inter" (400/500)
+- Technical / Cyber: Heading "Chakra Petch" (700) + Body "Inter" (400) + Mono "JetBrains Mono"
+- Luxury Monograph: Heading "Cinzel" (700) + Body "Plus Jakarta Sans" (400)
+
+### COLOR FREEDOM & DISCIPLINE:
+- Define hex colors for bg, fg, muted, line, accent, accentForeground, cardBg, cardBorder.
+- Choose light, dark, or warm paper theme based genuinely on the brand concept, NOT defaulting blindly to light mode!
+- Limit accent colors to primary CTAs and active states for clarity and elegance.
+
+### THE SIGNATURE MOMENT:
+Define ONE memorable visual or interactive hook the website will be known for (e.g., "ambient video hero with floating typography overlay", "oversized editorial letter reveal on hover", "interactive canvas with tactile sound/visual feedback", "sticky drawer cart pill with instant badge updates").
+
+Return ONLY valid JSON matching the DesignSpecSchema.`;
+
+export function createDefaultDesignSpec(prompt = "") {
+  const lower = prompt.toLowerCase();
+  const isAppOrGame = /game|calculator|todo|tictactoe|tic tac toe|stopwatch|counter|quiz|weather|unit converter|chess|tracker/.test(lower);
+  const wantsDark = /dark|night|nocturnal|black|cyber|neon|matrix|space|void/.test(lower);
+
+  // 1. Interactive Application / Game / Utility
+  if (isAppOrGame) {
+    return {
+      purpose: "Interactive utility / game application",
+      targetAudience: "Users seeking a fast, focused interactive tool",
+      category: "interactive_app",
+      visualDirection: wantsDark ? "Focused nocturnal dark tool with clean controls" : "Minimalist modern application with clean layout",
+      archetype: "minimal_utility",
+      brandPersonality: ["focused", "clean", "responsive"],
+      colorPalette: {
+        theme: wantsDark ? "dark" : "light",
+        bg: wantsDark ? "#09090b" : "#f8fafc",
+        fg: wantsDark ? "#fafafa" : "#0f172a",
+        muted: wantsDark ? "#a1a1aa" : "#64748b",
+        line: wantsDark ? "#27272a" : "#e2e8f0",
+        accent: "#6366f1",
+        accentForeground: "#ffffff",
+        cardBg: wantsDark ? "#18181b" : "#ffffff",
+        cardBorder: wantsDark ? "#27272a" : "#e2e8f0",
+      },
+      typography: {
+        heading: {
+          family: "Inter",
+          weights: ["600", "700", "800"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap",
+          usage: "Titles and scoreboards",
+        },
+        body: {
+          family: "Inter",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap",
+          usage: "Buttons and labels",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-4xl",
+        sectionPadding: "py-12 md:py-20",
+        gap: "gap-4 md:gap-6",
+        structure: "Single viewport centered interactive tool",
+      },
+      componentStyling: {
+        cardRadius: "rounded-2xl",
+        buttonRadius: "rounded-xl",
+        shadow: "shadow-sm",
+        borderStyle: "border border-zinc-200",
+        cardStyle: wantsDark ? "bg-zinc-900 border border-zinc-800 rounded-2xl p-6" : "bg-white border border-slate-200 rounded-2xl p-6 shadow-sm",
+      },
+      navigation: {
+        type: "minimal_bar",
+        details: "Minimal top header with app title and action button",
+      },
+      hero: {
+        composition: "interactive_canvas",
+        ctaText: "Play Now",
+        details: "Live interactive canvas directly in hero viewport",
+      },
+      mediaDirection: {
+        type: "code_graphics",
+        description: "Vector UI and CSS keyframe feedback",
+        imageTreatment: "None",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Crisp state change animations and feedback bumps",
+        keyframes: ["fadeIn", "scaleIn"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Full viewport touch-friendly controls",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-indigo-500",
+        semanticElements: true,
+      },
+      signature: "Immediate interactive responsiveness with smooth visual feedback",
+    };
+  }
+
+  // 2. Restaurant / Culinary / Hospitality
+  if (/restaurant|cafe|coffee|bistro|dining|culinary|food|bakery|bar|kitchen/.test(lower)) {
+    return {
+      purpose: "Atmospheric culinary & dining destination website",
+      targetAudience: "Guests seeking memorable culinary dining experiences and reservations",
+      category: "restaurant_hospitality",
+      visualDirection: "Warm organic elegance with rich sensory food photography and refined typography",
+      archetype: "organic_natural",
+      brandPersonality: ["artisanal", "inviting", "sophisticated"],
+      colorPalette: {
+        theme: wantsDark ? "dark" : "light",
+        bg: wantsDark ? "#1c1917" : "#fdfcf9",
+        fg: wantsDark ? "#fafaf9" : "#1c1917",
+        muted: wantsDark ? "#a8a29e" : "#78716c",
+        line: wantsDark ? "#292524" : "#e7e5e4",
+        accent: "#d97706",
+        accentForeground: "#ffffff",
+        cardBg: wantsDark ? "#292524" : "#ffffff",
+        cardBorder: wantsDark ? "#44403c" : "#f5f5f4",
+      },
+      typography: {
+        heading: {
+          family: "Fraunces",
+          weights: ["600", "700"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+          usage: "Menu categories, story headlines, restaurant name",
+        },
+        body: {
+          family: "Plus Jakarta Sans",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+          usage: "Dish descriptions, operating hours, reservation copy",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-6xl",
+        sectionPadding: "py-20 md:py-32",
+        gap: "gap-8 md:gap-12",
+        structure: "Atmospheric narrative (Hero, Chef's Philosophy, Curated Menu, Ambient Gallery, Reservation)",
+      },
+      componentStyling: {
+        cardRadius: "rounded-2xl",
+        buttonRadius: "rounded-full",
+        shadow: "shadow-sm hover:shadow-md",
+        borderStyle: "border border-amber-900/10",
+        cardStyle: wantsDark ? "bg-stone-900 border border-stone-800 rounded-2xl p-8" : "bg-white border border-stone-100 rounded-2xl p-8 shadow-sm",
+      },
+      navigation: {
+        type: "floating_island",
+        details: "Translucent floating header with menu link, hours, and reservation CTA",
+      },
+      hero: {
+        composition: "split",
+        headline: "Culinary craft rooted in season and place.",
+        subheadline: "An intimate dining room celebrating wild heritage ingredients and natural wine.",
+        ctaText: "Reserve Table",
+        details: "Split hero with atmospheric dining photography and reservation booking drawer trigger",
+      },
+      mediaDirection: {
+        type: "curated_photography",
+        description: "Atmospheric dining room interior and seasonal plated dish photography",
+        imageTreatment: "Warm tone with subtle border radius",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Gentle entrance fades and subtle warm hover elevation",
+        keyframes: ["fadeIn", "fadeInUp"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Fluid stacked menu with sticky reservation bar",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-amber-600",
+        semanticElements: true,
+      },
+      signature: "Ambient candlelight warmth with interactive seasonal tasting menu and reservation drawer",
+    };
+  }
+
+  // 3. Architecture / Interior Studio
+  if (/architect|interior|studio|atelier|monograph|spatial/.test(lower)) {
+    return {
+      purpose: "Architectural monograph and design studio showcase",
+      targetAudience: "Commercial and residential clients commissioning bespoke architecture",
+      category: "agency_portfolio",
+      visualDirection: "Minimalist editorial monograph with high-contrast typography and dramatic whitespace",
+      archetype: "editorial_magazine",
+      brandPersonality: ["meticulous", "timeless", "authoritative"],
+      colorPalette: {
+        theme: wantsDark ? "dark" : "light",
+        bg: wantsDark ? "#0c0a09" : "#fafaf9",
+        fg: wantsDark ? "#fafaf9" : "#1c1917",
+        muted: wantsDark ? "#a8a29e" : "#78716c",
+        line: wantsDark ? "#292524" : "#e7e5e4",
+        accent: "#b45309",
+        accentForeground: "#ffffff",
+        cardBg: wantsDark ? "#1c1917" : "#ffffff",
+        cardBorder: wantsDark ? "#292524" : "#e7e5e4",
+      },
+      typography: {
+        heading: {
+          family: "Playfair Display",
+          weights: ["600", "700"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap",
+          usage: "Monograph headers, project names, index numbers",
+        },
+        body: {
+          family: "Inter",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+          usage: "Project descriptions, architectural briefs, specifications",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-7xl",
+        sectionPadding: "py-24 md:py-36",
+        gap: "gap-8 md:gap-16",
+        structure: "Editorial monograph (Hero, Selected Works, Studio Philosophy, Materials, Inquiry)",
+      },
+      componentStyling: {
+        cardRadius: "rounded-none",
+        buttonRadius: "rounded-none",
+        shadow: "none",
+        borderStyle: "border border-stone-200",
+        cardStyle: wantsDark ? "bg-stone-900 border border-stone-800 p-8" : "bg-white border border-stone-200 p-8",
+      },
+      navigation: {
+        type: "minimal_bar",
+        details: "Minimal top monograph bar with index and project inquiry",
+      },
+      hero: {
+        composition: "split",
+        headline: "Sculpting spaces that endure across generations.",
+        subheadline: "Contextual residential and cultural architecture grounded in materiality and light.",
+        ctaText: "View Monograph",
+        details: "Split hero with high-contrast architectural photography and restrained editorial headline",
+      },
+      mediaDirection: {
+        type: "curated_photography",
+        description: "High-contrast architectural photography and material textures",
+        imageTreatment: "Grayscale with sharp borders and subtle hover warmth",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Deliberate editorial fades with smooth ease-out curves",
+        keyframes: ["fadeIn", "fadeInUp"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Single column vertical stream with full-bleed project photos",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-stone-900",
+        semanticElements: true,
+      },
+      signature: "Full-bleed architectural gallery with monograph index numbers and hover reveals",
+    };
+  }
+
+  // 4. Personal Creative Portfolio
+  if (/portfolio|designer|creative director|photographer|artist|freelancer/.test(lower)) {
+    return {
+      purpose: "Creative design portfolio showcasing selected high-impact projects",
+      targetAudience: "Creative directors, studio leaders, and clients seeking visionary design leadership",
+      category: "agency_portfolio",
+      visualDirection: "Bold experimental creative direction with expressive typography and kinetic project cards",
+      archetype: "experimental_creative",
+      brandPersonality: ["innovative", "audacious", "crafted"],
+      colorPalette: {
+        theme: "dark",
+        bg: "#0a0a0c",
+        fg: "#f4f4f5",
+        muted: "#71717a",
+        line: "#18181b",
+        accent: "#2563eb",
+        accentForeground: "#ffffff",
+        cardBg: "#121216",
+        cardBorder: "#27272a",
+      },
+      typography: {
+        heading: {
+          family: "Syne",
+          weights: ["700", "800"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+          usage: "Giant case study titles, bio statements, hero tagline",
+        },
+        body: {
+          family: "Plus Jakarta Sans",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+          usage: "Project background, client details, navigation",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-7xl",
+        sectionPadding: "py-24 md:py-36",
+        gap: "gap-8 md:gap-14",
+        structure: "Dynamic portfolio stream (Hero, Selected Works, Capabilities, Recognition, Contact)",
+      },
+      componentStyling: {
+        cardRadius: "rounded-3xl",
+        buttonRadius: "rounded-full",
+        shadow: "shadow-2xl",
+        borderStyle: "border border-zinc-800",
+        cardStyle: "bg-zinc-900/60 backdrop-blur border border-zinc-800 rounded-3xl p-8 hover:border-zinc-700 transition",
+      },
+      navigation: {
+        type: "floating_island",
+        details: "Glassmorphic floating island with quick work navigation and availability status pill",
+      },
+      hero: {
+        composition: "centered",
+        headline: "Designing digital artifacts that challenge convention.",
+        subheadline: "Independent design technologist specializing in brand identity, spatial interfaces, and kinetic web systems.",
+        ctaText: "View Case Studies",
+        details: "Oversized kinetic typography hero with interactive work teaser cards",
+      },
+      mediaDirection: {
+        type: "curated_photography",
+        description: "High-resolution project case study previews and interface screenshots",
+        imageTreatment: "Rounded corners with subtle glow borders",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Kinetic hover lifts, fluid micro-interactions, and cursor responsiveness",
+        keyframes: ["fadeInUp", "float"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Responsive card stack with simplified touch-friendly project carousel",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-blue-500",
+        semanticElements: true,
+      },
+      signature: "Kinetic project cards with magnetic hover elevation and live availability ping",
+    };
+  }
+
+  // 5. Ecommerce Storefront / D2C Brand
+  if (/ecommerce|store|shop|apparel|clothing|boutique|merch|sneaker|product shop/.test(lower)) {
+    return {
+      purpose: "High-converting modern boutique ecommerce storefront",
+      targetAudience: "Discerning shoppers seeking curated, premium design goods",
+      category: "ecommerce",
+      visualDirection: "Modern editorial storefront with clean product grids, crisp typography, and seamless checkout indicators",
+      archetype: "modern_ecommerce",
+      brandPersonality: ["curated", "premium", "effortless"],
+      colorPalette: {
+        theme: "light",
+        bg: "#ffffff",
+        fg: "#09090b",
+        muted: "#71717a",
+        line: "#e4e4e7",
+        accent: "#18181b",
+        accentForeground: "#ffffff",
+        cardBg: "#f8fafc",
+        cardBorder: "#f1f5f9",
+      },
+      typography: {
+        heading: {
+          family: "Plus Jakarta Sans",
+          weights: ["600", "700", "800"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap",
+          usage: "Product titles, collection names, hero headlines",
+        },
+        body: {
+          family: "Inter",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+          usage: "Pricing, variant selectors, descriptions, shipping details",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-7xl",
+        sectionPadding: "py-16 md:py-28",
+        gap: "gap-6 md:gap-10",
+        structure: "High-conversion commerce layout (Hero Drop, Featured Collection, Lookbook, Reviews, Footer)",
+      },
+      componentStyling: {
+        cardRadius: "rounded-xl",
+        buttonRadius: "rounded-lg",
+        shadow: "shadow-sm hover:shadow-md",
+        borderStyle: "border border-zinc-200",
+        cardStyle: "bg-zinc-50 border border-zinc-100 rounded-xl overflow-hidden p-4",
+      },
+      navigation: {
+        type: "sticky_header",
+        details: "Sticky clean header with search bar, collection links, and dynamic bag/cart counter pill",
+      },
+      hero: {
+        composition: "split",
+        headline: "Engineered for longevity. Tailored for comfort.",
+        subheadline: "Introducing the Autumn / Winter capsule collection crafted from regenerative Japanese wool.",
+        ctaText: "Shop Collection",
+        details: "Hero product showcase with quick-add size selector and lookbook photography",
+      },
+      mediaDirection: {
+        type: "curated_photography",
+        description: "Studio product photography and contextual on-model lookbook shots",
+        imageTreatment: "Clean off-white background with subtle product shadow",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Smooth image zoom on hover and instant cart drawer feedback",
+        keyframes: ["fadeIn", "fadeInUp"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Two-column mobile product grid with sticky bottom quick-add bar",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-zinc-900",
+        semanticElements: true,
+      },
+      signature: "Sticky cart drawer trigger with instant variant preview and fast checkout micro-flow",
+    };
+  }
+
+  // 6. Editorial / Magazine / Journalism
+  if (/editorial|magazine|journal|gazette|publication|blog|newsletter/.test(lower)) {
+    return {
+      purpose: "Thought-leadership publication and culture magazine",
+      targetAudience: "Intellectuals, industry leaders, and readers seeking deep-dive investigative essays",
+      category: "editorial_blog",
+      visualDirection: "Refined editorial publication with warm paper background, rich serif typography, and multi-column article spreads",
+      archetype: "editorial_magazine",
+      brandPersonality: ["insightful", "literary", "provocative"],
+      colorPalette: {
+        theme: "light",
+        bg: "#fdfbf7",
+        fg: "#1c1917",
+        muted: "#78716c",
+        line: "#e7e5e4",
+        accent: "#c2410c",
+        accentForeground: "#ffffff",
+        cardBg: "#ffffff",
+        cardBorder: "#f5f5f4",
+      },
+      typography: {
+        heading: {
+          family: "Playfair Display",
+          weights: ["600", "700", "800"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600&display=swap",
+          usage: "Cover headlines, essay titles, pull quotes",
+        },
+        body: {
+          family: "Inter",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+          usage: "Article body copy, author bylines, reading time indicators",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-6xl",
+        sectionPadding: "py-20 md:py-32",
+        gap: "gap-8 md:gap-14",
+        structure: "Broadsheet editorial spread (Lead Story, Dual Essay Column, Culture Briefs, Opinion, Newsletter Archive)",
+      },
+      componentStyling: {
+        cardRadius: "rounded-none",
+        buttonRadius: "rounded-none",
+        shadow: "none",
+        borderStyle: "border border-stone-200",
+        cardStyle: "bg-white border border-stone-200 p-8",
+      },
+      navigation: {
+        type: "sticky_header",
+        details: "Classic editorial masthead with edition date, categories, and subscription callout",
+      },
+      hero: {
+        composition: "split",
+        headline: "The Architecture of Attention in the Algorithmic Age.",
+        subheadline: "An investigation into how synthetic cognition is restructuring human memory and social institutions.",
+        ctaText: "Read Cover Story",
+        details: "Broadsheet cover story presentation with lead photograph and reading duration badge",
+      },
+      mediaDirection: {
+        type: "curated_photography",
+        description: "Editorial photojournalism and conceptual cultural photography",
+        imageTreatment: "Unfiltered natural light with serif captions",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Calm page entrance and subtle hover underline reveals",
+        keyframes: ["fadeIn", "fadeInUp"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Single column reading stream with sticky reading progress indicator",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant (min 7:1 for text)",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-stone-900",
+        semanticElements: true,
+      },
+      signature: "Broadsheet multi-column layout with editorial pull quotes and reading progress tracker",
+    };
+  }
+
+  // 7. Technology / Deep Tech Infrastructure / Cyber
+  if (/\b(deeptech|robotics|quantum|infrastructure|runtime|developer tool|cybersecurity|cloud compute)\b/.test(lower) || (/\bai\b/.test(lower) && !/analytics|dashboard|finance|fintech|b2b/.test(lower))) {
+    return {
+      purpose: "Next-generation deep tech infrastructure & runtime platform",
+      targetAudience: "Engineers, systems architects, and technical leaders scaling modern compute systems",
+      category: "developer_tools",
+      visualDirection: "Futuristic dark tech aesthetic with cybernetic glows, monospace metadata badges, and interactive telemetry",
+      archetype: "futuristic_technology",
+      brandPersonality: ["powerful", "autonomous", "cutting-edge"],
+      colorPalette: {
+        theme: "dark",
+        bg: "#030712",
+        fg: "#f9fafb",
+        muted: "#9ca3af",
+        line: "#1f2937",
+        accent: "#06b6d4",
+        accentForeground: "#030712",
+        cardBg: "#0f172a",
+        cardBorder: "#1e293b",
+      },
+      typography: {
+        heading: {
+          family: "Space Grotesk",
+          weights: ["600", "700"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
+          usage: "Platform headlines, telemetry metrics, technical features",
+        },
+        body: {
+          family: "Inter",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+          usage: "Documentation, specifications, architecture descriptions",
+        },
+        mono: {
+          family: "JetBrains Mono",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap",
+          usage: "Code snippets, CLI commands, status badges",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-7xl",
+        sectionPadding: "py-24 md:py-36",
+        gap: "gap-8 md:gap-14",
+        structure: "Technical narrative (Hero Terminal, Architectural Pillars, Live Benchmarks, Integration CLI, CTA)",
+      },
+      componentStyling: {
+        cardRadius: "rounded-xl",
+        buttonRadius: "rounded-lg",
+        shadow: "shadow-2xl shadow-cyan-950/20",
+        borderStyle: "border border-cyan-500/20",
+        cardStyle: "bg-slate-900/80 backdrop-blur border border-slate-800 rounded-xl p-8 hover:border-cyan-500/40 transition",
+      },
+      navigation: {
+        type: "sticky_header",
+        details: "Clean technical navbar with system status indicator (99.99% uptime) and CLI copy button",
+      },
+      hero: {
+        composition: "split",
+        headline: "Deterministic AI Runtime for Autonomous Agent Fleets.",
+        subheadline: "Sub-millisecond inference routing, distributed vector synchronization, and verifiable cryptographical execution.",
+        ctaText: "Deploy Cluster",
+        details: "Split hero with interactive CLI terminal preview and real-time benchmark throughput counter",
+      },
+      mediaDirection: {
+        type: "code_graphics",
+        description: "Interactive command-line terminals, network topology visualizations, and benchmark charts",
+        imageTreatment: "Glowing border ring with dark carbon finish",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Luminous cybernetic border pulses and terminal typing animations",
+        keyframes: ["fadeIn", "float"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Responsive terminal view with horizontal code scrolling",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-cyan-400",
+        semanticElements: true,
+      },
+      signature: "Interactive CLI terminal hero with live latency simulator and luminous border shine",
+    };
+  }
+
+  // 8. Professional Corporate / Legal / Advisory / Wealth
+  if (/corporate|consulting|advisory|legal|law firm|wealth|finance|private equity|venture capital/.test(lower)) {
+    return {
+      purpose: "Executive corporate advisory and professional services website",
+      targetAudience: "Enterprise leaders, board members, and institutional investors seeking strategic counsel",
+      category: "saas_landing",
+      visualDirection: "Dignified corporate presence with deep navy authority, crisp typographic structure, and executive metric credentials",
+      archetype: "professional_corporate",
+      brandPersonality: ["authoritative", "trustworthy", "strategic"],
+      colorPalette: {
+        theme: "light",
+        bg: "#ffffff",
+        fg: "#0f172a",
+        muted: "#64748b",
+        line: "#e2e8f0",
+        accent: "#1e3a8a",
+        accentForeground: "#ffffff",
+        cardBg: "#f8fafc",
+        cardBorder: "#e2e8f0",
+      },
+      typography: {
+        heading: {
+          family: "Plus Jakarta Sans",
+          weights: ["600", "700", "800"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap",
+          usage: "Strategic pillars, executive statements, metric counters",
+        },
+        body: {
+          family: "Inter",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+          usage: "Advisory practice briefs, governance frameworks, bios",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-7xl",
+        sectionPadding: "py-20 md:py-32",
+        gap: "gap-8 md:gap-14",
+        structure: "Executive narrative (Hero Consultation, Strategic Practices, Institutional Impact, Leadership, Confidential Inquiry)",
+      },
+      componentStyling: {
+        cardRadius: "rounded-lg",
+        buttonRadius: "rounded-md",
+        shadow: "shadow-sm hover:shadow",
+        borderStyle: "border border-slate-200",
+        cardStyle: "bg-slate-50 border border-slate-200 rounded-lg p-8",
+      },
+      navigation: {
+        type: "sticky_header",
+        details: "Dignified corporate navbar with practice dropdowns, investor portal, and consultation CTA",
+      },
+      hero: {
+        composition: "split",
+        headline: "Strategic clarity for complex institutional decisions.",
+        subheadline: "Global management consultancy partnering with visionary leadership teams across enterprise transformation and capital allocation.",
+        ctaText: "Schedule Consultation",
+        details: "Executive hero with verified institutional metrics and confidential advisory booking",
+      },
+      mediaDirection: {
+        type: "curated_photography",
+        description: "Modern architectural headquarters and executive boardroom photography",
+        imageTreatment: "Subtle cool corporate color grading",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Restrained executive transitions and subtle card elevation",
+        keyframes: ["fadeIn", "fadeInUp"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Clean stacked layout preserving executive hierarchy and touch targets",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant (min 7:1 for text)",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-blue-900",
+        semanticElements: true,
+      },
+      signature: "Institutional metric counter row with confidential advisory booking trigger",
+    };
+  }
+
+  // 9. Default Modern SaaS / Tech Product
+  return {
+    purpose: "Modern high-converting web landing page",
+    targetAudience: "Prospective customers, developers, and product teams",
+    category: "saas_landing",
+    visualDirection: wantsDark ? "Cinematic dark luxury aesthetic with luminous ambient accents" : "Clean modern SaaS interface with crisp typography and refined elevations",
+    archetype: wantsDark ? "dark_luxury" : "clean_modern",
+    brandPersonality: ["innovative", "polished", "reliable"],
+    colorPalette: {
+      theme: wantsDark ? "dark" : "light",
+      bg: wantsDark ? "#09090b" : "#ffffff",
+      fg: wantsDark ? "#fafafa" : "#09090b",
+      muted: wantsDark ? "#a1a1aa" : "#71717a",
+      line: wantsDark ? "#27272a" : "#e4e4e7",
+      accent: wantsDark ? "#818cf8" : "#6366f1",
+      accentForeground: "#ffffff",
+      cardBg: wantsDark ? "#18181b" : "#ffffff",
+      cardBorder: wantsDark ? "#27272a" : "#e4e4e7",
+    },
+    typography: {
+      heading: {
+        family: "Plus Jakarta Sans",
+        weights: ["600", "700", "800"],
+        googleFontsUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500&display=swap",
+        usage: "Hero headlines, section headers",
+      },
+      body: {
+        family: "Inter",
+        weights: ["400", "500"],
+        googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap",
+        usage: "Body paragraphs, navigation links, cards",
+      },
+      fontImportUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500&display=swap",
+    },
+    layout: {
+      containerWidth: "max-w-7xl",
+      sectionPadding: "py-20 md:py-32",
+      gap: "gap-8 md:gap-12",
+      structure: "Narrative product landing page tailored to the core value proposition",
+    },
+    componentStyling: {
+      cardRadius: "rounded-2xl",
+      buttonRadius: "rounded-full",
+      shadow: "shadow-sm hover:shadow-md",
+      borderStyle: wantsDark ? "border border-zinc-800" : "border border-zinc-200",
+      cardStyle: wantsDark ? "bg-zinc-900/50 backdrop-blur border border-zinc-800 rounded-2xl p-8" : "bg-white border border-zinc-200 rounded-2xl p-8 shadow-sm",
+    },
+    navigation: {
+      type: "sticky_header",
+      details: "Sticky translucent navbar with brand logo, nav links, and CTA",
+    },
+    hero: {
+      composition: "centered",
+      ctaText: "Get Started Free",
+      details: "High-impact centered hero with announcement chip, bold H1, and dual action buttons",
+    },
+    mediaDirection: {
+      type: "curated_photography",
+      description: "High-resolution curated photography and visual cards",
+      imageTreatment: "Rounded corners with subtle border ring",
+      iconStyle: "Lucide React inline SVG icons",
+    },
+    motion: {
+      strategy: "Smooth entrance fades and hover lift micro-interactions",
+      keyframes: ["fadeInUp", "float"],
+      reducedMotion: true,
+    },
+    responsive: {
+      breakpoints: "Mobile (<640px), Tablet (640-1024px), Desktop (>1024px)",
+      mobileStrategy: "Responsive fluid grid and mobile menu",
+    },
+    accessibility: {
+      contrastRatio: "WCAG 2.2 AA compliant",
+      focusRings: "focus-visible:ring-2 focus-visible:ring-indigo-500",
+      semanticElements: true,
+    },
+    signature: "Ambient lighting glow with crisp typographic hierarchy and pill badge micro-interactions",
+  };
+}
+
+export function buildFilePlanSystem(designSpec) {
+  const specContext = designSpec
+    ? `
+---
+
+## ACTIVE DESIGN SPECIFICATION CONTRACT
+You MUST build a file plan that directly implements this design specification:
+- **Category:** ${designSpec.category}
+- **Archetype:** ${designSpec.archetype}
+- **Theme:** ${designSpec.colorPalette?.theme || "light"}
+- **Palette Tokens:** Background ${designSpec.colorPalette?.bg}, Text ${designSpec.colorPalette?.fg}, Accent ${designSpec.colorPalette?.accent}, Card ${designSpec.colorPalette?.cardBg}
+- **Typography:** Display "${designSpec.typography?.heading?.family}" + Body "${designSpec.typography?.body?.family}"
+- **Font Import URL:** \`${designSpec.typography?.fontImportUrl || ""}\`
+- **Layout Structure:** ${designSpec.layout?.structure}
+- **Navigation Type:** ${designSpec.navigation?.type}
+- **Hero Composition:** ${designSpec.hero?.composition}
+- **Signature Visual Hook:** ${designSpec.signature}
+
+---
+`
+    : "";
+
+  return `${BASE_SYSTEM}
+${specContext}
+You are planning which files to create for a React project based on the Design Specification.
 Respond with a JSON object listing every file needed, including their contract of imports and exports (so different files don't have mismatched component or default export signatures):
 {
   "files": [
     { 
       "path": "/App.js", 
-      "description": "Main app component rendering the hero, features, pricing, etc.",
+      "description": "Main app component assembling layout, navigation, hero, and sections",
       "exports": "default App",
       "imports": ["./styles.css", "./components/Header.js", "./components/Hero.js", "./components/Features.js", "./components/Footer.js"]
     },
     { 
       "path": "/styles.css", 
-      "description": "Global CSS: Google Font import, keyframe animations, utility classes",
+      "description": "Global CSS: Google Fonts import, root CSS variables for DesignSpec palette, keyframe animations",
       "exports": "none",
       "imports": []
     },
     { 
       "path": "/components/Header.js", 
-      "description": "Sticky navigation bar",
+      "description": "Sticky navigation header adhering to DesignSpec navigation",
       "exports": "default Header",
       "imports": []
     }
@@ -292,16 +1043,18 @@ Respond with a JSON object listing every file needed, including their contract o
 
 Rules:
 - ALWAYS include /App.js
-- ALWAYS include /styles.css for font imports and CSS keyframe animations
-- Match the component plan to the project type:
-  * For SMALL INTERACTIVE APPS / GAMES / TOOLS (e.g., Tic Tac Toe, Calculator, Todo App, Stopwatch, Counter, Quiz App, Unit Converter): Plan ONLY 2 files — /App.js and /styles.css! Do NOT create extra sub-component files in /components/. Write all state, logic, and UI components inside /App.js.
-  * For LARGE MARKETING WEBSITES: Plan /App.js, /styles.css, and landing page section components in /components/ (e.g., /components/Header.js, /components/Hero.js, /components/Features.js, /components/Pricing.js, /components/Footer.js).
-- Define "exports" indicating what this file will export (e.g., "default Header", "default Button"). Every JS/JSX component file must have EXACTLY ONE default export.
-- Define "imports" listing relative file imports this component relies on from the plan (e.g., ["./components/Header.js", "./styles.css"]).
-- Each description should be one sentence explaining what that file does
-- Do NOT write any code — only plan the file list`;
+- ALWAYS include /styles.css with the exact font imports and CSS root variables matching the DesignSpec
+- Match the component plan to the DesignSpec category:
+  * For "interactive_app" or "utility_game": Plan ONLY /App.js and /styles.css! Write all state, logic, and UI components inside /App.js.
+  * For marketing landing pages and brand sites: Plan /App.js, /styles.css, and modular component files in /components/ (e.g. Header.js, Hero.js, Content sections, CTA.js, Footer.js).
+- Define "exports" indicating what this file will export (Every JS component file must have EXACTLY ONE default export).
+- Define "imports" listing relative file imports this component relies on from the plan.
+- Do NOT write any code — only plan the file list.`;
+}
 
-export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles) {
+export const FILE_PLAN_SYSTEM = buildFilePlanSystem(null);
+
+export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec) {
     const fileList = allFiles
         .map((f) => {
             const impStr = f.imports && f.imports.length > 0 ? ` (Imports: ${f.imports.join(", ")})` : "";
@@ -320,11 +1073,31 @@ export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles) {
         }
     }
 
+    let designSpecStr = "";
+    if (designSpec) {
+      designSpecStr = `
+\n---
+## MANDATORY DESIGN SPECIFICATION COMPLIANCE
+Every component you write MUST conform to this exact design specification:
+- **Archetype:** ${designSpec.archetype}
+- **Theme:** ${designSpec.colorPalette?.theme || "light"}
+- **Colors:** Background: ${designSpec.colorPalette?.bg}, Text: ${designSpec.colorPalette?.fg}, Muted: ${designSpec.colorPalette?.muted}, Line: ${designSpec.colorPalette?.line}, Accent: ${designSpec.colorPalette?.accent}, CardBg: ${designSpec.colorPalette?.cardBg}, CardBorder: ${designSpec.colorPalette?.cardBorder}
+- **Heading Font:** "${designSpec.typography?.heading?.family}"
+- **Body Font:** "${designSpec.typography?.body?.family}"
+- **Font Import Link (for styles.css):** \`${designSpec.typography?.fontImportUrl || ""}\`
+- **Card Styling:** \`${designSpec.componentStyling?.cardStyle}\`
+- **Button Radius:** \`${designSpec.componentStyling?.buttonRadius}\`
+- **Signature Hook:** "${designSpec.signature}"
+- **Icons:** Use \`lucide-react\` inline SVG icons (e.g. \`import { ArrowRight, Check, Sparkles } from 'lucide-react'\`). Do NOT use external Font Awesome CDNs.
+---
+`;
+    }
+
     return `${BASE_SYSTEM}
 
 You are writing a SINGLE file for a React project.
 The full project file structure is:
-${fileList}${contextStr}
+${fileList}${contextStr}${designSpecStr}
 
 Write ONLY the code for the specific file the user requests.
 Return a JSON object with exactly this shape:
@@ -336,6 +1109,11 @@ Rules:
 - Do NOT include any other files
 - The code must be complete, visually stunning, and production-ready
 - Import other project files using their exact paths (e.g. import Header from './components/Header')
-- The /styles.css file MUST include: Google Font @import, @keyframes float/fadeInUp/fadeIn, and .animate-* utility classes
-- Apply the full design system defined in the base instructions — premium typography, generous spacing, proper hover effects, and animations`;
+- The /styles.css file MUST include the DesignSpec font @import URL and declared keyframe animations
+- Icons: Use lucide-react components (e.g. import { ... } from 'lucide-react')
+- Prop Contract & Configuration: Parent components (like /App.js) MUST explicitly pass all expected props to children (e.g. config={STORE_CONFIG}, cart={cart}, categories={categories}). Child components MUST declare sensible default parameter values (e.g. config = STORE_CONFIG, cart = [], categories = []) and use safe optional chaining (config?.freeShippingThreshold) to prevent runtime TypeError exceptions.
+- Diverse product imagery: Every product in a grid or list MUST have a unique image URL. Never repeat the exact same image URL across multiple products.
+- Ultra-compact mobile resilience: Ensure buttons, search bars, and filter pills wrap cleanly (e.g. flex-wrap gap-2 or w-full) on screens below 360px without clipping or horizontal overflow.
+- Standardized aspect ratios: Use explicit aspect ratio classes (aspect-[4/5], aspect-square, aspect-[16/9]) with object-cover on all card images.
+- Apply the full design system defined in the design specification — consistent typography, generous spacing, and smooth hover micro-interactions`;
 }
