@@ -16,7 +16,11 @@ const app = express();
 
 await connectToDatabase()
 
-app.use(cors({origin: process.env.ORIGINS.split(","), credentials: true}))
+const allowedOrigins = process.env.ORIGINS
+  ? process.env.ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:5173", "http://localhost:3000"];
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(cookieParser())
 app.use(express.json())
 
@@ -25,10 +29,14 @@ app.use('/api/auth', authRouter)
 app.use('/api/projects', projectRouter)
 
 // Centralized error handler
-app.use((err, _req, res, _next)=>{
-   console.error(`[Error] ${err.message}`)
-   res.status(500).json({error: err.message})
-})
+app.use((err, _req, res, _next) => {
+  console.error(`[Error] ${err.message}`);
+  const safeMessage =
+    process.env.NODE_ENV === "production"
+      ? "Internal server error"
+      : err.message;
+  res.status(500).json({ error: safeMessage });
+});
 
 const port = process.env.PORT || 3000;
 

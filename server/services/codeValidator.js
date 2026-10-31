@@ -201,8 +201,8 @@ export function validateAndFixCode(code, filePath, context = {}) {
       });
     } else if (defaultExports.length === 0) {
       // Attempt safe auto-repair: find top-level component function/const and export it
-      const funcMatch = code.match(/^function\s+([A-Z]\w*)\s*\(/m);
-      const constMatch = code.match(/^const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
+      const funcMatch = code.match(/^\s*function\s+([A-Z]\w*)\s*\(/m);
+      const constMatch = code.match(/^\s*const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
       const componentName = funcMatch?.[1] || constMatch?.[1];
 
       if (componentName) {
@@ -263,8 +263,8 @@ export function validateAndFixCode(code, filePath, context = {}) {
     // Fallback export check if AST parser is inactive
     const defaultExportCount = (code.match(/export\s+default\s+/g) || []).length;
     if (defaultExportCount === 0) {
-      const funcMatch = code.match(/^function\s+([A-Z]\w*)\s*\(/m);
-      const constMatch = code.match(/^const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
+      const funcMatch = code.match(/^\s*function\s+([A-Z]\w*)\s*\(/m);
+      const constMatch = code.match(/^\s*const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
       const componentName = funcMatch?.[1] || constMatch?.[1];
 
       if (componentName) {
