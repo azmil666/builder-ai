@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Project } from "../models/Project.js";
 import { reviseProject } from "../services/ai.js";
 import { applyOperations } from "../services/diff.js";
@@ -22,6 +23,11 @@ export async function chat(req, res) {
 
   if (!req.user) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
     return;
   }
 

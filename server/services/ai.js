@@ -151,9 +151,9 @@ export async function generateProject(prompt, callbacks){
             if(ext === "css"){
                 files[pendingFile.path] = `/* ${pendingFile.description || pendingFile.path} — Generation failed, please retry */\n`;
             }else{
-                files[pendingFile.path] = "import React from 'react';\n\n" + 
+                files[pendingFile.path] = "import React from 'react';\n\n" +
                 `// ⚠️ This file could not be generated. Please retry.\n` +
-                `// Purpose: ${pendingFile.description || pendingFile.path}\n\n` + 
+                `// Purpose: ${pendingFile.description || pendingFile.path}\n\n` +
                 "export default function Placeholder() {\n" +
                 "  return (\n" +
                     "    <div className='p-8 text-center text-zinc-400'>\n" +
@@ -243,4 +243,4 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
         })
     }
     return rawParsed;
-}
+}

@@ -1,9 +1,11 @@
+import 'dotenv/config';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
 import authRouter from '../routes/authRoutes.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { Project } from '../models/Project.js';
+import { sanitizeError } from '../controllers/projectController.js';
 
 describe('Phase 1A: Core Functionality Stabilization Tests', () => {
 
@@ -143,15 +145,6 @@ describe('Phase 1A: Core Functionality Stabilization Tests', () => {
     });
 
     it('redacts sensitive API keys and authorization headers from error messages', () => {
-      function sanitizeError(error) {
-        if (!error) return 'Unknown error';
-        const str = typeof error === 'string' ? error : error.message || String(error);
-        return str
-          .replace(/Bearer\s+[a-zA-Z0-9_\.\-]+/gi, 'Bearer [REDACTED_TOKEN]')
-          .replace(/sk-[a-zA-Z0-9_\-]+/g, '[REDACTED_API_KEY]')
-          .replace(/mongodb(\+srv)?:\/\/[^@]+@/gi, 'mongodb$1://[REDACTED_AUTH]@');
-      }
-
       const rawOpenRouterErr = 'OpenRouter request failed: Bearer sk-or-v1-abcdef1234567890 failed';
       const rawMongoErr = 'Failed to connect: mongodb+srv://user:secretpass@cluster0.net/db';
 

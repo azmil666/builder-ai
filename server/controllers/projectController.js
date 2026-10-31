@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Project } from "../models/Project.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
@@ -6,7 +7,7 @@ function hashContent(content) {
   return crypto.createHash("md5").update(content).digest("hex").slice(0, 12);
 }
 
-function sanitizeError(error) {
+export function sanitizeError(error) {
   if (!error) return "Unknown error";
   const str = typeof error === "string" ? error : error.message || String(error);
   return str
@@ -29,6 +30,8 @@ export async function createProject(req, res) {
     return;
   }
 
+  const userId = req.user.userID || req.user.userId;
+
   // Create project in DB immediately with "pending" status
   const project = await Project.create({
     name: "Planning project...",
@@ -39,7 +42,7 @@ export async function createProject(req, res) {
       { role: "assistant", content: "Planning project structure..." },
     ],
     version: 0,
-    owner: req.user.userID,
+    owner: userId,
     status: "pending",
     filesPlanned: [],
     filesGenerated: [],
@@ -179,8 +182,10 @@ export async function listProjects(req, res) {
     return;
   }
 
+  const userId = req.user.userID || req.user.userId;
+
   const projects = await Project.find(
-    { owner: req.user.userID },
+    { owner: userId },
     { name: 1, description: 1, version: 1, createdAt: 1, updatedAt: 1 },
   ).sort({ updatedAt: -1 });
 
@@ -195,9 +200,16 @@ export async function getProject(req, res) {
     return;
   }
 
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+
   const project = await Project.findOne({
     _id: req.params.id,
-    owner: req.user.userID,
+    owner: userId,
   });
 
   if (!project) {
@@ -235,9 +247,16 @@ export async function deleteProject(req, res) {
     return;
   }
 
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+
   const result = await Project.findOneAndDelete({
     _id: req.params.id,
-    owner: req.user.userID,
+    owner: userId,
   });
 
   if (!result) {
@@ -261,9 +280,16 @@ export async function updateProjectFiles(req, res) {
     return;
   }
 
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+
   const project = await Project.findOne({
     _id: req.params.id,
-    owner: req.user.userID,
+    owner: userId,
   });
 
   if (!project) {
@@ -307,8 +333,15 @@ export async function publishProject(req, res) {
     return;
   }
 
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+
   const project = await Project.findOneAndUpdate(
-    { _id: req.params.id, owner: req.user.userID },
+    { _id: req.params.id, owner: userId },
     { published: true },
     { returnDocument: "after" },
   );
@@ -324,6 +357,11 @@ export async function publishProject(req, res) {
 // GET /api/projects/public/:id
 // Get a publicly published project details (without auth).
 export async function getPublicProject(req, res) {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
   const project = await Project.findById(req.params.id);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
