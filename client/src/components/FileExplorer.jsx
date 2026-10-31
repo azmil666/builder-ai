@@ -12,7 +12,8 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import FileCreateModal from './FileCreateModal';
+import FileDeleteModal from './FileDeleteModal';
 
 function buildTree(paths) {
   const root = [];
@@ -56,7 +57,7 @@ function TreeItem({
   activeFile,
   onFileSelect,
   onRename,
-  onDelete,
+  onDeleteRequest,
   depth = 0,
 }) {
   const [isOpen, setIsOpen] = useState(true);
@@ -107,7 +108,7 @@ function TreeItem({
                 activeFile={activeFile}
                 onFileSelect={onFileSelect}
                 onRename={onRename}
-                onDelete={onDelete}
+                onDeleteRequest={onDeleteRequest}
                 depth={depth + 1}
               />
             ))}
@@ -166,10 +167,10 @@ function TreeItem({
             </button>
           )}
 
-          {node.path !== '/App.js' && node.path !== '/styles.css' && onDelete && (
+          {node.path !== '/App.js' && node.path !== '/styles.css' && onDeleteRequest && (
             <button
               type="button"
-              onClick={() => onDelete(node.path)}
+              onClick={() => onDeleteRequest(node.path)}
               className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
               title="Delete file"
             >
@@ -191,8 +192,8 @@ const FileExplorer = ({
   onDeleteFile,
 }) => {
   const [filterQuery, setFilterQuery] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [newFilePath, setNewFilePath] = useState('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const allFileKeys = useMemo(() => Object.keys(files || {}), [files]);
 
@@ -203,23 +204,6 @@ const FileExplorer = ({
   }, [allFileKeys, filterQuery]);
 
   const tree = useMemo(() => buildTree(filteredKeys), [filteredKeys]);
-
-  const handleCreateSubmit = (e) => {
-    e.preventDefault();
-    const trimmed = newFilePath.trim();
-    if (!trimmed) {
-      setIsCreating(false);
-      return;
-    }
-    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    if (!/\.(js|jsx|css|json)$/.test(cleanPath)) {
-      toast.error('File must end in .jsx, .js, .css, or .json');
-      return;
-    }
-    onCreateFile(cleanPath);
-    setNewFilePath('');
-    setIsCreating(false);
-  };
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 text-zinc-200 border-r border-zinc-850">
@@ -237,9 +221,9 @@ const FileExplorer = ({
         {onCreateFile && (
           <button
             type="button"
-            onClick={() => setIsCreating(true)}
+            onClick={() => setIsCreateModalOpen(true)}
             className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
-            title="Create new file"
+            title="Create new file with template"
           >
             <FilePlusIcon size={14} />
           </button>
@@ -269,30 +253,6 @@ const FileExplorer = ({
         </div>
       </div>
 
-      {/* Inline Create Input */}
-      {isCreating && (
-        <form onSubmit={handleCreateSubmit} className="p-2 border-b border-zinc-800 bg-zinc-900/60">
-          <div className="text-[10px] text-zinc-400 mb-1 flex items-center justify-between">
-            <span>New File Path:</span>
-            <button
-              type="button"
-              onClick={() => setIsCreating(false)}
-              className="hover:text-zinc-200"
-            >
-              Cancel
-            </button>
-          </div>
-          <input
-            type="text"
-            value={newFilePath}
-            onChange={(e) => setNewFilePath(e.target.value)}
-            placeholder="/components/Hero.jsx"
-            autoFocus
-            className="w-full bg-zinc-950 border border-indigo-500 rounded px-2 py-1 text-xs text-white outline-none"
-          />
-        </form>
-      )}
-
       {/* File Tree */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5 hide-scrollbar">
         {tree.length === 0 && (
@@ -308,10 +268,26 @@ const FileExplorer = ({
             activeFile={activeFile}
             onFileSelect={onFileSelect}
             onRename={onRenameFile}
-            onDelete={onDeleteFile}
+            onDeleteRequest={setDeleteTarget}
           />
         ))}
       </div>
+
+      {/* Create File Modal */}
+      <FileCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        existingFiles={files}
+        onCreate={onCreateFile}
+      />
+
+      {/* Delete File Modal */}
+      <FileDeleteModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        filePath={deleteTarget}
+        onConfirm={onDeleteFile}
+      />
     </div>
   );
 };

@@ -21,6 +21,8 @@ export function AppContextProvider({children}){
     const [chatLoading, setChatLoading] = useState(false);
     const [generatingProject, setGeneratingProject] = useState(false);
     const [activeFile, setActiveFile] = useState("/App.js");
+    const [openTabs, setOpenTabs] = useState(["/App.js"]);
+    const [dirtyFiles, setDirtyFiles] = useState(new Set());
     const [showCode, setShowCode] = useState(false);
     const [syncStatus, setSyncStatus] = useState("saved"); // "saved" | "saving" | "error"
     
@@ -103,14 +105,13 @@ export function AppContextProvider({children}){
        setActiveProject(data);
        
        //default file selection 
-
        const files = Object.keys(data.files || {});
        if(files.length > 0){
-        setActiveFile((prev)=>{
-            if(files.includes(prev)) return prev;
-            if(files.includes("/App.js")) return "/App.js";
-            return files[0];
-
+        const target = files.includes("/App.js") ? "/App.js" : files[0];
+        setActiveFile(target);
+        setOpenTabs((prev) => {
+          const valid = prev.filter((p) => files.includes(p));
+          return valid.length > 0 ? valid : [target];
         });
        }
     } catch (err) {
@@ -210,6 +211,7 @@ export function AppContextProvider({children}){
         try {
           await api.put(`/api/projects/${id}/files`, { files });
           setSyncStatus("saved");
+          setDirtyFiles(new Set());
         } catch (err) {
           console.error("Failed to auto-save files:", err);
           setSyncStatus("error");
@@ -225,9 +227,47 @@ export function AppContextProvider({children}){
     };
   }, [debouncedSave]);
 
+  const saveNow = useCallback(async () => {
+    debouncedSave.flush();
+    setSyncStatus("saved");
+    setDirtyFiles(new Set());
+    toast.success("Saved project files");
+  }, [debouncedSave]);
+
+  const markFileDirty = useCallback((path, isDirty = true) => {
+    setDirtyFiles((prev) => {
+      const next = new Set(prev);
+      if (isDirty) next.add(path);
+      else next.delete(path);
+      return next;
+    });
+  }, []);
+
+  const openFile = useCallback((path) => {
+    setActiveFile(path);
+    setOpenTabs((prev) => (prev.includes(path) ? prev : [...prev, path]));
+    setShowCode(true);
+  }, []);
+
+  const closeTab = useCallback(
+    (path) => {
+      setOpenTabs((prev) => {
+        const filtered = prev.filter((p) => p !== path);
+        const nextTabs = filtered.length > 0 ? filtered : ["/App.js"];
+        if (activeFile === path) {
+          const nextActive = nextTabs[nextTabs.length - 1] || "/App.js";
+          setActiveFile(nextActive);
+        }
+        return nextTabs;
+      });
+    },
+    [activeFile],
+  );
+
   const updateProjectFiles = useCallback(
     async (files) => {
       if (!activeProject || !user) return;
+      setActiveProject((prev) => (prev ? { ...prev, files } : prev));
       setSyncStatus("saving");
       debouncedSave(files, activeProject._id);
     },
@@ -249,6 +289,7 @@ export function AppContextProvider({children}){
       };
       setActiveProject((prev) => (prev ? { ...prev, files: updated } : prev));
       setActiveFile(normalizedPath);
+      setOpenTabs((prev) => (prev.includes(normalizedPath) ? prev : [...prev, normalizedPath]));
       setShowCode(true);
       updateProjectFiles(updated);
       toast.success(`Created ${normalizedPath}`);
@@ -278,6 +319,7 @@ export function AppContextProvider({children}){
 
       setActiveProject((prev) => (prev ? { ...prev, files: updated } : prev));
       setActiveFile((prev) => (prev === oldPath ? normalizedNew : prev));
+      setOpenTabs((prev) => prev.map((p) => (p === oldPath ? normalizedNew : p)));
       updateProjectFiles(updated);
       toast.success(`Renamed to ${normalizedNew}`);
     },
@@ -299,6 +341,10 @@ export function AppContextProvider({children}){
 
       setActiveProject((prev) => (prev ? { ...prev, files: updated } : prev));
       setActiveFile((prev) => (prev === path ? "/App.js" : prev));
+      setOpenTabs((prev) => {
+        const next = prev.filter((p) => p !== path);
+        return next.length > 0 ? next : ["/App.js"];
+      });
       updateProjectFiles(updated);
       toast.success(`Deleted ${path}`);
     },
@@ -342,6 +388,12 @@ export function AppContextProvider({children}){
         handleChat,
         updateProjectFiles,
         syncStatus,
+        openTabs,
+        dirtyFiles,
+        openFile,
+        closeTab,
+        markFileDirty,
+        saveNow,
         createFile,
         renameFile,
         deleteFile,

@@ -41,7 +41,8 @@ const BuilderPage = () => {
     loadingActiveProject,
     activeFile,
     showCode,
-    setActiveFile,
+    openFile,
+    saveNow,
     setShowCode,
     loadProject,
     logout,
@@ -81,8 +82,9 @@ const BuilderPage = () => {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!activeProject) return;
+    await saveNow();
     exportProjectZip(activeProject);
   };
 
@@ -214,10 +216,7 @@ const BuilderPage = () => {
                 messages={activeProject.messages}
                 onSend={handleChat}
                 loading={chatLoading}
-                onFileSelect={(path) => {
-                  setActiveFile(path);
-                  setShowCode(true);
-                }}
+                onFileSelect={(path) => openFile(path)}
               />
             )}
 
@@ -225,10 +224,7 @@ const BuilderPage = () => {
               <FileExplorer
                 files={activeProject.files}
                 activeFile={activeFile}
-                onFileSelect={(path) => {
-                  setActiveFile(path);
-                  setShowCode(true);
-                }}
+                onFileSelect={(path) => openFile(path)}
                 onCreateFile={createFile}
                 onRenameFile={renameFile}
                 onDeleteFile={deleteFile}
