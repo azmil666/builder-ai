@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Project } from "../models/Project.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
+import { emitProjectEvent, formatSSE, subscribeProjectEvents } from "../services/projectEvents.js";
 
 function hashContent(content) {
   return crypto.createHash("md5").update(content).digest("hex").slice(0, 12);
@@ -96,6 +97,9 @@ async function runBackgroundGeneration(projectId, prompt) {
             },
           },
         });
+        emitProjectEvent(projectId, "design_spec", {
+          designSpec: spec,
+        });
       },
       onPlan: async (plan) => {
         console.log(
@@ -117,6 +121,11 @@ async function runBackgroundGeneration(projectId, prompt) {
             },
           },
         });
+        emitProjectEvent(projectId, "plan", {
+          status: "generating",
+          name: plan.projectName || "Generated Project",
+          filesPlanned: plan.files,
+        });
       },
       onFileStart: async (path) => {
         console.log(
@@ -125,6 +134,9 @@ async function runBackgroundGeneration(projectId, prompt) {
         await Project.findByIdAndUpdate(projectId, {
           currentFile: path,
           CurrentFile: path,
+        });
+        emitProjectEvent(projectId, "file_start", {
+          currentFile: path,
         });
       },
       onFileComplete: async (path, code) => {
@@ -151,6 +163,13 @@ async function runBackgroundGeneration(projectId, prompt) {
           project.CurrentFile = null;
           project.markModified("files");
           await project.save();
+
+          emitProjectEvent(projectId, "file_complete", {
+            path,
+            filesGenerated: project.filesGenerated,
+            currentFile: null,
+            file: { content: code },
+          });
         }
       },
     });
@@ -173,6 +192,14 @@ async function runBackgroundGeneration(projectId, prompt) {
         timestamp: new Date(),
       });
       await project.save();
+
+      emitProjectEvent(projectId, "completed", {
+        status: "completed",
+        version: project.version,
+        name: project.name,
+        designSpec: project.designSpec,
+        filesGenerated: project.filesGenerated,
+      });
     }
   } catch (err) {
     const safeError = sanitizeError(err);
@@ -190,6 +217,11 @@ async function runBackgroundGeneration(projectId, prompt) {
           timestamp: new Date(),
         },
       },
+    });
+
+    emitProjectEvent(projectId, "failed", {
+      status: "failed",
+      error: safeError,
     });
   }
 }
@@ -414,5 +446,98 @@ export async function getPublicProject(req, res) {
     description: project.description,
     files: filesObj,
     version: project.version,
+  });
+}
+
+// GET /api/projects/:id/stream
+// Stream real-time progress events for project generation and revisions via Server-Sent Events (SSE).
+export async function streamProjectProgress(req, res) {
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  // Cross-user subscription protection: owner verification
+  if (project.owner.toString() !== userId.toString()) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  // Set SSE Headers
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  // 1. Immediately send ground-truth state from database
+  const initialState = {
+    projectId: project._id,
+    status: project.status,
+    name: project.name,
+    version: project.version,
+    designSpec: project.designSpec,
+    filesPlanned: project.filesPlanned || [],
+    filesGenerated: project.filesGenerated || [],
+    currentFile: project.currentFile,
+    error: project.error,
+  };
+  res.write(formatSSE("initial_state", initialState));
+
+  // 2. If already terminal (completed or failed), terminate stream immediately
+  if (project.status === "completed" || project.status === "failed") {
+    res.write(
+      formatSSE(project.status, {
+        status: project.status,
+        error: project.error,
+        version: project.version,
+        name: project.name,
+        designSpec: project.designSpec,
+        filesGenerated: project.filesGenerated || [],
+      }),
+    );
+    res.end();
+    return;
+  }
+
+  // 3. Subscribe to real-time events for this project
+  const unsubscribe = subscribeProjectEvents(project._id, ({ event, data }) => {
+    try {
+      res.write(formatSSE(event, data));
+      if (event === "completed" || event === "failed") {
+        res.end();
+      }
+    } catch {
+      // Client disconnected
+    }
+  });
+
+  // 4. Send keepalive heartbeat comment every 15 seconds
+  const heartbeatTimer = setInterval(() => {
+    try {
+      res.write(": heartbeat\n\n");
+    } catch {
+      clearInterval(heartbeatTimer);
+    }
+  }, 15000);
+
+  // 5. Clean up on connection close
+  req.on("close", () => {
+    clearInterval(heartbeatTimer);
+    unsubscribe();
   });
 }

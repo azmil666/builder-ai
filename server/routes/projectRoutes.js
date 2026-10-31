@@ -6,6 +6,7 @@ import {
   getPublicProject,
   listProjects,
   publishProject,
+  streamProjectProgress,
   updateProjectFiles,
 } from "../controllers/projectController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
@@ -25,6 +26,7 @@ projectRouter.use(authMiddleware);
 
 projectRouter.post("/", aiGenerationRateLimiter, createProject);
 projectRouter.get("/", listProjects);
+projectRouter.get("/:id/stream", streamProjectProgress);
 projectRouter.get("/:id", getProject);
 projectRouter.delete("/:id", deleteProject);
 projectRouter.put("/:id/files", updateProjectFiles);

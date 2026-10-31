@@ -124,27 +124,182 @@ export function AppContextProvider({children}){
         if(!silent) setLoadingActiveProject(false);
     }
     }, [user, navigate]);
-    // automatically poll active project status
-    useEffect(() => {
-        const projectId = activeProject?._id;
-        const status = activeProject?.status;
-        if (!projectId || !user) {
-            setChatLoading(false);
-            return;
-        }
+  // Stream progress using Server-Sent Events (SSE) with resilient polling fallback
+  useEffect(() => {
+    const projectId = activeProject?._id;
+    const status = activeProject?.status;
+    if (!projectId || !user) {
+      setChatLoading(false);
+      return;
+    }
 
-        const isOngoing = status === "generating" || status === "pending" || status === "revising";
+    const isOngoing =
+      status === "generating" || status === "pending" || status === "revising";
 
-        if(isOngoing){
-            setChatLoading(true);
-            const interval = setInterval(()=>{
-                loadProject(projectId, true);
-            },2000);
-            return () => clearInterval(interval);
-        }else{
-            setChatLoading(false);
+    if (!isOngoing) {
+      setChatLoading(false);
+      return;
+    }
+
+    setChatLoading(true);
+
+    let eventSource = null;
+    let fallbackInterval = null;
+    let sseFailed = false;
+
+    // Start fallback polling if SSE fails or is unsupported
+    const startFallbackPolling = () => {
+      if (fallbackInterval) return;
+      fallbackInterval = setInterval(() => {
+        loadProject(projectId, true);
+      }, 3000);
+    };
+
+    // If EventSource is not supported by browser environment
+    if (typeof EventSource === "undefined") {
+      startFallbackPolling();
+      return () => {
+        if (fallbackInterval) clearInterval(fallbackInterval);
+      };
+    }
+
+    try {
+      const streamUrl = `/api/projects/${projectId}/stream`;
+      eventSource = new EventSource(streamUrl, { withCredentials: true });
+
+      eventSource.addEventListener("initial_state", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) => (prev ? { ...prev, ...data } : prev));
+        } catch (err) {
+          console.error("Failed to parse initial_state SSE event:", err);
         }
-    }, [activeProject?._id, activeProject?.status, loadProject, user]);
+      });
+
+      eventSource.addEventListener("design_spec", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev ? { ...prev, designSpec: data.designSpec } : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse design_spec SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("plan", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "generating",
+                  name: data.name || prev.name,
+                  filesPlanned: data.filesPlanned || prev.filesPlanned,
+                }
+              : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse plan SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("file_start", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev ? { ...prev, currentFile: data.currentFile } : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse file_start SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("file_complete", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) => {
+            if (!prev) return prev;
+            const updatedFiles = { ...(prev.files || {}) };
+            if (data.path && data.file) {
+              updatedFiles[data.path] = data.file;
+            }
+            return {
+              ...prev,
+              files: updatedFiles,
+              filesGenerated: data.filesGenerated || prev.filesGenerated,
+              currentFile: null,
+            };
+          });
+        } catch (err) {
+          console.error("Failed to parse file_complete SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("completed", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "completed",
+                  version: data.version || prev.version || 1,
+                  name: data.name || prev.name,
+                  designSpec: data.designSpec || prev.designSpec,
+                }
+              : prev,
+          );
+          setChatLoading(false);
+          eventSource?.close();
+          loadProject(projectId, true);
+        } catch (err) {
+          console.error("Failed to parse completed SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("failed", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "failed",
+                  error: data.error || "Generation failed",
+                }
+              : prev,
+          );
+          setChatLoading(false);
+          eventSource?.close();
+        } catch (err) {
+          console.error("Failed to parse failed SSE event:", err);
+        }
+      });
+
+      eventSource.onerror = (err) => {
+        console.warn("[SSE] Stream disconnected, falling back to polling:", err);
+        if (!sseFailed) {
+          sseFailed = true;
+          eventSource?.close();
+          startFallbackPolling();
+        }
+      };
+    } catch (err) {
+      console.error("[SSE] Connection error:", err);
+      startFallbackPolling();
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
+    };
+  }, [activeProject?._id, activeProject?.status, loadProject, user]);
 
     const handleGenerate = useCallback(
         async (prompt) => {
