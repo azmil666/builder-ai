@@ -25,6 +25,7 @@ const ProjectSchema = new Schema({
     filesGenerated: {type: [String], default: []},
     currentFile: {type: String, default: null},
     CurrentFile: {type: String, default: null},
+    designSpec: {type: Schema.Types.Mixed, default: null},
     error: {type: String, default: null},
 },{timestamps: true})
 

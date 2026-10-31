@@ -261,27 +261,247 @@ CRITICAL RULES for "update" operations:
 
 Be minimal: only touch files that NEED to change.`;
 
-export const FILE_PLAN_SYSTEM = `${BASE_SYSTEM}
+export const DESIGN_SPEC_SYSTEM = `You are a Principal Design Systems Architect and Creative Director.
+Your task is to analyze the user's project request and synthesize a world-class, structured DesignSpec JSON object.
 
-You are planning which files to create for a React project.
+Before any files are planned or code is written, you must establish the intentional aesthetic identity, color palette, typography pairing, layout strategy, and signature visual hook.
+
+### AESTHETIC ARCHETYPES:
+1. "clean_modern": Pristine, high-contrast tech/SaaS interface (Linear, Stripe, Vercel). Clean off-white background, subtle 1px border lines, crisp typography.
+2. "dark_luxury": Nocturnal, cinematic luxury (Apple Pro, automotive, high-end crypto). Deep near-black background (#09090b or #0a0a0a), subtle bronze/gold/violet accent, glowing ambient blur.
+3. "editorial_magazine": High-fashion, journalism, culture, luxury retail. Warm paper background (#fdfcf9), high-contrast serif headlines (Instrument Serif or Playfair Display), italic accents, generous letter-spacing.
+4. "swiss_international": Strict grid, bold grotesque typography (Plus Jakarta Sans, Inter), high-contrast monochrome with exactly ONE stark accent (cobalt blue or safety orange).
+5. "neo_brutalism": High-contrast 2px black borders, sharp geometry, vibrant pastel or stark accents, bold shadows.
+6. "bento_grid": Modular multi-compartment card grids with subtle glass borders and micro-statistics.
+7. "minimal_utility": Distraction-free single-purpose tool, calculator, game, or dashboard layout. Zero marketing fluff.
+
+### TYPOGRAPHY PAIRINGS:
+- Modern SaaS / Tech: Heading "Inter" (700/800) + Body "Inter" (400/500)
+- Luxury / Modern Editorial: Heading "Instrument Serif" (400 italic/normal) + Body "Inter" (400/500)
+- High-Impact Agency: Heading "Syne" (700/800) + Body "Plus Jakarta Sans" (400/500)
+- Startup / Product: Heading "Plus Jakarta Sans" (700/800) + Body "Inter" (400/500)
+- Technical / Data / Dev: Heading "DM Sans" (700) + Body "Inter" (400) + Mono "Space Mono"
+- Elegant Lifestyle: Heading "Playfair Display" (700) + Body "Plus Jakarta Sans" (400)
+
+### COLOR DISCIPLINE:
+- Define hex colors for bg, fg, muted, line, accent, accentForeground, cardBg, cardBorder.
+- If the user explicitly asks for dark mode or if the archetype is "dark_luxury", set theme: "dark" with near-black bg (#09090b or #0a0a0a) and bright foreground (#fafafa).
+- Otherwise, use clean light mode (bg: "#ffffff" or "#fafafa", fg: "#09090b").
+- Limit accent color to primary CTAs and active states.
+
+### THE SIGNATURE MOMENT:
+Define ONE memorable visual or interactive hook the website will be known for (e.g., "floating glass status pill with live ping animation", "giant ghost headline layer with ambient backdrop blur", "interactive card tilt with border shine").
+
+Return ONLY valid JSON matching the DesignSpecSchema.`;
+
+export function createDefaultDesignSpec(prompt = "") {
+  const lower = prompt.toLowerCase();
+  const isAppOrGame = /game|calculator|todo|tictactoe|tic tac toe|stopwatch|counter|quiz|weather|unit converter|chess|tracker/.test(lower);
+  const wantsDark = /dark|night|nocturnal|black|cyber|neon/.test(lower);
+
+  if (isAppOrGame) {
+    return {
+      purpose: "Interactive utility / game application",
+      targetAudience: "Users seeking a fast, focused interactive tool",
+      category: "interactive_app",
+      visualDirection: wantsDark ? "Focused nocturnal dark tool with clean controls" : "Minimalist modern application with clean layout",
+      archetype: "minimal_utility",
+      brandPersonality: ["focused", "clean", "responsive"],
+      colorPalette: {
+        theme: wantsDark ? "dark" : "light",
+        bg: wantsDark ? "#09090b" : "#f8fafc",
+        fg: wantsDark ? "#fafafa" : "#0f172a",
+        muted: wantsDark ? "#a1a1aa" : "#64748b",
+        line: wantsDark ? "#27272a" : "#e2e8f0",
+        accent: "#6366f1",
+        accentForeground: "#ffffff",
+        cardBg: wantsDark ? "#18181b" : "#ffffff",
+        cardBorder: wantsDark ? "#27272a" : "#e2e8f0",
+      },
+      typography: {
+        heading: {
+          family: "Inter",
+          weights: ["600", "700", "800"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap",
+          usage: "Titles and scoreboards",
+        },
+        body: {
+          family: "Inter",
+          weights: ["400", "500"],
+          googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap",
+          usage: "Buttons and labels",
+        },
+        fontImportUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+      },
+      layout: {
+        containerWidth: "max-w-4xl",
+        sectionPadding: "py-12 md:py-20",
+        gap: "gap-4 md:gap-6",
+        structure: "Single viewport centered interactive tool",
+      },
+      componentStyling: {
+        cardRadius: "rounded-2xl",
+        buttonRadius: "rounded-xl",
+        shadow: "shadow-sm",
+        borderStyle: "border border-zinc-200",
+        cardStyle: wantsDark ? "bg-zinc-900 border border-zinc-800 rounded-2xl p-6" : "bg-white border border-slate-200 rounded-2xl p-6 shadow-sm",
+      },
+      navigation: {
+        type: "minimal_bar",
+        details: "Minimal top header with app title and action button",
+      },
+      hero: {
+        composition: "interactive_canvas",
+        ctaText: "Play Now",
+        details: "Live interactive canvas directly in hero viewport",
+      },
+      mediaDirection: {
+        type: "code_graphics",
+        description: "Vector UI and CSS keyframe feedback",
+        imageTreatment: "None",
+        iconStyle: "Lucide React inline SVG icons",
+      },
+      motion: {
+        strategy: "Crisp state change animations and feedback bumps",
+        keyframes: ["fadeIn", "scaleIn"],
+        reducedMotion: true,
+      },
+      responsive: {
+        breakpoints: "Mobile (<640px), Desktop (>640px)",
+        mobileStrategy: "Full viewport touch-friendly controls",
+      },
+      accessibility: {
+        contrastRatio: "WCAG 2.2 AA compliant",
+        focusRings: "focus-visible:ring-2 focus-visible:ring-indigo-500",
+        semanticElements: true,
+      },
+      signature: "Immediate interactive responsiveness with smooth visual feedback",
+    };
+  }
+
+  // Default SaaS / Marketing Landing Page
+  return {
+    purpose: "Modern high-converting web landing page",
+    targetAudience: "Prospective customers and users",
+    category: "saas_landing",
+    visualDirection: wantsDark ? "Cinematic dark luxury aesthetic" : "Clean modern SaaS interface with crisp typography",
+    archetype: wantsDark ? "dark_luxury" : "clean_modern",
+    brandPersonality: ["innovative", "polished", "reliable"],
+    colorPalette: {
+      theme: wantsDark ? "dark" : "light",
+      bg: wantsDark ? "#09090b" : "#ffffff",
+      fg: wantsDark ? "#fafafa" : "#09090b",
+      muted: wantsDark ? "#a1a1aa" : "#71717a",
+      line: wantsDark ? "#27272a" : "#e4e4e7",
+      accent: wantsDark ? "#818cf8" : "#6366f1",
+      accentForeground: "#ffffff",
+      cardBg: wantsDark ? "#18181b" : "#ffffff",
+      cardBorder: wantsDark ? "#27272a" : "#e4e4e7",
+    },
+    typography: {
+      heading: {
+        family: "Plus Jakarta Sans",
+        weights: ["600", "700", "800"],
+        googleFontsUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500&display=swap",
+        usage: "Hero headlines, section headers",
+      },
+      body: {
+        family: "Inter",
+        weights: ["400", "500"],
+        googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap",
+        usage: "Body paragraphs, navigation links, cards",
+      },
+      fontImportUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500&display=swap",
+    },
+    layout: {
+      containerWidth: "max-w-7xl",
+      sectionPadding: "py-20 md:py-32",
+      gap: "gap-8 md:gap-12",
+      structure: "Multi-section narrative landing page (Header, Hero, Features, Social Proof, CTA, Footer)",
+    },
+    componentStyling: {
+      cardRadius: "rounded-2xl",
+      buttonRadius: "rounded-full",
+      shadow: "shadow-sm hover:shadow-md",
+      borderStyle: wantsDark ? "border border-zinc-800" : "border border-zinc-200",
+      cardStyle: wantsDark ? "bg-zinc-900/50 backdrop-blur border border-zinc-800 rounded-2xl p-8" : "bg-white border border-zinc-200 rounded-2xl p-8 shadow-sm",
+    },
+    navigation: {
+      type: "sticky_header",
+      details: "Sticky translucent navbar with brand logo, nav links, and CTA",
+    },
+    hero: {
+      composition: "centered",
+      ctaText: "Get Started Free",
+      details: "High-impact centered hero with announcement chip, bold H1, and dual action buttons",
+    },
+    mediaDirection: {
+      type: "curated_photography",
+      description: "High-resolution curated photography and visual cards",
+      imageTreatment: "Rounded corners with subtle border ring",
+      iconStyle: "Lucide React inline SVG icons",
+    },
+    motion: {
+      strategy: "Smooth entrance fades and hover lift micro-interactions",
+      keyframes: ["fadeInUp", "float"],
+      reducedMotion: true,
+    },
+    responsive: {
+      breakpoints: "Mobile (<640px), Tablet (640-1024px), Desktop (>1024px)",
+      mobileStrategy: "Responsive fluid grid and mobile menu",
+    },
+    accessibility: {
+      contrastRatio: "WCAG 2.2 AA compliant",
+      focusRings: "focus-visible:ring-2 focus-visible:ring-indigo-500",
+      semanticElements: true,
+    },
+    signature: "Ambient lighting glow with crisp typographic hierarchy and pill badge micro-interactions",
+  };
+}
+
+export function buildFilePlanSystem(designSpec) {
+  const specContext = designSpec
+    ? `
+---
+
+## ACTIVE DESIGN SPECIFICATION CONTRACT
+You MUST build a file plan that directly implements this design specification:
+- **Category:** ${designSpec.category}
+- **Archetype:** ${designSpec.archetype}
+- **Theme:** ${designSpec.colorPalette?.theme || "light"}
+- **Palette Tokens:** Background ${designSpec.colorPalette?.bg}, Text ${designSpec.colorPalette?.fg}, Accent ${designSpec.colorPalette?.accent}, Card ${designSpec.colorPalette?.cardBg}
+- **Typography:** Display "${designSpec.typography?.heading?.family}" + Body "${designSpec.typography?.body?.family}"
+- **Font Import URL:** \`${designSpec.typography?.fontImportUrl || ""}\`
+- **Layout Structure:** ${designSpec.layout?.structure}
+- **Navigation Type:** ${designSpec.navigation?.type}
+- **Hero Composition:** ${designSpec.hero?.composition}
+- **Signature Visual Hook:** ${designSpec.signature}
+
+---
+`
+    : "";
+
+  return `${BASE_SYSTEM}
+${specContext}
+You are planning which files to create for a React project based on the Design Specification.
 Respond with a JSON object listing every file needed, including their contract of imports and exports (so different files don't have mismatched component or default export signatures):
 {
   "files": [
     { 
       "path": "/App.js", 
-      "description": "Main app component rendering the hero, features, pricing, etc.",
+      "description": "Main app component assembling layout, navigation, hero, and sections",
       "exports": "default App",
       "imports": ["./styles.css", "./components/Header.js", "./components/Hero.js", "./components/Features.js", "./components/Footer.js"]
     },
     { 
       "path": "/styles.css", 
-      "description": "Global CSS: Google Font import, keyframe animations, utility classes",
+      "description": "Global CSS: Google Fonts import, root CSS variables for DesignSpec palette, keyframe animations",
       "exports": "none",
       "imports": []
     },
     { 
       "path": "/components/Header.js", 
-      "description": "Sticky navigation bar",
+      "description": "Sticky navigation header adhering to DesignSpec navigation",
       "exports": "default Header",
       "imports": []
     }
@@ -292,16 +512,18 @@ Respond with a JSON object listing every file needed, including their contract o
 
 Rules:
 - ALWAYS include /App.js
-- ALWAYS include /styles.css for font imports and CSS keyframe animations
-- Match the component plan to the project type:
-  * For SMALL INTERACTIVE APPS / GAMES / TOOLS (e.g., Tic Tac Toe, Calculator, Todo App, Stopwatch, Counter, Quiz App, Unit Converter): Plan ONLY 2 files — /App.js and /styles.css! Do NOT create extra sub-component files in /components/. Write all state, logic, and UI components inside /App.js.
-  * For LARGE MARKETING WEBSITES: Plan /App.js, /styles.css, and landing page section components in /components/ (e.g., /components/Header.js, /components/Hero.js, /components/Features.js, /components/Pricing.js, /components/Footer.js).
-- Define "exports" indicating what this file will export (e.g., "default Header", "default Button"). Every JS/JSX component file must have EXACTLY ONE default export.
-- Define "imports" listing relative file imports this component relies on from the plan (e.g., ["./components/Header.js", "./styles.css"]).
-- Each description should be one sentence explaining what that file does
-- Do NOT write any code — only plan the file list`;
+- ALWAYS include /styles.css with the exact font imports and CSS root variables matching the DesignSpec
+- Match the component plan to the DesignSpec category:
+  * For "interactive_app" or "utility_game": Plan ONLY /App.js and /styles.css! Write all state, logic, and UI components inside /App.js.
+  * For marketing landing pages: Plan /App.js, /styles.css, and modular component files in /components/ (e.g. Header.js, Hero.js, Features.js, CTA.js, Footer.js).
+- Define "exports" indicating what this file will export (Every JS component file must have EXACTLY ONE default export).
+- Define "imports" listing relative file imports this component relies on from the plan.
+- Do NOT write any code — only plan the file list.`;
+}
 
-export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles) {
+export const FILE_PLAN_SYSTEM = buildFilePlanSystem(null);
+
+export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec) {
     const fileList = allFiles
         .map((f) => {
             const impStr = f.imports && f.imports.length > 0 ? ` (Imports: ${f.imports.join(", ")})` : "";
@@ -320,11 +542,31 @@ export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles) {
         }
     }
 
+    let designSpecStr = "";
+    if (designSpec) {
+      designSpecStr = `
+\n---
+## MANDATORY DESIGN SPECIFICATION COMPLIANCE
+Every component you write MUST conform to this exact design specification:
+- **Archetype:** ${designSpec.archetype}
+- **Theme:** ${designSpec.colorPalette?.theme || "light"}
+- **Colors:** Background: ${designSpec.colorPalette?.bg}, Text: ${designSpec.colorPalette?.fg}, Muted: ${designSpec.colorPalette?.muted}, Line: ${designSpec.colorPalette?.line}, Accent: ${designSpec.colorPalette?.accent}, CardBg: ${designSpec.colorPalette?.cardBg}, CardBorder: ${designSpec.colorPalette?.cardBorder}
+- **Heading Font:** "${designSpec.typography?.heading?.family}"
+- **Body Font:** "${designSpec.typography?.body?.family}"
+- **Font Import Link (for styles.css):** \`${designSpec.typography?.fontImportUrl || ""}\`
+- **Card Styling:** \`${designSpec.componentStyling?.cardStyle}\`
+- **Button Radius:** \`${designSpec.componentStyling?.buttonRadius}\`
+- **Signature Hook:** "${designSpec.signature}"
+- **Icons:** Use \`lucide-react\` inline SVG icons (e.g. \`import { ArrowRight, Check, Sparkles } from 'lucide-react'\`). Do NOT use external Font Awesome CDNs.
+---
+`;
+    }
+
     return `${BASE_SYSTEM}
 
 You are writing a SINGLE file for a React project.
 The full project file structure is:
-${fileList}${contextStr}
+${fileList}${contextStr}${designSpecStr}
 
 Write ONLY the code for the specific file the user requests.
 Return a JSON object with exactly this shape:
@@ -336,6 +578,7 @@ Rules:
 - Do NOT include any other files
 - The code must be complete, visually stunning, and production-ready
 - Import other project files using their exact paths (e.g. import Header from './components/Header')
-- The /styles.css file MUST include: Google Font @import, @keyframes float/fadeInUp/fadeIn, and .animate-* utility classes
-- Apply the full design system defined in the base instructions — premium typography, generous spacing, proper hover effects, and animations`;
+- The /styles.css file MUST include the DesignSpec font @import URL and declared keyframe animations
+- Icons: Use lucide-react components (e.g. import { ... } from 'lucide-react')
+- Apply the full design system defined in the design specification — consistent typography, generous spacing, and smooth hover micro-interactions`;
 }

@@ -48,6 +48,7 @@ export async function createProject(req, res) {
     filesGenerated: [],
     currentFile: null,
     CurrentFile: null,
+    designSpec: null,
     error: null,
   });
 
@@ -70,6 +71,7 @@ export async function createProject(req, res) {
     filesPlanned: project.filesPlanned,
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
+    designSpec: project.designSpec || null,
     error: project.error,
     createdAt: project.createdAt,
   });
@@ -80,6 +82,21 @@ async function runBackgroundGeneration(projectId, prompt) {
   try {
     console.log(`[Background AI] Starting generation for project ${projectId}`);
     const result = await generateProject(prompt, {
+      onDesignSpec: async (spec) => {
+        console.log(
+          `[Background AI] DesignSpec established for project ${projectId}: archetype="${spec.archetype}", aesthetic="${spec.aestheticDirection}"`,
+        );
+        await Project.findByIdAndUpdate(projectId, {
+          designSpec: spec,
+          $push: {
+            messages: {
+              role: "assistant",
+              content: `Design concept established: **${spec.aestheticDirection}** (${spec.archetype} archetype) with palette (${spec.colorPalette?.primary}, ${spec.colorPalette?.accent}).`,
+              timestamp: new Date(),
+            },
+          },
+        });
+      },
       onPlan: async (plan) => {
         console.log(
           `[Background AI] Plan created for project ${projectId}. Planned ${plan.files.length} files.`,
@@ -146,6 +163,9 @@ async function runBackgroundGeneration(projectId, prompt) {
       project.version = 1;
       if (result.description) {
         project.name = result.description;
+      }
+      if (result.designSpec) {
+        project.designSpec = result.designSpec;
       }
       project.messages.push({
         role: "assistant",
@@ -233,6 +253,7 @@ export async function getProject(req, res) {
     filesPlanned: project.filesPlanned,
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
+    designSpec: project.designSpec || null,
     error: project.error,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,

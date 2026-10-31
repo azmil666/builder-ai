@@ -1,8 +1,8 @@
 import {createOpenAI} from '@ai-sdk/openai'
 import { generateObject } from 'ai';
 import pMap from "p-map";
-import { FileCodeSchema, FilePlanSchema, RevisionResultSchema } from './aiSchemas.js';
-import { buildFileCodeSystem, FILE_PLAN_SYSTEM, REVISE_SYSTEM } from './prompts.js';
+import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema } from './aiSchemas.js';
+import { buildFileCodeSystem, buildFilePlanSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
 import { validateAndFixCode, validateRevisionContent } from './codeValidator.js';
 
@@ -18,8 +18,8 @@ const openrouter = createOpenAI({
 const model = openrouter(MODEL);
 
 // Generate a single file's code
-async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles){
-     const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles);
+async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles, designSpec){
+     const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec);
 
      const userMsg = `Project: ${prompt}\n\nWrite the complete code for: ${file.path}\nPurpose: ${file.description}`;
 
@@ -51,14 +51,36 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles)
      return {path: file.path, code}
 }
 
-// Generate project files: plan first, then build files in order with fallback retries
+// Generate project files: DesignSpec first, then plan, then build files in order with fallback retries
 export async function generateProject(prompt, callbacks){
-    // Phase 1: Plan
-    console.log(`[AI] Phase 1: Planning file structure for: "${prompt.slice(0,80)}..."`);
+    // Phase 1: Design Intelligence - Establish visual identity and design tokens
+    console.log(`[AI] Phase 1: Generating DesignSpec for: "${prompt.slice(0,80)}..."`);
+    let designSpec = null;
+    try {
+        const { object: spec } = await generateObject({
+            model,
+            schema: DesignSpecSchema,
+            system: DESIGN_SPEC_SYSTEM,
+            prompt: `Create a comprehensive, production-grade DesignSpec for: ${prompt}`,
+            maxRetries: 2,
+        });
+        designSpec = spec;
+    } catch (err) {
+        console.warn(`[AI] DesignSpec generation failed: ${err.message}. Using intelligent default spec.`);
+        designSpec = createDefaultDesignSpec(prompt);
+    }
+
+    if(callbacks?.onDesignSpec){
+        await callbacks.onDesignSpec(designSpec);
+    }
+
+    // Phase 2: Technical File Planning informed by DesignSpec
+    console.log(`[AI] Phase 2: Planning file structure for: "${prompt.slice(0,80)}..."`);
+    const filePlanSystem = buildFilePlanSystem(designSpec);
     const { object: plan } = await generateObject({
         model,
         schema: FilePlanSchema,
-        system: FILE_PLAN_SYSTEM,
+        system: filePlanSystem,
         prompt: `Plan a React website for: ${prompt}`,
         maxRetries: 2,
     });
@@ -75,7 +97,7 @@ export async function generateProject(prompt, callbacks){
     if(!plan.files.find((f)=> f.path === "/styles.css")){
         plan.files.push({
              path: "/styles.css",
-            description: "Global CSS: Google Font import, keyframe animations, utility classes",
+            description: "Global CSS: Google Font import, design tokens, keyframe animations, utility classes",
             exports: "none",
             imports: [],
         })
@@ -85,11 +107,30 @@ export async function generateProject(prompt, callbacks){
         await callbacks.onPlan(plan)
     }
 
-    console.log(`[AI] Phase 2: Generating ${plan.files.length} files in parallel (concurrency=${MAX_CONCURRENCY}): ${plan.files.map((f)=> f.path).join(", ")}`);
-
-
     const files = {};
-    let pendingFiles = plan.files.map((f)=>({...f}));
+
+    // Phase 3a: Generate foundation /styles.css first if planned, establishing tokens and classes for all other files
+    const stylesFile = plan.files.find((f) => f.path === "/styles.css");
+    if (stylesFile) {
+        console.log(`[AI] Phase 3a: Generating foundation /styles.css before components...`);
+        try {
+            if (callbacks?.onFileStart) {
+                await callbacks.onFileStart(stylesFile.path);
+            }
+            const stylesResult = await generateSingleFile(stylesFile, plan.files, prompt, files, designSpec);
+            files[stylesFile.path] = stylesResult.code;
+            if (callbacks?.onFileComplete) {
+                await callbacks.onFileComplete(stylesFile.path, stylesResult.code);
+            }
+        } catch (err) {
+            console.warn(`[AI] Foundation /styles.css generation deferred to retry loop: ${err.message}`);
+        }
+    }
+
+    // Phase 3b: Generate remaining components
+    let pendingFiles = plan.files.filter((f) => !files[f.path]).map((f) => ({ ...f }));
+
+    console.log(`[AI] Phase 3b: Generating ${pendingFiles.length} files in parallel (concurrency=${MAX_CONCURRENCY}): ${pendingFiles.map((f)=> f.path).join(", ")}`);
 
     const maxRetryRounds = 2;
 
@@ -110,7 +151,7 @@ export async function generateProject(prompt, callbacks){
                         await callbacks.onFileStart(file.path)
                     }
 
-                    const singleResult = await generateSingleFile(file, plan.files, prompt, files)
+                    const singleResult = await generateSingleFile(file, plan.files, prompt, files, designSpec)
 
                     if(callbacks?.onFileComplete){
                         await callbacks.onFileComplete(file.path, singleResult.code)
@@ -149,7 +190,10 @@ export async function generateProject(prompt, callbacks){
             const ext = pendingFile.path.split(".").pop()?.toLowerCase();
 
             if(ext === "css"){
-                files[pendingFile.path] = `/* ${pendingFile.description || pendingFile.path} — Generation failed, please retry */\n`;
+                const fontImport = designSpec?.typography?.googleFontsUrl
+                    ? `@import url('${designSpec.typography.googleFontsUrl}');\n\n`
+                    : "";
+                files[pendingFile.path] = `${fontImport}/* ${pendingFile.description || pendingFile.path} — Fallback styles */\n:root {\n  --color-primary: ${designSpec?.colorPalette?.primary || "#3b82f6"};\n  --color-accent: ${designSpec?.colorPalette?.accent || "#8b5cf6"};\n}\n`;
             }else{
                 files[pendingFile.path] = "import React from 'react';\n\n" +
                 `// ⚠️ This file could not be generated. Please retry.\n` +
@@ -169,7 +213,7 @@ export async function generateProject(prompt, callbacks){
         throw new Error("AI did not generate /App.js entry point");
     }
 
-    return {files, description: plan.projectDescription}
+    return {files, description: plan.projectDescription, designSpec}
 }
 
 export async function reviseProject(prompt, manifest, relevantFiles, recentMessages){
