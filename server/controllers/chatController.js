@@ -25,9 +25,11 @@ export async function chat(req, res) {
     return;
   }
 
+  const userId = req.user.userID || req.user.userId;
+
   const project = await Project.findOne({
     _id: req.params.id,
-    owner: req.user.userId,
+    owner: userId,
   });
 
   if (!project) {
@@ -126,8 +128,12 @@ export async function chat(req, res) {
     });
   } catch (err) {
     console.error(`[AI Revision Error] ${err.message}`);
-    project.status = "completed";
-    await project.save();
+    try {
+      project.status = "completed";
+      await project.save();
+    } catch (saveErr) {
+      console.error(`[AI Revision Save Error] ${saveErr.message}`);
+    }
     res.status(500).json({
       error: err.message || "Failed to process revision request",
     });

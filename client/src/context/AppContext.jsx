@@ -24,93 +24,93 @@ export function AppContextProvider({children}){
     const [showCode, setShowCode] = useState(false);
     
     //Auth Actions
-    const checkSession = async ()=>{
+    const checkSession = useCallback(async () => {
         try {
-            const { data } = await api.get("/api/auth/me")
+            const { data } = await api.get("/api/auth/me");
             setUser(data.user);
-        } catch (error) {
-            setUser(null)
-        } finally{
-            setLoadingUser(false)
+        } catch {
+            setUser(null);
+        } finally {
+            setLoadingUser(false);
         }
-        
-    }
-    useEffect(()=>{
-        checkSession()
-    },[])
+    }, []);
 
-    const login = async (email, password) => {
+    useEffect(() => {
+        checkSession();
+    }, [checkSession]);
+
+    const login = useCallback(async (email, password) => {
        try {
-          const { data } = await api.post("/api/auth/login", {email, password});
-          setUser(data.user)
-          toast.success("Welcome back!")
-          navigate("/")
+          const { data } = await api.post("/api/auth/login", { email, password });
+          setUser(data.user);
+          toast.success("Welcome back!");
+          navigate("/");
        } catch (error) {
-          console.error("Login failed:", err);
-          const errMsg =err?.response?.data?.error || "Invalid email or password";
+          console.error("Login failed:", error);
+          const errMsg = error?.response?.data?.error || "Invalid email or password";
           toast.error(errMsg);
           throw new Error(errMsg);
        }
-    }
-    const register = async (name, email, password) => {
+    }, [navigate]);
+
+    const register = useCallback(async (name, email, password) => {
        try {
-          const { data } = await api.post("/api/auth/register", {name, email, password});
-          setUser(data.user)
-          toast.success("Account Created Sucessfully!")
-          navigate("/")
+          const { data } = await api.post("/api/auth/register", { name, email, password });
+          setUser(data.user);
+          toast.success("Account Created Sucessfully!");
+          navigate("/");
        } catch (error) {
-          console.error("Registration failed:", err);
-          const errMsg =err?.response?.data?.error || "Registration failed";
+          console.error("Registration failed:", error);
+          const errMsg = error?.response?.data?.error || "Registration failed";
           toast.error(errMsg);
           throw new Error(errMsg);
        }
-    }
+    }, [navigate]);
 
-    const logout = async ()=>{
+    const logout = useCallback(async () => {
         try {
-           await api.post("/api/auth/logout")
-           setUser(null)
-           setProjects([])
-           setActiveProject(null)
-           toast.success("Logged out sucessfully")
-           navigate("/login")
+           await api.post("/api/auth/logout");
+           setUser(null);
+           setProjects([]);
+           setActiveProject(null);
+           toast.success("Logged out sucessfully");
+           navigate("/login");
         } catch (err) {
            console.error("Logout failed:", err);
            toast.error("Logout failed");
         }
-
-    }
+    }, [navigate]);
     //project actions
 
-    const loadProjects = async () =>{
+    const loadProjects = useCallback(async () => {
        if(!user) return;
        try {
-        const { data } = await api.get("/api/projects")
-        setProjects(data)
+        const { data } = await api.get("/api/projects");
+        setProjects(data);
        } catch(err){
          console.error("Failed to list projects:", err);
          toast.error("Failed to load projects list");
        }finally {
         setLoadingProjects(false);
        }
-    }
-    const loadProject = async (id, silent = false)=>{
+    }, [user]);
+    const loadProject = useCallback(async (id, silent = false) => {
        if(!user) return;
-       if (!silent) setLoadingActiveProject(true)
+       if (!silent) setLoadingActiveProject(true);
         try {
-       const { data } = await api.get(`/api/projects/${id}`)
+       const { data } = await api.get(`/api/projects/${id}`);
        setActiveProject(data);
        
        //default file selection 
 
-       const files = Object.keys(data.files);
+       const files = Object.keys(data.files || {});
        if(files.length > 0){
         setActiveFile((prev)=>{
             if(files.includes(prev)) return prev;
             if(files.includes("/App.js")) return "/App.js";
-            return files[0]
+            return files[0];
 
-        })
+        });
        }
     } catch (err) {
         console.error("Failed to load project:", err);
@@ -119,25 +119,30 @@ export function AppContextProvider({children}){
             navigate("/");
         }  
     }finally{
-        if(!silent) setLoadingActiveProject(false)
+        if(!silent) setLoadingActiveProject(false);
     }
-    }
+    }, [user, navigate]);
     // automatically poll active project status
-    useEffect(()=>{
-        if (!activeProject?._id || !user) return;
+    useEffect(() => {
+        const projectId = activeProject?._id;
+        const status = activeProject?.status;
+        if (!projectId || !user) {
+            setChatLoading(false);
+            return;
+        }
 
-        const isOngoing = activeProject.status === "generating" || activeProject.status === "pending" || activeProject.status === "revising";
+        const isOngoing = status === "generating" || status === "pending" || status === "revising";
 
         if(isOngoing){
             setChatLoading(true);
             const interval = setInterval(()=>{
-                loadProject(activeProject._id,true)
+                loadProject(projectId, true);
             },2000);
-            return ()=> clearInterval(interval)
+            return () => clearInterval(interval);
         }else{
             setChatLoading(false);
         }
-    },[activeProject?._id, activeProject?.status, loadProject, user])
+    }, [activeProject?._id, activeProject?.status, loadProject, user]);
 
     const handleGenerate = useCallback(
         async (prompt) => {

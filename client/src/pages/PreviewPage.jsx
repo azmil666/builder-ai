@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { data, useParams } from "react-router-dom";
-import api from "../api/api";
+import React, { useEffect } from "react";
+import { useParams } from "react-router-dom";
 import Loading from "../components/Loading";
-import { AlertCircleIcon } from "lucide-react";
 import FullPagePreview from "../components/FullPagePreview";
 import { useAppContext } from "../context/AppContext";
 
@@ -18,7 +16,7 @@ const PreviewPage = () => {
     if (id) {
       loadProject(id);
     }
-  }, [id]);
+  }, [id, loadProject]);
 
   if (loading || !project) {
     return <Loading />;

@@ -6,6 +6,15 @@ function hashContent(content) {
   return crypto.createHash("md5").update(content).digest("hex").slice(0, 12);
 }
 
+function sanitizeError(error) {
+  if (!error) return "Unknown error";
+  const str = typeof error === "string" ? error : error.message || String(error);
+  return str
+    .replace(/Bearer\s+[a-zA-Z0-9_\.\-]+/gi, "Bearer [REDACTED_TOKEN]")
+    .replace(/sk-[a-zA-Z0-9_\-]+/g, "[REDACTED_API_KEY]")
+    .replace(/mongodb(\+srv)?:\/\/[^@]+@/gi, "mongodb$1://[REDACTED_AUTH]@");
+}
+
 // POST /api/projects
 // Create a new project from an AI prompt .
 export async function createProject(req, res) {
@@ -35,14 +44,15 @@ export async function createProject(req, res) {
     filesPlanned: [],
     filesGenerated: [],
     currentFile: null,
+    CurrentFile: null,
     error: null,
   });
 
   // Start background generation
   runBackgroundGeneration(project._id.toString(), prompt).catch((err) => {
+    const safeError = sanitizeError(err);
     console.error(
-      `[Background AI] Fatal generation error for project ${project._id}:`,
-      err,
+      `[Background AI] Fatal generation error for project ${project._id}: ${safeError}`,
     );
   });
 
@@ -56,7 +66,7 @@ export async function createProject(req, res) {
     status: project.status,
     filesPlanned: project.filesPlanned,
     filesGenerated: project.filesGenerated,
-    currentFile: project.currentFile,
+    currentFile: project.currentFile ?? project.CurrentFile ?? null,
     error: project.error,
     createdAt: project.createdAt,
   });
@@ -94,6 +104,7 @@ async function runBackgroundGeneration(projectId, prompt) {
         );
         await Project.findByIdAndUpdate(projectId, {
           currentFile: path,
+          CurrentFile: path,
         });
       },
       onFileComplete: async (path, code) => {
@@ -117,6 +128,7 @@ async function runBackgroundGeneration(projectId, prompt) {
             timestamp: new Date(),
           });
           project.currentFile = null;
+          project.CurrentFile = null;
           project.markModified("files");
           await project.save();
         }
@@ -140,18 +152,18 @@ async function runBackgroundGeneration(projectId, prompt) {
       await project.save();
     }
   } catch (err) {
+    const safeError = sanitizeError(err);
     console.error(
-      `[Background AI] Fatal generation error for project ${projectId}:`,
-      err,
+      `[Background AI] Fatal generation error for project ${projectId}: ${safeError}`,
     );
 
     await Project.findByIdAndUpdate(projectId, {
       status: "failed",
-      error: err.message,
+      error: safeError,
       $push: {
         messages: {
           role: "assistant",
-          content: `❌ Generation failed: ${err.message}`,
+          content: `❌ Generation failed: ${safeError}`,
           timestamp: new Date(),
         },
       },
@@ -208,7 +220,7 @@ export async function getProject(req, res) {
     status: project.status,
     filesPlanned: project.filesPlanned,
     filesGenerated: project.filesGenerated,
-    currentFile: project.currentFile,
+    currentFile: project.currentFile ?? project.CurrentFile ?? null,
     error: project.error,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,

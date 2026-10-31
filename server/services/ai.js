@@ -3,7 +3,6 @@ import { generateObject } from 'ai';
 import pMap from "p-map";
 import { FileCodeSchema, FilePlanSchema, RevisionResultSchema } from './aiSchemas.js';
 import { buildFileCodeSystem, FILE_PLAN_SYSTEM, REVISE_SYSTEM } from './prompts.js';
-import { el } from 'zod/v4/locales';
 import { normalizeContent } from './contentNormalizer.js';
 import { validateAndFixCode, validateRevisionContent } from './codeValidator.js';
 
@@ -141,15 +140,20 @@ export async function generateProject(prompt, callbacks){
         const failedPaths = pendingFiles.map((f)=>f.path).join(", ");
         console.error(`[AI] Failed to generate ${pendingFiles.length} files after all retry rounds: ${failedPaths}`);
 
-        if (pendingFiles.some((f) => f.path === "/App.js")){
-            const ext = file.path.split(".").pop()?.toLowerCase();
+        // Provide fallback placeholders for non-App.js components/styles so the project can still build if entry point succeeded
+        for (const pendingFile of pendingFiles) {
+            if (pendingFile.path === "/App.js") {
+                // Do not create a fake placeholder for /App.js — entry point failure must not be masked
+                continue;
+            }
+            const ext = pendingFile.path.split(".").pop()?.toLowerCase();
 
             if(ext === "css"){
-                files[file.path] = `/* ${file.description} — Generation failed, please retry */\n`
+                files[pendingFile.path] = `/* ${pendingFile.description || pendingFile.path} — Generation failed, please retry */\n`;
             }else{
-                files[file.path] = "import React from 'react';\n\n" + 
+                files[pendingFile.path] = "import React from 'react';\n\n" + 
                 `// ⚠️ This file could not be generated. Please retry.\n` +
-                `// Purpose: ${file.description}\n\n` + 
+                `// Purpose: ${pendingFile.description || pendingFile.path}\n\n` + 
                 "export default function Placeholder() {\n" +
                 "  return (\n" +
                     "    <div className='p-8 text-center text-zinc-400'>\n" +
@@ -159,7 +163,6 @@ export async function generateProject(prompt, callbacks){
                     "}\n";
             }
         }
-
     }
 
     if(!files["/App.js"]){
@@ -240,4 +243,4 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
         })
     }
     return rawParsed;
-}
+}

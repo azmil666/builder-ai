@@ -92,11 +92,11 @@ export async function me(req, res) {
         res.status(401).json({error: "Not authenticated"})
         return;
     }
-    const user = await User.findById(req.user.userID).select("-password");
+    const userId = req.user.userID || req.user.userId;
+    const user = await User.findById(userId).select("-password");
     if(!user){
         res.status(404).json({ error: "User not found" });
         return;
     }
     res.json({user})
-    
 }
