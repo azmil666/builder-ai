@@ -588,6 +588,30 @@ export function validateAndFixCode(code, filePath, context = {}) {
             warnings.push(`${filePath}: Added defensive default 'onClose = () => {}' in '${funcName}'`);
             return "onClose = () => {}";
           }
+          if (part === "setDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'setDarkMode = () => {}' in '${funcName}'`);
+            return "setDarkMode = () => {}";
+          }
+          if (part === "onToggleDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'onToggleDarkMode = () => {}' in '${funcName}'`);
+            return "onToggleDarkMode = () => {}";
+          }
+          if (part === "toggleDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'toggleDarkMode = () => {}' in '${funcName}'`);
+            return "toggleDarkMode = () => {}";
+          }
+          if (part === "setIsDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'setIsDarkMode = () => {}' in '${funcName}'`);
+            return "setIsDarkMode = () => {}";
+          }
+          if (part === "darkMode") {
+            warnings.push(`${filePath}: Added defensive default 'darkMode = false' in '${funcName}'`);
+            return "darkMode = false";
+          }
+          if (part === "isDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'isDarkMode = false' in '${funcName}'`);
+            return "isDarkMode = false";
+          }
           return part;
         });
         return `function ${funcName}({ ${updated.join(", ")} })`;
@@ -627,6 +651,30 @@ export function validateAndFixCode(code, filePath, context = {}) {
           if (part === "onClose") {
             warnings.push(`${filePath}: Added defensive default 'onClose = () => {}' in '${funcName}'`);
             return "onClose = () => {}";
+          }
+          if (part === "setDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'setDarkMode = () => {}' in '${funcName}'`);
+            return "setDarkMode = () => {}";
+          }
+          if (part === "onToggleDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'onToggleDarkMode = () => {}' in '${funcName}'`);
+            return "onToggleDarkMode = () => {}";
+          }
+          if (part === "toggleDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'toggleDarkMode = () => {}' in '${funcName}'`);
+            return "toggleDarkMode = () => {}";
+          }
+          if (part === "setIsDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'setIsDarkMode = () => {}' in '${funcName}'`);
+            return "setIsDarkMode = () => {}";
+          }
+          if (part === "darkMode") {
+            warnings.push(`${filePath}: Added defensive default 'darkMode = false' in '${funcName}'`);
+            return "darkMode = false";
+          }
+          if (part === "isDarkMode") {
+            warnings.push(`${filePath}: Added defensive default 'isDarkMode = false' in '${funcName}'`);
+            return "isDarkMode = false";
           }
           return part;
         });
@@ -1315,6 +1363,11 @@ export function validatePropContracts(files) {
               if (allProps.has(objName) && !propDefaults.has(objName)) {
                 requiredProps.add(objName);
               }
+            } else if (n.type === "CallExpression" && n.callee?.type === "Identifier") {
+              const funcPropName = n.callee.name;
+              if (allProps.has(funcPropName) && !propDefaults.has(funcPropName)) {
+                requiredProps.add(funcPropName);
+              }
             }
           });
 
@@ -1341,6 +1394,9 @@ export function validatePropContracts(files) {
     categories: ["categoryList", "cats"],
     isOpen: ["open", "show", "visible", "isCartOpen", "isModalOpen"],
     onClose: ["close", "handleClose", "onDismiss"],
+    setDarkMode: ["onToggleDarkMode", "toggleDarkMode", "setIsDarkMode", "setTheme"],
+    darkMode: ["isDarkMode", "theme"],
+    onToggleDarkMode: ["setDarkMode", "toggleDarkMode", "setIsDarkMode"],
   };
 
   // 2. Scan JSX invocations across all files

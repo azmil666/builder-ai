@@ -55,8 +55,8 @@ export function cleanJsonSchema(zodSchema) {
  */
 export function isTransientError(err) {
   if (!err) return false;
-  const status = err.status || err.code || err.statusCode;
-  if (status === 429 || status === 503) return true;
+  const status = err.status || err.code || err.statusCode || err.error?.code || err.error?.status;
+  if (status === 429 || status === 503 || status === "RESOURCE_EXHAUSTED" || status === "UNAVAILABLE") return true;
 
   const msg = (err.message || "").toLowerCase();
   return (
@@ -66,8 +66,57 @@ export function isTransientError(err) {
     msg.includes("unavailable") ||
     msg.includes("high demand") ||
     msg.includes("spikes in demand") ||
-    msg.includes("temporarily unavailable")
+    msg.includes("temporarily unavailable") ||
+    msg.includes("rate limit") ||
+    msg.includes("ratelimit") ||
+    msg.includes("quota") ||
+    msg.includes("too many requests") ||
+    msg.includes("overloaded") ||
+    msg.includes("fetch failed") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout")
   );
+}
+
+/**
+ * Formats exhausted transient errors into actionable, user-friendly errors.
+ */
+export function formatTransientError(err) {
+  if (!err) return new Error("Unknown transient error");
+  const msg = (err.message || "").toLowerCase();
+  const status = err.status || err.code || err.statusCode || err.error?.code;
+
+  if (
+    status === 429 ||
+    status === "RESOURCE_EXHAUSTED" ||
+    msg.includes("429") ||
+    msg.includes("resource_exhausted") ||
+    msg.includes("quota") ||
+    msg.includes("rate limit") ||
+    msg.includes("too many requests")
+  ) {
+    const error = new Error("Gemini API rate limit reached (429). The model is experiencing high request volume or your API quota limit was exceeded. Please wait a moment and try again.");
+    error.status = 429;
+    error.code = "RATE_LIMIT_EXCEEDED";
+    return error;
+  }
+
+  if (
+    status === 503 ||
+    status === "UNAVAILABLE" ||
+    msg.includes("503") ||
+    msg.includes("unavailable") ||
+    msg.includes("overloaded") ||
+    msg.includes("high demand") ||
+    msg.includes("spikes in demand")
+  ) {
+    const error = new Error("Gemini service is temporarily unavailable (503). Google AI servers are experiencing high demand. Please try again in a few moments.");
+    error.status = 503;
+    error.code = "SERVICE_UNAVAILABLE";
+    return error;
+  }
+
+  return err;
 }
 
 /**
@@ -76,7 +125,7 @@ export function isTransientError(err) {
  */
 export function getRetryDelayMs(err, attempt) {
   const msg = err?.message || "";
-  const match = msg.match(/retry\s+in\s+([0-9\.]+)\s*s/i);
+  const match = msg.match(/retry\s+(?:in|after)\s+([0-9\.]+)\s*s/i);
   if (match) {
     const seconds = parseFloat(match[1]);
     if (!isNaN(seconds) && seconds > 0) {
@@ -235,6 +284,9 @@ export async function generateGeminiObject({
     }
   }
 
+  if (lastError && isTransientError(lastError)) {
+    throw formatTransientError(lastError);
+  }
   throw lastError || new Error("Gemini object generation failed after all retries and fallback models.");
 }
 
@@ -248,41 +300,60 @@ export async function generateGeminiText({
   model = null,
 }) {
   const client = getGeminiClient();
-  const currentModel = model || process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const primaryModel = model || process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
 
   const config = {};
   if (system && typeof system === "string" && system.trim().length > 0) {
     config.systemInstruction = system;
   }
 
+  const modelsToAttempt = [primaryModel];
+  if (fallbackModel && fallbackModel !== primaryModel) {
+    modelsToAttempt.push(fallbackModel);
+  }
+
   let lastError = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await client.models.generateContent({
-        model: currentModel,
-        contents: prompt,
-        config,
-      });
+  for (const currentModel of modelsToAttempt) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await client.models.generateContent({
+          model: currentModel,
+          contents: prompt,
+          config,
+        });
 
-      const candidate = response?.candidates?.[0];
-      if (candidate?.finishReason === "SAFETY") {
-        throw new Error("Gemini blocked response generation due to content safety policy.");
-      }
-      if (candidate?.finishReason === "MAX_TOKENS") {
-        throw new Error("Gemini response was truncated due to MAX_TOKENS limit.");
-      }
+        const candidate = response?.candidates?.[0];
+        if (candidate?.finishReason === "SAFETY") {
+          throw new Error("Gemini blocked response generation due to content safety policy.");
+        }
+        if (candidate?.finishReason === "MAX_TOKENS") {
+          throw new Error("Gemini response was truncated due to MAX_TOKENS limit.");
+        }
 
-      return { text: response?.text || "" };
-    } catch (err) {
-      lastError = err;
-      if (isTransientError(err) && attempt < maxRetries) {
-        const delay = getRetryDelayMs(err, attempt);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        continue;
+        return { text: response?.text || "" };
+      } catch (err) {
+        lastError = err;
+        const transient = isTransientError(err);
+        if (transient && attempt < maxRetries) {
+          const delay = getRetryDelayMs(err, attempt);
+          console.warn(`[Gemini Text] Transient error (${err.status || err.message}). Retrying ${currentModel} in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        if (transient && currentModel !== fallbackModel) {
+          console.warn(`[Gemini Text] Model ${currentModel} exhausted retries. Attempting fallback model ${fallbackModel}...`);
+          break;
+        }
+        if (!transient) {
+          throw err;
+        }
       }
-      throw err;
     }
   }
 
-  throw lastError;
+  if (lastError && isTransientError(lastError)) {
+    throw formatTransientError(lastError);
+  }
+  throw lastError || new Error("Gemini text generation failed after all retries and fallback models.");
 }

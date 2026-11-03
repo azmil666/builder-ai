@@ -8,6 +8,7 @@ import { normalizeContent } from './contentNormalizer.js';
 import { validateAndFixCode, validateRevisionContent, validateProject, verifyProjectRuntime } from './codeValidator.js';
 import { deriveFeatureChecklist, validateFeatureChecklist } from './featureValidator.js';
 import { generateGeminiObject } from './gemini.js';
+import { loadCraftworkSkill } from './craftworkSkill.js';
 
 // --- AI Provider Resolution & Abstraction ---
 export function getActiveAiProvider() {
@@ -91,7 +92,7 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles,
         console.warn(`[Validator] ${file.path} has ${validation.errors.length} validation errors. Attempting targeted correction...`);
         const errorList = validation.errors.map(e => `- [${e.type.toUpperCase()}] ${e.message}`).join("\n");
         try {
-            const repairMsg = `Project: ${prompt}\n\nThe generated code for ${file.path} failed validation with these errors:\n${errorList}\n\nCurrent code:\n\`\`\`javascript\n${code}\n\`\`\`\n\nPlease fix the syntax, import, or export errors and return the corrected complete code.`;
+            const repairMsg = `Project: ${prompt}\n\nThe generated code for ${file.path} failed validation with these errors:\n${errorList}\n\nCurrent code:\n\`\`\`javascript\n${code}\n\`\`\`\n\nPlease fix the syntax, import, or export errors and return the corrected complete code while adhering to Craftwork design guidance and DesignSpec tokens.`;
             const { object: repairedObj } = await generateStructuredObject({
                 schema: FileCodeSchema,
                 system,
@@ -168,7 +169,7 @@ export async function repairProjectFiles(
             const currentCode = currentFiles[filePath];
             const system = buildFileCodeSystem(allPlannedFiles, currentFiles, designSpec);
 
-            const repairPrompt = `Project: ${prompt}\n\nThe file '${filePath}' failed validation with these errors:\n${errorSummary}\n\nCurrent code for ${filePath}:\n\`\`\`javascript\n${currentCode}\n\`\`\`\n\nRepair only the code for '${filePath}'. Fix all syntax, import, export, and contract errors while preserving visual styling and DesignSpec tokens. Return the complete corrected code.`;
+            const repairPrompt = `Project: ${prompt}\n\nThe file '${filePath}' failed validation with these errors:\n${errorSummary}\n\nCurrent code for ${filePath}:\n\`\`\`javascript\n${currentCode}\n\`\`\`\n\nRepair only the code for '${filePath}'. Fix all syntax, import, export, and contract errors while preserving visual styling, Craftwork design guidance, and DesignSpec tokens. Return the complete corrected code.`;
 
             try {
                 const { object } = await generateStructuredObject({
@@ -225,6 +226,9 @@ export async function repairProjectFiles(
 
 // Generate project files: DesignSpec first, then plan, then build files in order with fallback retries
 export async function generateProject(prompt, callbacks){
+    // Ensure runtime Craftwork design guidance is loaded and available
+    loadCraftworkSkill();
+
     // Phase 1: Design Intelligence - Establish visual identity and design tokens
     console.log(`[AI] Phase 1: Generating DesignSpec for: "${prompt.slice(0,80)}..."`);
     let designSpec = null;
@@ -277,7 +281,7 @@ export async function generateProject(prompt, callbacks){
         await callbacks.onPlan(plan)
     }
 
-    const files = {};
+    let files = {};
 
     // Phase 3a: Generate foundation /styles.css first if planned, establishing tokens and classes for all other files
     const stylesFile = plan.files.find((f) => f.path === "/styles.css");
@@ -304,13 +308,17 @@ export async function generateProject(prompt, callbacks){
 
     const maxRetryRounds = 2;
 
+    let lastFileError = null;
+
     for (let round = 0; round <= maxRetryRounds; round++) {
         if(pendingFiles.length === 0) break;
 
         if(round > 0){
+            const backoffMs = Math.min(Math.pow(2, round) * 2000, 8000);
             console.log(
-                `[AI] Retry round ${round}/${maxRetryRounds} for ${pendingFiles.length} failed files: ${pendingFiles.map((f) => f.path).join(", ")}`,
+                `[AI] Waiting ${backoffMs}ms before retry round ${round}/${maxRetryRounds} for ${pendingFiles.length} failed files: ${pendingFiles.map((f) => f.path).join(", ")}`,
             );
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
         }
 
         const results = await pMap(
@@ -341,7 +349,8 @@ export async function generateProject(prompt, callbacks){
                 files[path.startsWith("/") ? path : "/" + path] = code;
             }else{
                 console.warn(`[AI] File ${entry.file.path} failed in round ${round}: ${entry.error?.message || entry.error}`);
-                failedFiles.push(entry.file)
+                failedFiles.push(entry.file);
+                lastFileError = entry.error;
             }
          }
          pendingFiles = failedFiles;
@@ -349,8 +358,9 @@ export async function generateProject(prompt, callbacks){
 
     if(pendingFiles.length > 0){
         const failedPaths = pendingFiles.map((f)=>f.path).join(", ");
-        console.error(`[AI] Failed to generate ${pendingFiles.length} mandatory files after all retries: ${failedPaths}`);
-        throw new Error(`Failed to generate mandatory planned file(s): ${failedPaths}`);
+        const errorDetail = lastFileError?.message ? ` (${lastFileError.message})` : "";
+        console.error(`[AI] Failed to generate ${pendingFiles.length} mandatory files after all retries: ${failedPaths}${errorDetail}`);
+        throw new Error(`Failed to generate mandatory planned file(s): ${failedPaths}${errorDetail}`);
     }
 
     if(!files["/App.js"]){
@@ -405,10 +415,11 @@ export async function generateProject(prompt, callbacks){
 }
 
 export async function reviseProject(prompt, manifest, relevantFiles, recentMessages, designSpec){
+    loadCraftworkSkill();
     const contextParts = [];
 
     if (designSpec) {
-        contextParts.push("## Active Design Specification (MUST PRESERVE UNLESS EXPLICITLY ASKED TO REDESIGN)");
+        contextParts.push("## Active Design Specification & Craftwork Guidance (MUST PRESERVE UNLESS EXPLICITLY ASKED TO REDESIGN)");
         contextParts.push(`- Archetype: ${designSpec.archetype}`);
         contextParts.push(`- Theme: ${designSpec.colorPalette?.theme || "light"}`);
         contextParts.push(`- Colors: Background ${designSpec.colorPalette?.bg}, Text ${designSpec.colorPalette?.fg}, Accent ${designSpec.colorPalette?.accent}, Card ${designSpec.colorPalette?.cardBg}`);
@@ -474,6 +485,12 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
                 if(validation.warnings.length > 0){
                     console.log(`[Validator] Revision Create adjustments for ${op.path}:\n  - ${validation.warnings.join("\n  - ")}`);
                 }
+            }else if(op.op === "update" && op.content){
+                const validation = validateRevisionContent(op.content, op.path, "create");
+                op.content = validation.content;
+                if(validation.warnings.length > 0){
+                    console.log(`[Validator] Revision Update (full content) adjustments for ${op.path}:\n  - ${validation.warnings.join("\n  - ")}`);
+                }
             }else if(op.op === "update" && op.replace){
                  const validation = validateRevisionContent(op.replace, op.path, "update");
                  op.replace = validation.content;
@@ -485,4 +502,47 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
         })
     }
     return rawParsed;
+}
+
+/**
+ * Regenerates the full content of a file during project revisions when search/replace fails.
+ * Avoids brittle exact-text diff matching and guarantees valid, working component code.
+ */
+export async function regenerateFileForRevision(filePath, currentCode, prompt, allFiles, designSpec) {
+    loadCraftworkSkill();
+    const plannedList = Object.keys(allFiles).map((p) => ({
+        path: p,
+        description: `Component/File ${p}`,
+    }));
+
+    const system = buildFileCodeSystem(plannedList, allFiles, designSpec);
+
+    const userMsg = `Project Revision Request: ${prompt}
+
+Write the complete updated code for: ${filePath}
+Purpose: Apply the requested revisions to '${filePath}' while preserving the rest of the file's functionality, exports, and DesignSpec aesthetic.
+
+Current code for reference:
+\`\`\`javascript
+${currentCode || ""}
+\`\`\`
+
+CRITICAL: Return the COMPLETE updated file code.
+- If this is /App.js and dark mode is requested: ensure theme state is declared (const [darkMode, setDarkMode] = useState(false)), passed to <Navbar darkMode={darkMode} setDarkMode={setDarkMode} onToggleDarkMode={() => setDarkMode(prev => !prev)} />, and applied to the root wrapper so the whole page visibly updates.
+- If this is /components/Navbar.js and dark mode is requested: ensure props (darkMode = false, setDarkMode = () => {}, onToggleDarkMode) have defensive defaults and clicking the toggle safely updates theme.`;
+
+    const { object } = await generateStructuredObject({
+        schema: FileCodeSchema,
+        system,
+        prompt: userMsg,
+        maxRetries: 1,
+    });
+
+    let code = normalizeContent(object.code);
+    const validation = validateAndFixCode(code, filePath, {
+        allPlannedFiles: plannedList,
+        existingFiles: Object.keys(allFiles),
+    });
+
+    return validation.code;
 }

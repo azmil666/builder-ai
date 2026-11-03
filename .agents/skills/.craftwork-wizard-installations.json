@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "craftwork-assets": {
+      "agents": [
+        "github-copilot",
+        "kiro-cli"
+      ],
+      "canonicalPath": "/Users/azmilmohammed/Desktop/builder-ai/.agents/skills/craftwork-assets",
+      "paths": {
+        "github-copilot": "/Users/azmilmohammed/Desktop/builder-ai/.agents/skills/craftwork-assets",
+        "kiro-cli": "/Users/azmilmohammed/Desktop/builder-ai/.kiro/skills/craftwork-assets"
+      },
+      "modes": {
+        "github-copilot": "symlink",
+        "kiro-cli": "symlink"
+      }
+    }
+  }
+}
