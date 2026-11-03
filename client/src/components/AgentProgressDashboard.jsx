@@ -66,7 +66,7 @@ export default function AgentProgressDashboard({ project }) {
                         <div className="space-y-2.5 max-h-75 overflow-y-auto pr-1">
                             {planned.map((file) => {
                                 const isCompleted = completed.includes(file.path);
-                                const isGenerating = current === file.path;
+                                const isGenerating = !isFailed && current === file.path;
 
                                 return (
                                     <div

@@ -114,6 +114,7 @@ export function AppContextProvider({children}){
           return valid.length > 0 ? valid : [target];
         });
        }
+       return data;
     } catch (err) {
         console.error("Failed to load project:", err);
         if(!silent){
@@ -150,8 +151,13 @@ export function AppContextProvider({children}){
     // Start fallback polling if SSE fails or is unsupported
     const startFallbackPolling = () => {
       if (fallbackInterval) return;
-      fallbackInterval = setInterval(() => {
-        loadProject(projectId, true);
+      fallbackInterval = setInterval(async () => {
+        const proj = await loadProject(projectId, true);
+        if (proj && (proj.status === "completed" || proj.status === "failed")) {
+          clearInterval(fallbackInterval);
+          fallbackInterval = null;
+          setChatLoading(false);
+        }
       }, 3000);
     };
 
@@ -164,7 +170,8 @@ export function AppContextProvider({children}){
     }
 
     try {
-      const streamUrl = `/api/projects/${projectId}/stream`;
+      const baseUrl = import.meta.env.VITE_BASE_URL || "";
+      const streamUrl = `${baseUrl}/api/projects/${projectId}/stream`;
       eventSource = new EventSource(streamUrl, { withCredentials: true });
 
       eventSource.addEventListener("initial_state", (e) => {
@@ -281,6 +288,10 @@ export function AppContextProvider({children}){
           );
           setChatLoading(false);
           eventSource?.close();
+          if (fallbackInterval) {
+            clearInterval(fallbackInterval);
+            fallbackInterval = null;
+          }
           loadProject(projectId, true);
         } catch (err) {
           console.error("Failed to parse completed SSE event:", err);
@@ -301,6 +312,10 @@ export function AppContextProvider({children}){
           );
           setChatLoading(false);
           eventSource?.close();
+          if (fallbackInterval) {
+            clearInterval(fallbackInterval);
+            fallbackInterval = null;
+          }
         } catch (err) {
           console.error("Failed to parse failed SSE event:", err);
         }
@@ -380,6 +395,7 @@ export function AppContextProvider({children}){
       } catch (err) {
         console.error("Revision request failed:", err);
         toast.error(err?.response?.data?.error || "Revision request failed");
+        loadProject(activeProject._id, true);
       } finally {
         setChatLoading(false);
       }

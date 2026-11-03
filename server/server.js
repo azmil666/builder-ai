@@ -3,6 +3,7 @@ import "dotenv/config";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectToDatabase } from "./config/db.js";
+import { Project } from "./models/Project.js";
 import authRouter from "./routes/authRoutes.js";
 import projectRouter from "./routes/projectRoutes.js";
 
@@ -14,7 +15,32 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length === 0) {
 
 const app = express();
 
-await connectToDatabase()
+await connectToDatabase();
+
+// Clean up orphaned in-flight projects left behind if server restarted
+try {
+  const result = await Project.updateMany(
+    { status: { $in: ["pending", "generating", "validating", "repairing"] } },
+    {
+      $set: {
+        status: "failed",
+        error: "Generation was interrupted by a server restart. Please try again.",
+      },
+      $push: {
+        messages: {
+          role: "assistant",
+          content: "❌ Generation was interrupted by a server restart. Please try creating or regenerating the project.",
+          timestamp: new Date(),
+        },
+      },
+    }
+  );
+  if (result.modifiedCount > 0) {
+    console.log(`[Startup] Marked ${result.modifiedCount} orphaned project(s) as failed.`);
+  }
+} catch (cleanErr) {
+  console.warn(`[Startup] Orphaned project cleanup notice: ${cleanErr.message}`);
+}
 
 const allowedOrigins = process.env.ORIGINS
   ? process.env.ORIGINS.split(",").map((o) => o.trim())

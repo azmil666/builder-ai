@@ -20,6 +20,7 @@ import DesignSpecPanel from '../components/DesignSpecPanel';
 import ProjectSettingsPanel from '../components/ProjectSettingsPanel';
 import VisualQAPanel from '../components/VisualQAPanel';
 import AgentProgressDashboard from '../components/AgentProgressDashboard';
+import GenerationFailureView from '../components/GenerationFailureView';
 import PublishModal from '../components/PublishModal';
 import ProjectDeleteModal from '../components/dashboard/ProjectDeleteModal';
 import api from '../api/api';
@@ -37,6 +38,7 @@ const BuilderPage = () => {
   const [publishing, setPublishing] = useState(false);
   const [publishUrl, setPublishUrl] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [inspectPartialFiles, setInspectPartialFiles] = useState(false);
 
   const {
     activeProject,
@@ -50,6 +52,7 @@ const BuilderPage = () => {
     logout,
     chatLoading,
     handleChat,
+    handleGenerate,
     handleDelete,
     syncStatus,
     createFile,
@@ -113,8 +116,8 @@ const BuilderPage = () => {
     activeProject.status === 'pending' ||
     activeProject.status === 'generating' ||
     activeProject.status === 'validating' ||
-    activeProject.status === 'repairing' ||
-    activeProject.status === 'failed';
+    activeProject.status === 'repairing';
+  const isFailed = activeProject.status === 'failed';
 
   return (
     <div className="h-screen flex flex-col bg-zinc-950 overflow-hidden text-zinc-100 relative font-sans">
@@ -275,13 +278,38 @@ const BuilderPage = () => {
         <div className="flex-1 h-full min-w-0 min-h-0 overflow-hidden flex flex-col bg-zinc-950">
           {isOngoingBuild ? (
             <AgentProgressDashboard project={activeProject} />
-          ) : (
-            <PreviewPanel
+          ) : isFailed && !inspectPartialFiles ? (
+            <GenerationFailureView
               project={activeProject}
-              activeFile={activeFile}
-              showCode={showCode}
-              deviceViewport={deviceViewport}
+              onRetry={() => handleGenerate(activeProject.description || activeProject.name)}
+              onBack={() => navigate('/')}
+              onInspectFiles={
+                Object.keys(activeProject.files || {}).length > 0
+                  ? () => setInspectPartialFiles(true)
+                  : null
+              }
             />
+          ) : (
+            <>
+              {isFailed && inspectPartialFiles && (
+                <div className="bg-amber-950/80 border-b border-amber-800/80 px-4 py-2 flex items-center justify-between text-xs text-amber-200 shrink-0">
+                  <span>Viewing partial files from failed build.</span>
+                  <button
+                    type="button"
+                    onClick={() => setInspectPartialFiles(false)}
+                    className="text-xs text-amber-300 hover:text-white underline cursor-pointer"
+                  >
+                    Back to Error View
+                  </button>
+                </div>
+              )}
+              <PreviewPanel
+                project={activeProject}
+                activeFile={activeFile}
+                showCode={showCode}
+                deviceViewport={deviceViewport}
+              />
+            </>
           )}
         </div>
       </div>

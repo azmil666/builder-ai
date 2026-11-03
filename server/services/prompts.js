@@ -1,3 +1,14 @@
+import {
+  loadCraftworkSkill,
+  getCraftworkDesignSpecGuidance,
+  getCraftworkFilePlanGuidance,
+  getCraftworkCodeGuidance,
+  getCraftworkRevisionGuidance,
+} from "./craftworkSkill.js";
+
+// Ensure required runtime Craftwork skill is verified at load time
+loadCraftworkSkill();
+
 // --- System Prompts ---
 // All AI prompts are centralized here for easy editing and consistency.
 
@@ -105,16 +116,30 @@ Great pages are carried by intentional media. Never output ugly grey placeholder
      \`const freeShippingThreshold = config?.freeShippingThreshold ?? 150;\`
      \`const shippingFee = config?.standardShippingFee ?? 15;\`
    - **Shared Component Props Consistency**: Ensure all child components declare default parameters for destructured props to prevent runtime TypeError crashes:
-     * \`Navbar({ cartCount = 0, categories = [], onOpenCart, onSelectCategory, activeCategory = 'All' })\`
+     * \`Navbar({ cartCount = 0, categories = [], onOpenCart, onSelectCategory, activeCategory = 'All', darkMode = false, setDarkMode = () => {}, onToggleDarkMode = () => {} })\`
      * \`ProductGrid({ products = [], activeCategory = 'All', searchQuery = '', onAddToCart })\`
      * \`ProductCard({ product = {}, onAddToCart, onToggleWishlist, isWishlisted = false })\`
      * \`CartDrawer({ isOpen = false, onClose, cart = [], onUpdateQuantity, onRemoveItem, onCheckout, config = STORE_CONFIG })\`
    - **Prop Name Alignment**: Prop names between parent and child MUST match identically. Never pass \`config\` if child expects \`storeConfig\`, or pass \`items\` if child expects \`products\`.
-5. **Ultra-Compact Mobile Layout Resilience (<360px)**:
+5. **Theme State & Dark Mode Architecture (Strict Prop Contract Standard)**:
+   When dark mode or theme switching is present or requested:
+   - **Central State Ownership in /App.js**: Theme state MUST live exclusively at top-level in \`/App.js\`:
+     \`const [darkMode, setDarkMode] = useState(false);\`
+     \`const toggleDarkMode = () => setDarkMode((prev) => !prev);\`
+   - **Parent Passing**: \`/App.js\` MUST explicitly pass BOTH the boolean state AND setter/handler props to \`<Navbar />\`:
+     \`<Navbar darkMode={darkMode} setDarkMode={setDarkMode} onToggleDarkMode={toggleDarkMode} />\`
+   - **Child Defensive Fallback**: \`/components/Navbar.js\` MUST declare default fallback parameters for all theme props:
+     \`export default function Navbar({ darkMode = false, setDarkMode = () => {}, onToggleDarkMode = () => {}, ... })\`
+     And provide a safe handler:
+     \`const handleToggle = () => { if (typeof onToggleDarkMode === 'function') onToggleDarkMode(); else if (typeof setDarkMode === 'function') setDarkMode(!darkMode); };\`
+   - **Whole-Page Visual Update**: Dark mode MUST visibly update the ENTIRE page, not just the navbar! The outermost wrapper in \`/App.js\` MUST apply theme styling:
+     \`className={'min-h-screen transition-colors duration-300 ' + (darkMode ? 'dark bg-zinc-950 text-zinc-100' : 'bg-white text-zinc-900')}\`
+     All child components, cards, and sections must adapt visually to \`darkMode\`.
+6. **Ultra-Compact Mobile Layout Resilience (<360px)**:
    On ultra-small screens (such as 320px–360px iPhone SE or narrow fold outer displays), ensure search inputs, filter buttons, sort dropdowns, and button groups wrap cleanly (\`flex-wrap gap-2\` or \`w-full\`). Never use rigid fixed widths like \`w-[320px]\` or non-wrapping horizontal flexbars that force text truncation or horizontal viewport scrolling.
-6. **Type-Led / Graphic Fallback**:
+7. **Type-Led / Graphic Fallback**:
    If photography is not required by the concept, design a stunning typography-led layout, subtle CSS radial glow, or inline SVG geometric illustration. Never leave empty blank spaces.
-7. **Accessibility**:
+8. **Accessibility**:
    Meaningful images MUST have descriptive \`alt\` text. Purely decorative elements must carry \`alt=""\` or \`aria-hidden="true"\`.
 
 ---
@@ -166,9 +191,48 @@ Always use \`lucide-react\` inline SVG icons:
 - ALWAYS use single quotes (\`'\`) for JSX className attributes to prevent JSON escaping errors.
 - Every component must return valid JSX wrapped in parentheses: \`return ( <div>...</div> );\`
 - Always import React: \`import React from 'react';\`
-- Define all event handler functions within component scope or use inline arrow functions.`;
+- Define all event handler functions within component scope or use inline arrow functions.
+
+---
+
+## 8. CRAFTWORK TASTE RULES & ANTI-AI PRODUCTION GUIDELINES
+
+Every website you generate or revise must adhere to Craftwork's design principles:
+1. **Restraint & Centerpieces**:
+   - Every section must have ONE clear visual centerpiece (the real product interface, an interactive tool, or a device mockup on a flat token surface).
+   - NEVER place generic glowing indigo/purple background blobs, neon halos, or fake metallic bevels behind screenshots.
+   - NO annotation chips, fake cursors, or floating badge pills on top of screenshots.
+   - NO cards inside cards.
+   - NO rounded icon tiles above every single heading.
+   - NO row of three identical feature cards. Plan varied bento cells (e.g. \`col-span-2\`), split layouts, or grouped lists.
+   - NO split section header cliché (headline left and disconnected floating paragraph on the right).
+2. **Typographic Discipline & Widow Prevention**:
+   - Apply \`text-wrap: balance\` on all headlines and section titles so no single word dangles alone on the last line.
+   - Apply \`text-wrap: pretty\` on short descriptions and callouts.
+   - Headings: tight letter-spacing (\`tracking-tight\`), line-height 1.1-1.25, maximum 2 lines on desktop, weight one step above body (semibold/medium).
+   - Minimum font sizes: body >= 16px, UI text >= 14px, captions/labels >= 12px.
+3. **Color, Surfaces & Geometry**:
+   - Single neutral family across the entire site (never mix warm stone with cool slate).
+   - Accent color comes from the product domain and represents ~10% of the visual space for primary CTAs and active states.
+   - NO pure #000000 text or backgrounds; tint shadows to the surface tone.
+   - Concentric nested border radii: \`outer_radius = inner_radius + padding\`.
+   - Full-height heroes must use \`min-h-dvh\` or \`min-height: 100dvh\` (never \`100vh\`).
+4. **States & Hover Micro-Interactions**:
+   - EVERY interactive element (navigation links, buttons, cards, list items) MUST have a smooth, visible animated hover (\`transition-all duration-200 ease-out\`).
+   - HOVER NEVER RECOLORS BORDERS ALONE! Change the background fill, text color, subtle lift (\`hover:-translate-y-0.5 hover:shadow-md\`), or shadow instead.
+   - One button scale across the entire site (e.g. \`h-10\` or \`h-11\`). Side-by-side buttons MUST share identical height.
+   - Buttons must use action verbs plus objects ("Create workspace", "Reserve table"), never generic "Submit" or "Click Here".
+   - Only ONE primary filled CTA button per viewport.
+   - Subtle active press feedback (\`active:scale-[0.98]\`).
+   - Visible keyboard focus rings (\`focus-visible:ring-2 focus-visible:ring-offset-2\`).
+5. **Copy & Content Standards**:
+   - NO em dashes (—) or en dashes (–) anywhere in UI text! Use periods, commas, colons, or hyphens.
+   - NO middle dots (·) as metadata separators. Use spacing, line breaks, or subtle dividers.
+   - NO empty filler verbs ("elevate", "seamless", "unleash", "next-gen", "revolutionize"). State clearly what the product does.
+   - Authentic, believable names, numbers, and data.`;
 
 export const REVISE_SYSTEM = `${BASE_SYSTEM}
+${getCraftworkRevisionGuidance()}
 
 You are revising an existing React project. You will receive:
 1. Active Design Specification (if set) — You MUST preserve the existing visual design, palette, typography, and archetype unless the user explicitly asks for a redesign or retheme!
@@ -188,15 +252,18 @@ You MUST respond with a valid JSON object of this exact shape:
 
 Operation types:
 - "create": Add a new file with full content
-- "update": Modify an existing file using search/replace. The "search" must be an EXACT substring from the current file. The "replace" is what to substitute it with. You can use multiple update ops for the same file.
+- "update": Modify an existing file.
+  * For structural changes, state changes (like dark mode toggle), prop contract updates, or multi-line edits: provide "content" with the COMPLETE updated file content. Supplying "content" is robust, safe, and avoids brittle search-and-replace mismatches!
+  * For small 1-2 line adjustments: you may provide "search" and "replace". If using search/replace, "search" must be an EXACT verbatim substring from the current file.
 - "delete": Remove a file
 
-CRITICAL RULES for "update" operations:
-- The "search" string must be a VERBATIM copy of the existing code (including whitespace/indentation)
-- Keep search blocks as small as possible (just the lines that change + minimal surrounding context for uniqueness)
-- Prefer targeted search/replace over recreating entire files
-- PRESERVE DESIGN CONSISTENCY: Keep color tokens, typography, component styling, and layout structure consistent with the project's DesignSpec.
+THEME & DARK MODE REVISION CONTRACT:
+When a revision asks for dark mode toggle or theme switching:
+1. In /App.js: Declare theme state (\`const [darkMode, setDarkMode] = useState(false);\`), pass BOTH \`darkMode={darkMode}\` and \`setDarkMode={setDarkMode}\` (and \`onToggleDarkMode={() => setDarkMode(prev => !prev)}\`) to <Navbar />, and wrap the entire page in \`className={'min-h-screen transition-colors duration-300 ' + (darkMode ? 'dark bg-zinc-950 text-zinc-100' : 'bg-white text-zinc-900')}\` so dark mode visibly changes the whole page.
+2. In /components/Navbar.js: Declare default parameter fallback \`darkMode = false, setDarkMode = () => {}, onToggleDarkMode = () => {}\`, and render the toggle button with Sun / Moon icons invoking the safe toggle handler.
+3. Provide complete updated "content" for /App.js and /components/Navbar.js to ensure consistent wiring.
 
+PRESERVE DESIGN CONSISTENCY: Keep color tokens, typography, component styling, and layout structure consistent with the project's DesignSpec.
 Be minimal: only touch files that NEED to change.`;
 
 export const DESIGN_SPEC_SYSTEM = `You are a Principal Design Systems Architect and Creative Director.
@@ -234,6 +301,8 @@ Before any files are planned or code is written, you must establish the intentio
 
 ### THE SIGNATURE MOMENT:
 Define ONE memorable visual or interactive hook the website will be known for (e.g., "ambient video hero with floating typography overlay", "oversized editorial letter reveal on hover", "interactive canvas with tactile sound/visual feedback", "sticky drawer cart pill with instant badge updates").
+
+${getCraftworkDesignSpecGuidance()}
 
 Return ONLY valid JSON matching the DesignSpecSchema.`;
 
@@ -991,6 +1060,8 @@ export function createDefaultDesignSpec(prompt = "") {
 }
 
 export function buildFilePlanSystem(designSpec) {
+  loadCraftworkSkill();
+  const craftworkPlanGuidance = getCraftworkFilePlanGuidance();
   const specContext = designSpec
     ? `
 ---
@@ -1013,6 +1084,7 @@ You MUST build a file plan that directly implements this design specification:
     : "";
 
   return `${BASE_SYSTEM}
+${craftworkPlanGuidance}
 ${specContext}
 You are planning which files to create for a React project based on the Design Specification.
 Respond with a JSON object listing every file needed, including their contract of imports and exports (so different files don't have mismatched component or default export signatures):
@@ -1055,6 +1127,8 @@ Rules:
 export const FILE_PLAN_SYSTEM = buildFilePlanSystem(null);
 
 export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec) {
+    loadCraftworkSkill();
+    const craftworkCodeGuidance = getCraftworkCodeGuidance();
     const fileList = allFiles
         .map((f) => {
             const impStr = f.imports && f.imports.length > 0 ? ` (Imports: ${f.imports.join(", ")})` : "";
@@ -1094,6 +1168,7 @@ Every component you write MUST conform to this exact design specification:
     }
 
     return `${BASE_SYSTEM}
+${craftworkCodeGuidance}
 
 You are writing a SINGLE file for a React project.
 The full project file structure is:
@@ -1112,6 +1187,7 @@ Rules:
 - The /styles.css file MUST include the DesignSpec font @import URL and declared keyframe animations
 - Icons: Use lucide-react components (e.g. import { ... } from 'lucide-react')
 - Prop Contract & Configuration: Parent components (like /App.js) MUST explicitly pass all expected props to children (e.g. config={STORE_CONFIG}, cart={cart}, categories={categories}). Child components MUST declare sensible default parameter values (e.g. config = STORE_CONFIG, cart = [], categories = []) and use safe optional chaining (config?.freeShippingThreshold) to prevent runtime TypeError exceptions.
+- Theme & Dark Mode Contract: When dark mode / theme toggle is present, /App.js MUST own the state (\`const [darkMode, setDarkMode] = useState(false)\`) and pass BOTH \`darkMode={darkMode}\` and \`setDarkMode={setDarkMode}\` (and \`onToggleDarkMode={() => setDarkMode(prev => !prev)}\`) to <Navbar />. Child components (Navbar) MUST declare default parameters \`darkMode = false, setDarkMode = () => {}, onToggleDarkMode = () => {}\` and invoke the handler safely. The root wrapper in /App.js MUST apply theme styling \`className={'min-h-screen transition-colors duration-300 ' + (darkMode ? 'dark bg-zinc-950 text-zinc-100' : 'bg-white text-zinc-900')}\` so dark mode visibly updates the entire page!
 - Diverse product imagery: Every product in a grid or list MUST have a unique image URL. Never repeat the exact same image URL across multiple products.
 - Ultra-compact mobile resilience: Ensure buttons, search bars, and filter pills wrap cleanly (e.g. flex-wrap gap-2 or w-full) on screens below 360px without clipping or horizontal overflow.
 - Standardized aspect ratios: Use explicit aspect ratio classes (aspect-[4/5], aspect-square, aspect-[16/9]) with object-cover on all card images.

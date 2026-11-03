@@ -32,6 +32,14 @@ export function applyOperations(currentFiles, operations) {
                         errors.push(`update ${op.path}: file not found`);
                         break;
                     }
+                    if (op.content && typeof op.content === "string" && op.content.trim().length > 0) {
+                        files[op.path] = {
+                            content: op.content,
+                            hash: hashContent(op.content),
+                        };
+                        applied.push(`updated ${op.path}`);
+                        break;
+                    }
                     if (!op.search || op.replace == null) {
                         errors.push(`update ${op.path}: missing search/replace`);
                         break;
@@ -74,10 +82,18 @@ export function applyOperations(currentFiles, operations) {
 }
 
 // Search and replace code with fallback whitespace normalization matching
-function searchReplace(content, search, replace) {
+export function searchReplace(content, search, replace) {
+    if (!content || !search) return null;
+
     // 1. Try exact match
     if (content.includes(search)) {
         return content.replace(search, () => replace);
+    }
+
+    // 1b. Try trimmed search if search has leading/trailing blank lines
+    const trimmedSearch = search.trim();
+    if (trimmedSearch.length > 0 && content.includes(trimmedSearch)) {
+        return content.replace(trimmedSearch, () => replace);
     }
 
     // 2. Try with normalized whitespace (collapse multiple spaces/tabs, trim lines)

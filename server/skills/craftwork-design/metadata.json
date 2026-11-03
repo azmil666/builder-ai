@@ -1,0 +1,26 @@
+{
+  "skillName": "craftwork-design",
+  "sourcePackage": "@craftwork-design/wizard@latest",
+  "installedPath": ".agents/skills/craftwork-assets/SKILL.md",
+  "upstreamStoragePath": "server/skills/craftwork-design/upstream/SKILL.md",
+  "runtimeGuidancePath": "server/skills/craftwork-design/runtime-guidance.md",
+  "retrievalDate": "2026-11-03",
+  "version": "latest",
+  "refreshProcedure": [
+    "Run `npx -y @craftwork-design/wizard@latest add --all` in project root.",
+    "Copy the installed `.agents/skills/craftwork-assets/SKILL.md` into `server/skills/craftwork-design/upstream/SKILL.md`.",
+    "Update `server/skills/craftwork-design/metadata.json` with the new retrieval date.",
+    "Review `server/skills/craftwork-design/runtime-guidance.md` against upstream changes, maintaining design fidelity and Sandpack/React compatibility while excluding unauthenticated MCP tool calls.",
+    "Run `npm test --prefix server` to verify all prompt integration and regression tests pass."
+  ],
+  "excerptMethod": "Faithful extraction of upstream design rules (taste rules, restraint, typography, color/surface, layout, interaction/states, copy/text, dials, pre-flight checks). Excludes unauthenticated MCP tool schemas (craftwork_find_*, craftwork_download_*, craftwork_create_3d_embed, OAuth credentials, paid quotas) that require a live authenticated MCP bridge.",
+  "integratedStages": [
+    "DesignSpec generation",
+    "File planning",
+    "CSS foundation and component code generation",
+    "Targeted AI repair / self-repair",
+    "Project revisions"
+  ],
+  "mcpStatus": "MCP tool execution is not integrated at server runtime. Craftwork guidance operates purely as high-standard visual and architectural design instructions for the AI generation pipeline."
+}
+
