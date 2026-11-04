@@ -3,6 +3,12 @@
  * Analyzes generated React codebases for visual, responsive, asset, and accessibility defects.
  */
 
+import { generateStructuredObject } from './ai.js';
+import { FileCodeSchema } from './aiSchemas.js';
+import { buildFileCodeSystem } from './prompts.js';
+import { normalizeContent } from './contentNormalizer.js';
+import { validateAndFixCode, validateProject } from './codeValidator.js';
+
 // Heuristics for responsive and layout issues
 const RESPONSIVE_DEFECT_PATTERNS = [
   {
@@ -434,4 +440,509 @@ export function buildVisualQAFixPrompt(qaReport) {
 ${issuesList}
 
 Ensure mobile viewports (<768px) and desktop viewports are fully responsive and defect-free.`;
+}
+
+/**
+ * Standard viewports required for post-generation visual verification.
+ */
+export const VERIFICATION_VIEWPORTS = [
+  { name: 'desktop', width: 1440, height: 900 },
+  { name: 'mobile', width: 375, height: 812 },
+];
+
+/**
+ * Evaluates a single viewport render for runtime errors, compilation errors, and horizontal overflow.
+ */
+export function evaluateViewportRender({
+  viewport,
+  metrics = null,
+  errors = [],
+  compilationError = null,
+  timedOut = false,
+  infrastructureError = null,
+}) {
+  const issues = [];
+  const vp = {
+    name: viewport?.name || (viewport?.width > 768 ? 'desktop' : 'mobile'),
+    width: viewport?.width || (viewport?.name === 'mobile' ? 375 : 1440),
+    height: viewport?.height || (viewport?.name === 'mobile' ? 812 : 900),
+  };
+
+  // 1. Timeouts
+  if (timedOut) {
+    issues.push({
+      type: 'timeout',
+      viewport: vp,
+      severity: 'critical',
+      message: `Render timed out at ${vp.name} viewport (${vp.width}×${vp.height}). Preview failed to load within time limit.`,
+      evidence: { timedOut: true },
+    });
+    return {
+      viewport: vp,
+      passed: false,
+      metrics: null,
+      issues,
+      error: 'Render timed out',
+    };
+  }
+
+  // 2. Infrastructure errors
+  if (infrastructureError) {
+    const infraMsg = typeof infrastructureError === 'string'
+      ? infrastructureError
+      : infrastructureError.message || String(infrastructureError);
+    issues.push({
+      type: 'infrastructure_error',
+      viewport: vp,
+      severity: 'critical',
+      message: `Preview infrastructure error at ${vp.name} viewport: ${infraMsg}`,
+      evidence: { details: infraMsg },
+    });
+    return {
+      viewport: vp,
+      passed: false,
+      metrics: null,
+      issues,
+      error: infraMsg,
+    };
+  }
+
+  // 3. Compilation errors
+  if (compilationError) {
+    const compMsg = typeof compilationError === 'string'
+      ? compilationError
+      : compilationError.message || String(compilationError);
+    issues.push({
+      type: 'compilation_error',
+      viewport: vp,
+      severity: 'critical',
+      message: `Compilation failed at ${vp.name} viewport: ${compMsg}`,
+      evidence: {
+        error: compMsg,
+        file: compilationError?.file || null,
+      },
+      file: compilationError?.file || null,
+    });
+  }
+
+  // 4. Runtime errors
+  if (Array.isArray(errors) && errors.length > 0) {
+    for (const err of errors) {
+      const errMsg = typeof err === 'string' ? err : err.message || JSON.stringify(err);
+      issues.push({
+        type: 'runtime_error',
+        viewport: vp,
+        severity: 'critical',
+        message: `Runtime render error at ${vp.name} viewport: ${errMsg}`,
+        evidence: {
+          error: errMsg,
+          stack: err?.stack,
+          file: err?.file || null,
+        },
+        file: err?.file || null,
+      });
+    }
+  }
+
+  // 5. Horizontal overflow (scrollWidth > clientWidth)
+  if (metrics) {
+    const scrollWidth = Number(metrics.scrollWidth ?? metrics.bodyScrollWidth ?? vp.width);
+    const clientWidth = Number(metrics.clientWidth ?? metrics.bodyClientWidth ?? vp.width);
+
+    if (scrollWidth > clientWidth) {
+      const overflowPx = Math.round(scrollWidth - clientWidth);
+      issues.push({
+        type: 'overflow',
+        viewport: vp,
+        severity: 'critical',
+        message: `Horizontal document overflow detected at ${vp.name} viewport: scrollWidth (${scrollWidth}px) exceeds clientWidth (${clientWidth}px) by ${overflowPx}px.`,
+        evidence: {
+          scrollWidth,
+          clientWidth,
+          overflowPx,
+        },
+      });
+    }
+  }
+
+  const passed = issues.length === 0;
+
+  return {
+    viewport: vp,
+    passed,
+    metrics: metrics
+      ? {
+          scrollWidth: metrics.scrollWidth ?? metrics.bodyScrollWidth,
+          clientWidth: metrics.clientWidth ?? metrics.bodyClientWidth,
+          scrollHeight: metrics.scrollHeight ?? metrics.bodyScrollHeight,
+          clientHeight: metrics.clientHeight ?? metrics.bodyClientHeight,
+        }
+      : null,
+    issues,
+    error: issues.length > 0 ? issues[0].message : null,
+  };
+}
+
+/**
+ * Aggregates viewport verification results into a unified report.
+ */
+export function aggregateVisualVerificationResults(viewportResults = []) {
+  const issues = [];
+  const viewports = {};
+  let allPassed = viewportResults.length > 0;
+  let hasTimeoutOrInfra = false;
+
+  for (const res of viewportResults) {
+    viewports[res.viewport.name] = res;
+    if (res.issues && res.issues.length > 0) {
+      issues.push(...res.issues);
+      allPassed = false;
+    }
+    if (res.issues?.some((i) => i.type === 'timeout' || i.type === 'infrastructure_error')) {
+      hasTimeoutOrInfra = true;
+    }
+  }
+
+  let status = 'verified';
+  if (hasTimeoutOrInfra) {
+    status = 'unavailable';
+  } else if (!allPassed) {
+    status = 'defects_detected';
+  }
+
+  return {
+    status,
+    passed: allPassed,
+    timestamp: new Date().toISOString(),
+    viewports,
+    issues,
+    summary: {
+      totalIssues: issues.length,
+      overflowCount: issues.filter((i) => i.type === 'overflow').length,
+      runtimeErrorCount: issues.filter((i) => i.type === 'runtime_error').length,
+      compilationErrorCount: issues.filter((i) => i.type === 'compilation_error').length,
+      timeoutCount: issues.filter((i) => i.type === 'timeout').length,
+      infrastructureCount: issues.filter((i) => i.type === 'infrastructure_error').length,
+    },
+  };
+}
+
+/**
+ * Builds targeted repair instructions identifying candidate broken files and evidence.
+ */
+export function buildVisualRepairContext({ issues, files = {}, designSpec = null, prompt = '' }) {
+  const candidateFiles = new Set();
+
+  for (const issue of issues) {
+    if (issue.file && files[issue.file]) {
+      candidateFiles.add(issue.file);
+    }
+    if (issue.type === 'overflow') {
+      for (const [path, content] of Object.entries(files)) {
+        const code = typeof content === 'string' ? content : content?.content || '';
+        if (
+          /\b(w-\[\d{3,}px\]|min-w-\[\d{3,}px\]|w-screen|overflow-x-visible)\b/.test(code) ||
+          (issue.viewport.width < 768 && /\bgrid-cols-[2-9]\b/.test(code) && !/\bsm:grid-cols\b/.test(code))
+        ) {
+          candidateFiles.add(path);
+        }
+      }
+    }
+  }
+
+  // Fallback to top-level layout files if no specific candidate detected
+  if (candidateFiles.size === 0) {
+    if (files['/styles.css']) candidateFiles.add('/styles.css');
+    if (files['/App.js']) candidateFiles.add('/App.js');
+    for (const key of Object.keys(files)) {
+      if (/navbar|header|hero/i.test(key)) {
+        candidateFiles.add(key);
+      }
+    }
+  }
+
+  const issueDescriptions = issues
+    .map((iss, idx) => {
+      let desc = `${idx + 1}. [${iss.type.toUpperCase()}] at viewport "${iss.viewport.name}" (${iss.viewport.width}×${iss.viewport.height}): ${iss.message}`;
+      if (iss.evidence?.overflowPx) {
+        desc += `\n   Overflow evidence: scrollWidth (${iss.evidence.scrollWidth}px) > clientWidth (${iss.evidence.clientWidth}px) by ${iss.evidence.overflowPx}px.`;
+      }
+      if (iss.evidence?.error) {
+        desc += `\n   Error trace: ${iss.evidence.error}`;
+      }
+      return desc;
+    })
+    .join('\n\n');
+
+  const filesToRepair = Array.from(candidateFiles);
+
+  const repairPrompt = `Targeted Visual Defect Fix Request:
+
+The website rendered with visual defects at specific viewports:
+${issueDescriptions}
+
+Relevant file(s) identified for repair:
+${filesToRepair.map((f) => `- \`${f}\``).join('\n')}
+
+Instructions:
+1. Fix horizontal document overflow by replacing hardcoded widths (e.g. w-[...px], w-screen) with responsive fluid classes (\`w-full max-w-...\`, flex-wrap, overflow-x-hidden on outer shell).
+2. For mobile viewports (<768px), ensure headers, navigation, product grids, and toolbars wrap and adapt without clipping.
+3. Fix any runtime or compilation errors while preserving existing design tokens, colors, typography, and requested feature functionality.
+4. Return the complete corrected code for the requested file only. Do not modify unrelated behavior.`;
+
+  return {
+    filesToRepair,
+    issueDescriptions,
+    repairPrompt,
+  };
+}
+
+/**
+ * Performs at most one targeted AI repair attempt on affected files.
+ */
+export async function performTargetedVisualRepair({
+  files,
+  allPlannedFiles = [],
+  issues,
+  prompt = '',
+  designSpec = null,
+  callbacks = {},
+}) {
+  const repairContext = buildVisualRepairContext({ issues, files, designSpec, prompt });
+  const filesToRepair = repairContext.filesToRepair;
+
+  console.log(`[Visual QA Repair] Performing targeted visual repair on ${filesToRepair.length} file(s): ${filesToRepair.join(', ')}`);
+
+  let currentFiles = { ...files };
+  const repairLogs = [];
+
+  for (const filePath of filesToRepair) {
+    const rawContent = currentFiles[filePath];
+    const currentCode = typeof rawContent === 'string' ? rawContent : rawContent?.content || '';
+    const system = buildFileCodeSystem(allPlannedFiles, currentFiles, designSpec);
+
+    const userPrompt = `Project: ${prompt}
+
+${repairContext.repairPrompt}
+
+Current code for '${filePath}':
+\`\`\`${filePath.endsWith('.css') ? 'css' : 'javascript'}
+${currentCode}
+\`\`\`
+
+Return only the complete repaired code for '${filePath}'.`;
+
+    try {
+      const { object } = await generateStructuredObject({
+        schema: FileCodeSchema,
+        system,
+        prompt: userPrompt,
+        maxRetries: 1,
+      });
+
+      const normalized = normalizeContent(object.code);
+      const validation = validateAndFixCode(normalized, filePath, {
+        allPlannedFiles,
+        existingFiles: Object.keys(currentFiles),
+      });
+
+      if (validation.valid || validation.errors.length === 0) {
+        currentFiles[filePath] = validation.code;
+        repairLogs.push({ file: filePath, success: true });
+        if (callbacks?.onFileComplete) {
+          await callbacks.onFileComplete(filePath, validation.code);
+        }
+      } else {
+        console.warn(`[Visual QA Repair] Repaired code for ${filePath} failed validation: ${validation.errors[0]?.message}`);
+        repairLogs.push({ file: filePath, success: false, errors: validation.errors });
+      }
+    } catch (err) {
+      console.warn(`[Visual QA Repair] AI call failed for ${filePath}: ${err.message}`);
+      repairLogs.push({ file: filePath, success: false, error: err.message });
+    }
+  }
+
+  // Cross-file validation check
+  const projectVal = validateProject(currentFiles, allPlannedFiles);
+  if (!projectVal.valid && projectVal.errors.length > 0) {
+    console.warn(`[Visual QA Repair] Repaired files broke project validation (${projectVal.errors.length} errors). Reverting to best original files.`);
+    return {
+      success: false,
+      files,
+      repairedFiles: [],
+      repairLogs,
+      reverted: true,
+    };
+  }
+
+  return {
+    success: true,
+    files: currentFiles,
+    repairedFiles: filesToRepair,
+    repairLogs,
+    reverted: false,
+  };
+}
+
+/**
+ * Runs the complete post-generation visual verification render-and-fix loop.
+ */
+export async function runVisualVerificationLoop({
+  files,
+  prompt = '',
+  designSpec = null,
+  allPlannedFiles = [],
+  renderViewportFn,
+  callbacks = {},
+}) {
+  if (!renderViewportFn) {
+    return {
+      status: 'skipped',
+      files,
+      visualVerification: {
+        status: 'skipped',
+        reason: 'No render viewport function provided',
+        timestamp: new Date().toISOString(),
+        viewports: {},
+        issues: [],
+        repairAttempted: false,
+      },
+    };
+  }
+
+  const viewportsToCheck = VERIFICATION_VIEWPORTS;
+
+  if (callbacks?.onVerificationStart) {
+    await callbacks.onVerificationStart({ viewports: viewportsToCheck, round: 1 });
+  }
+
+  // Round 1: Initial Render & Viewport Inspection
+  const initialViewportResults = [];
+  for (const vp of viewportsToCheck) {
+    try {
+      const renderOutput = await renderViewportFn({ viewport: vp, files });
+      const evaluated = evaluateViewportRender({
+        viewport: vp,
+        metrics: renderOutput?.metrics,
+        errors: renderOutput?.errors,
+        compilationError: renderOutput?.compilationError,
+        timedOut: renderOutput?.timedOut,
+        infrastructureError: renderOutput?.infrastructureError,
+      });
+      initialViewportResults.push(evaluated);
+    } catch (err) {
+      initialViewportResults.push(
+        evaluateViewportRender({
+          viewport: vp,
+          infrastructureError: err.message || String(err),
+        })
+      );
+    }
+  }
+
+  const initialReport = aggregateVisualVerificationResults(initialViewportResults);
+
+  // If infrastructure failure or timeout occurred
+  if (initialReport.status === 'unavailable') {
+    return {
+      status: 'unavailable',
+      files,
+      visualVerification: {
+        ...initialReport,
+        repairAttempted: false,
+      },
+    };
+  }
+
+  // If clean: passed initial verification
+  if (initialReport.passed) {
+    return {
+      status: 'verified',
+      files,
+      visualVerification: {
+        ...initialReport,
+        status: 'verified',
+        repairAttempted: false,
+      },
+    };
+  }
+
+  // Defects detected! Trigger at most ONE targeted repair attempt
+  if (callbacks?.onRepairStart) {
+    await callbacks.onRepairStart({
+      issues: initialReport.issues,
+      round: 1,
+      maxAttempts: 1,
+    });
+  }
+
+  const repairResult = await performTargetedVisualRepair({
+    files,
+    allPlannedFiles,
+    issues: initialReport.issues,
+    prompt,
+    designSpec,
+    callbacks,
+  });
+
+  const candidateRepairedFiles = repairResult.files;
+
+  // Round 2: Re-render and Re-verify the repaired project
+  if (callbacks?.onReverificationStart) {
+    await callbacks.onReverificationStart({ viewports: viewportsToCheck, round: 2 });
+  }
+
+  const secondViewportResults = [];
+  for (const vp of viewportsToCheck) {
+    try {
+      const renderOutput = await renderViewportFn({ viewport: vp, files: candidateRepairedFiles });
+      const evaluated = evaluateViewportRender({
+        viewport: vp,
+        metrics: renderOutput?.metrics,
+        errors: renderOutput?.errors,
+        compilationError: renderOutput?.compilationError,
+        timedOut: renderOutput?.timedOut,
+        infrastructureError: renderOutput?.infrastructureError,
+      });
+      secondViewportResults.push(evaluated);
+    } catch (err) {
+      secondViewportResults.push(
+        evaluateViewportRender({
+          viewport: vp,
+          infrastructureError: err.message || String(err),
+        })
+      );
+    }
+  }
+
+  const secondReport = aggregateVisualVerificationResults(secondViewportResults);
+
+  // Determine final outcome
+  if (secondReport.passed) {
+    return {
+      status: 'repaired',
+      files: candidateRepairedFiles,
+      visualVerification: {
+        ...secondReport,
+        status: 'repaired',
+        repairAttempted: true,
+        repairedFiles: repairResult.repairedFiles,
+        initialIssues: initialReport.issues,
+      },
+    };
+  }
+
+  // Still failing after single retry: cap attempts, retain best available generated project, clearly report remaining issues
+  return {
+    status: 'unresolved',
+    files: candidateRepairedFiles, // retain best available
+    visualVerification: {
+      ...secondReport,
+      status: 'unresolved',
+      repairAttempted: true,
+      repairedFiles: repairResult.repairedFiles,
+      initialIssues: initialReport.issues,
+      remainingIssues: secondReport.issues,
+    },
+  };
 }

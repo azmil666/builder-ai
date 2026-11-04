@@ -3,7 +3,16 @@ import { Project } from "../models/Project.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
 import { emitProjectEvent, formatSSE, subscribeProjectEvents } from "../services/projectEvents.js";
-import { analyzeProjectVisualQuality, buildVisualQAFixPrompt } from "../services/visualQa.js";
+import {
+  analyzeProjectVisualQuality,
+  buildVisualQAFixPrompt,
+  evaluateViewportRender,
+  aggregateVisualVerificationResults,
+  performTargetedVisualRepair,
+  VERIFICATION_VIEWPORTS,
+} from "../services/visualQa.js";
+
+export const pendingVisualVerifications = new Map();
 
 function hashContent(content) {
   return crypto.createHash("md5").update(content).digest("hex").slice(0, 12);
@@ -75,6 +84,7 @@ export async function createProject(req, res) {
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
+    visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
   });
@@ -215,7 +225,6 @@ async function runBackgroundGeneration(projectId, prompt) {
 
     const project = await Project.findById(projectId);
     if (project) {
-      project.status = "completed";
       project.version = 1;
       if (result.description) {
         project.name = result.description;
@@ -223,20 +232,39 @@ async function runBackgroundGeneration(projectId, prompt) {
       if (result.designSpec) {
         project.designSpec = result.designSpec;
       }
+
+      // Enter Visual Verification stage
+      console.log(`[Background AI] Entering visual layout verification for project ${projectId}`);
+      project.status = "visual_verifying";
+      const initialVerification = {
+        status: "verifying",
+        timestamp: new Date().toISOString(),
+        viewports: {
+          desktop: { viewport: { name: "desktop", width: 1440, height: 900 }, passed: null, issues: [] },
+          mobile: { viewport: { name: "mobile", width: 375, height: 812 }, passed: null, issues: [] },
+        },
+        issues: [],
+        repairAttempted: false,
+      };
+      project.visualVerification = initialVerification;
       project.messages.push({
         role: "assistant",
-        content: `Website generation complete! You can view and edit the files.`,
+        content: `Code generation and semantic validation complete. Starting visual layout verification on desktop (1440×900) and mobile (375×812) viewports...`,
         timestamp: new Date(),
       });
       await project.save();
 
-      emitProjectEvent(projectId, "completed", {
-        status: "completed",
+      emitProjectEvent(projectId, "visual_verifying", {
+        status: "visual_verifying",
+        visualVerification: initialVerification,
         version: project.version,
         name: project.name,
         designSpec: project.designSpec,
         filesGenerated: project.filesGenerated,
       });
+
+      // Wait for visual verification reporting from client preview runtime
+      await waitForClientVisualVerification(projectId, project);
     }
   } catch (err) {
     const safeError = sanitizeError(err);
@@ -260,6 +288,66 @@ async function runBackgroundGeneration(projectId, prompt) {
       status: "failed",
       error: safeError,
     });
+  }
+}
+
+/**
+ * Awaits visual verification results from the client browser preview runtime.
+ * If the preview runtime does not report within the safe timeout (or if disconnected),
+ * gracefully transitions project to completed with visualVerification marked as skipped.
+ */
+export async function waitForClientVisualVerification(projectId, project) {
+  const timeoutMs = parseInt(
+    process.env.VISUAL_VERIFICATION_TIMEOUT_MS ||
+      (process.env.NODE_ENV === "test" ? "300" : "15000"),
+    10,
+  );
+
+  let resolveVerification;
+  const verifyPromise = new Promise((resolve) => {
+    resolveVerification = resolve;
+    pendingVisualVerifications.set(projectId.toString(), resolve);
+  });
+
+  const timer = setTimeout(() => {
+    resolveVerification({ timedOut: true });
+  }, timeoutMs);
+
+  const outcome = await verifyPromise;
+  clearTimeout(timer);
+  pendingVisualVerifications.delete(projectId.toString());
+
+  if (outcome?.timedOut) {
+    const updated = await Project.findById(projectId);
+    if (updated && updated.status === "visual_verifying") {
+      updated.status = "completed";
+      updated.visualVerification = {
+        status: "skipped",
+        reason: "Visual verification skipped: client preview runtime was not connected within timeout",
+        timestamp: new Date().toISOString(),
+        viewports: {
+          desktop: { viewport: { name: "desktop", width: 1440, height: 900 }, passed: null, issues: [] },
+          mobile: { viewport: { name: "mobile", width: 375, height: 812 }, passed: null, issues: [] },
+        },
+        issues: [],
+        repairAttempted: false,
+      };
+      updated.messages.push({
+        role: "assistant",
+        content: "Website generation complete. (Visual preview verification skipped: preview runtime was not available).",
+        timestamp: new Date(),
+      });
+      await updated.save();
+
+      emitProjectEvent(projectId, "completed", {
+        status: "completed",
+        version: updated.version,
+        name: updated.name,
+        designSpec: updated.designSpec,
+        filesGenerated: updated.filesGenerated,
+        visualVerification: updated.visualVerification,
+      });
+    }
   }
 }
 
@@ -332,6 +420,7 @@ export async function getProject(req, res) {
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
+    visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
@@ -528,6 +617,7 @@ export async function streamProjectProgress(req, res) {
     name: project.name,
     version: project.version,
     designSpec: project.designSpec,
+    visualVerification: project.visualVerification || null,
     filesPlanned: project.filesPlanned || [],
     filesGenerated: project.filesGenerated || [],
     currentFile: project.currentFile,
@@ -544,6 +634,7 @@ export async function streamProjectProgress(req, res) {
         version: project.version,
         name: project.name,
         designSpec: project.designSpec,
+        visualVerification: project.visualVerification || null,
         filesGenerated: project.filesGenerated || [],
       }),
     );
@@ -613,5 +704,227 @@ export async function getProjectVisualQA(req, res) {
     projectName: project.name,
     qaReport,
     fixPrompt,
+  });
+}
+
+// POST /api/projects/:id/visual-verification
+// Receives rendered viewport metrics/errors, evaluates overflow and runtime defects,
+// and triggers at most ONE targeted AI self-repair attempt before re-evaluating.
+export async function handleVisualVerification(req, res) {
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = req.user.userID || req.user.userId;
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.owner.toString() !== userId.toString()) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  const {
+    viewportResults = [],
+    timedOut = false,
+    infrastructureError = null,
+  } = req.body;
+
+  // Evaluate each viewport result
+  const evaluatedViewports = (viewportResults || []).map((vr) =>
+    evaluateViewportRender({
+      viewport: vr.viewport,
+      metrics: vr.metrics,
+      errors: vr.errors,
+      compilationError: vr.compilationError,
+      timedOut: timedOut || vr.timedOut,
+      infrastructureError: infrastructureError || vr.infrastructureError,
+    }),
+  );
+
+  const aggregated = aggregateVisualVerificationResults(evaluatedViewports);
+
+  // 1. Timeout or Infrastructure Error: MUST NEVER be labeled "passed" or "verified"
+  if (timedOut || infrastructureError || aggregated.status === "unavailable") {
+    aggregated.status = "unavailable";
+    project.visualVerification = {
+      ...aggregated,
+      status: "unavailable",
+      repairAttempted: Boolean(project.visualVerification?.repairAttempted),
+      repairedFiles: project.visualVerification?.repairedFiles || [],
+    };
+    project.status = "completed";
+    await project.save();
+
+    emitProjectEvent(project._id, "completed", {
+      status: "completed",
+      visualVerification: project.visualVerification,
+      filesGenerated: project.filesGenerated,
+      version: project.version,
+      name: project.name,
+      designSpec: project.designSpec,
+    });
+
+    const resolver = pendingVisualVerifications.get(project._id.toString());
+    if (resolver) resolver({ completed: true, status: "unavailable" });
+
+    res.json({
+      status: "unavailable",
+      visualVerification: project.visualVerification,
+      completed: true,
+    });
+    return;
+  }
+
+  // 2. Clean: passed visual verification!
+  if (aggregated.passed) {
+    const wasRepaired = Boolean(project.visualVerification?.repairAttempted);
+    const finalStatus = wasRepaired ? "repaired" : "verified";
+    project.visualVerification = {
+      ...aggregated,
+      status: finalStatus,
+      repairAttempted: wasRepaired,
+      repairedFiles: project.visualVerification?.repairedFiles || [],
+    };
+    project.status = "completed";
+    project.messages.push({
+      role: "assistant",
+      content: wasRepaired
+        ? `✅ Visual verification passed after targeted AI repair. Both desktop (1440×900) and mobile (375×812) viewports render cleanly with 0 overflow.`
+        : `✅ Visual verification passed. Both desktop (1440×900) and mobile (375×812) viewports render cleanly with 0 overflow.`,
+      timestamp: new Date(),
+    });
+    await project.save();
+
+    emitProjectEvent(project._id, "completed", {
+      status: "completed",
+      visualVerification: project.visualVerification,
+      filesGenerated: project.filesGenerated,
+      version: project.version,
+      name: project.name,
+      designSpec: project.designSpec,
+    });
+
+    const resolver = pendingVisualVerifications.get(project._id.toString());
+    if (resolver) resolver({ completed: true, status: finalStatus });
+
+    res.json({
+      status: finalStatus,
+      visualVerification: project.visualVerification,
+      completed: true,
+    });
+    return;
+  }
+
+  // 3. Defects detected! Check if repair was already attempted:
+  const alreadyRepaired = Boolean(project.visualVerification?.repairAttempted);
+
+  if (alreadyRepaired) {
+    // Single retry cap: do not loop indefinitely! Retain best available project and clearly report remaining issues.
+    project.visualVerification = {
+      ...aggregated,
+      status: "unresolved",
+      repairAttempted: true,
+      repairedFiles: project.visualVerification?.repairedFiles || [],
+      remainingIssues: aggregated.issues,
+    };
+    project.status = "completed";
+    project.messages.push({
+      role: "assistant",
+      content: `⚠️ Visual verification unresolved: ${aggregated.issues.length} issue(s) remaining after 1 targeted repair attempt. Retaining best available project.`,
+      timestamp: new Date(),
+    });
+    await project.save();
+
+    emitProjectEvent(project._id, "completed", {
+      status: "completed",
+      visualVerification: project.visualVerification,
+      filesGenerated: project.filesGenerated,
+      version: project.version,
+      name: project.name,
+      designSpec: project.designSpec,
+    });
+
+    const resolver = pendingVisualVerifications.get(project._id.toString());
+    if (resolver) resolver({ completed: true, status: "unresolved" });
+
+    res.json({
+      status: "unresolved",
+      visualVerification: project.visualVerification,
+      completed: true,
+    });
+    return;
+  }
+
+  // 4. First time defects detected: execute ONE targeted AI self-repair attempt
+  emitProjectEvent(project._id, "repairing", {
+    status: "repairing",
+    repairType: "visual",
+    errors: aggregated.issues,
+  });
+
+  const rawFiles = {};
+  for (const [p, entry] of Object.entries(project.files || {})) {
+    rawFiles[p] = typeof entry === "string" ? entry : entry?.content || "";
+  }
+
+  const repairResult = await performTargetedVisualRepair({
+    files: rawFiles,
+    allPlannedFiles: project.filesPlanned || [],
+    issues: aggregated.issues,
+    prompt: project.description || project.name,
+    designSpec: project.designSpec,
+    callbacks: {
+      onFileComplete: async (path, code) => {
+        emitProjectEvent(project._id, "file_complete", {
+          path,
+          file: { content: code },
+        });
+      },
+    },
+  });
+
+  const updatedFiles = {};
+  for (const [p, c] of Object.entries(repairResult.files)) {
+    updatedFiles[p] = { content: c, hash: hashContent(c) };
+  }
+  project.files = updatedFiles;
+  project.markModified("files");
+
+  project.visualVerification = {
+    ...aggregated,
+    status: "repairing",
+    repairAttempted: true,
+    repairedFiles: repairResult.repairedFiles,
+    initialIssues: aggregated.issues,
+  };
+  project.messages.push({
+    role: "assistant",
+    content: `Targeted visual repair applied to: ${repairResult.repairedFiles.join(", ") || "layout files"}. Re-rendering viewports to verify...`,
+    timestamp: new Date(),
+  });
+  await project.save();
+
+  const plainFiles = {};
+  for (const [p, entry] of Object.entries(project.files)) {
+    plainFiles[p] = entry.content;
+  }
+
+  res.json({
+    status: "repairing",
+    needsReverification: true,
+    visualVerification: project.visualVerification,
+    repairedFiles: repairResult.repairedFiles,
+    files: plainFiles,
   });
 }
