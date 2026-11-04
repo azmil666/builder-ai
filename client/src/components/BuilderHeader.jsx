@@ -20,6 +20,7 @@ const BuilderHeader = ({
   deviceViewport = 'desktop', // 'desktop' | 'tablet' | 'mobile'
   syncStatus = 'saved', // 'saved' | 'saving' | 'error'
   publishing = false,
+  visualVerification = null,
   onToggleViewMode,
   onChangeDeviceViewport,
   onOpenPreview,
@@ -75,6 +76,57 @@ const BuilderHeader = ({
             </>
           )}
         </div>
+
+        {/* Post-Generation Visual Verification Status Outcome */}
+        {visualVerification && visualVerification.status && (
+          <div
+            className={`hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono border transition ${
+              visualVerification.status === 'verified'
+                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                : visualVerification.status === 'repaired'
+                  ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                  : visualVerification.status === 'unresolved'
+                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                    : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+            }`}
+            title={
+              visualVerification.status === 'verified'
+                ? 'Verified: desktop (1440×900) & mobile (375×812) viewports clean with 0 horizontal overflow'
+                : visualVerification.status === 'repaired'
+                  ? 'Repaired: defects resolved by targeted AI repair & re-verified on 2nd render'
+                  : visualVerification.status === 'unresolved'
+                    ? `Unresolved: ${visualVerification.remainingIssues?.length || visualVerification.issues?.length || 0} issues remaining after 1 targeted retry`
+                    : visualVerification.reason || 'Visual verification'
+            }
+          >
+            {visualVerification.status === 'verified' ? (
+              <>
+                <span className="size-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span>Verified (1440px & 375px)</span>
+              </>
+            ) : visualVerification.status === 'repaired' ? (
+              <>
+                <span className="size-1.5 rounded-full bg-indigo-400 shrink-0" />
+                <span>Repaired on 2nd Render</span>
+              </>
+            ) : visualVerification.status === 'unresolved' ? (
+              <>
+                <span className="size-1.5 rounded-full bg-amber-400 shrink-0" />
+                <span>Unresolved Visual Defect</span>
+              </>
+            ) : visualVerification.status === 'unavailable' ? (
+              <>
+                <span className="size-1.5 rounded-full bg-red-400 shrink-0" />
+                <span>Visual QA Unavailable</span>
+              </>
+            ) : (
+              <>
+                <span className="size-1.5 rounded-full bg-zinc-500 shrink-0" />
+                <span>Visual QA {visualVerification.status}</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Center Area: Viewport Controls (Desktop, Tablet, Mobile) */}

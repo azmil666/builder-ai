@@ -135,7 +135,7 @@ export function AppContextProvider({children}){
     }
 
     const isOngoing =
-      status === "generating" || status === "pending" || status === "validating" || status === "repairing" || status === "revising";
+      status === "generating" || status === "pending" || status === "validating" || status === "repairing" || status === "revising" || status === "visual_verifying";
 
     if (!isOngoing) {
       setChatLoading(false);
@@ -272,6 +272,24 @@ export function AppContextProvider({children}){
         }
       });
 
+      eventSource.addEventListener("visual_verifying", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "visual_verifying",
+                  visualVerification: data.visualVerification || prev.visualVerification,
+                  currentFile: null,
+                }
+              : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse visual_verifying SSE event:", err);
+        }
+      });
+
       eventSource.addEventListener("completed", (e) => {
         try {
           const data = JSON.parse(e.data);
@@ -283,6 +301,7 @@ export function AppContextProvider({children}){
                   version: data.version || prev.version || 1,
                   name: data.name || prev.name,
                   designSpec: data.designSpec || prev.designSpec,
+                  visualVerification: data.visualVerification || prev.visualVerification,
                 }
               : prev,
           );
@@ -401,6 +420,45 @@ export function AppContextProvider({children}){
       }
     },
     [activeProject, user],
+  );
+
+  const reportVisualVerification = useCallback(
+    async (projectId, payload) => {
+      try {
+        const { data } = await api.post(
+          `/api/projects/${projectId}/visual-verification`,
+          payload,
+        );
+        if (data.status === "repairing" && data.files) {
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "repairing",
+                  files: data.files,
+                  visualVerification: data.visualVerification,
+                }
+              : prev,
+          );
+        } else if (data.completed) {
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "completed",
+                  visualVerification: data.visualVerification,
+                }
+              : prev,
+          );
+          loadProject(projectId, true);
+        }
+        return data;
+      } catch (err) {
+        console.error("Failed to report visual verification:", err);
+        return null;
+      }
+    },
+    [loadProject],
   );
 
   const debouncedSave = React.useMemo(
@@ -585,6 +643,7 @@ export function AppContextProvider({children}){
         handleDelete,
         logout,
         handleChat,
+        reportVisualVerification,
         updateProjectFiles,
         syncStatus,
         openTabs,

@@ -116,7 +116,8 @@ const BuilderPage = () => {
     activeProject.status === 'pending' ||
     activeProject.status === 'generating' ||
     activeProject.status === 'validating' ||
-    activeProject.status === 'repairing';
+    activeProject.status === 'repairing' ||
+    activeProject.status === 'visual_verifying';
   const isFailed = activeProject.status === 'failed';
 
   return (
@@ -129,6 +130,7 @@ const BuilderPage = () => {
         deviceViewport={deviceViewport}
         syncStatus={syncStatus}
         publishing={publishing}
+        visualVerification={activeProject.visualVerification}
         onToggleViewMode={() => setShowCode(!showCode)}
         onChangeDeviceViewport={setDeviceViewport}
         onOpenPreview={handleOpenPreview}

@@ -5,6 +5,7 @@ import {
   getProject,
   getProjectVisualQA,
   getPublicProject,
+  handleVisualVerification,
   listProjects,
   publishProject,
   streamProjectProgress,
@@ -29,6 +30,7 @@ projectRouter.post("/", aiGenerationRateLimiter, createProject);
 projectRouter.get("/", listProjects);
 projectRouter.get("/:id/stream", streamProjectProgress);
 projectRouter.get("/:id/qa", getProjectVisualQA);
+projectRouter.post("/:id/visual-verification", aiRevisionRateLimiter, handleVisualVerification);
 projectRouter.get("/:id", getProject);
 projectRouter.delete("/:id", deleteProject);
 projectRouter.put("/:id/files", updateProjectFiles);

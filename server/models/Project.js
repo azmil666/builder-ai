@@ -20,12 +20,13 @@ const ProjectSchema = new Schema({
     version: { type: Number, default: 0 },
     owner: {type: Schema.Types.ObjectId, ref: "User", required: true},
     published: { type: Boolean, default: false},
-    status: {type: String, enum: ["pending", "generating", "validating", "repairing", "revising", "completed", "failed"], default: "pending"},
+    status: {type: String, enum: ["pending", "generating", "validating", "repairing", "revising", "visual_verifying", "completed", "failed"], default: "pending"},
     filesPlanned: {type: [PlannedFileSchema], default: []},
     filesGenerated: {type: [String], default: []},
     currentFile: {type: String, default: null},
     CurrentFile: {type: String, default: null},
     designSpec: {type: Schema.Types.Mixed, default: null},
+    visualVerification: {type: Schema.Types.Mixed, default: null},
     error: {type: String, default: null},
 },{timestamps: true})
 
