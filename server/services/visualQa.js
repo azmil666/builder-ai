@@ -641,7 +641,7 @@ export function buildVisualRepairContext({ issues, files = {}, designSpec = null
       for (const [path, content] of Object.entries(files)) {
         const code = typeof content === 'string' ? content : content?.content || '';
         if (
-          /\b(w-\[\d{3,}px\]|min-w-\[\d{3,}px\]|w-screen|overflow-x-visible)\b/.test(code) ||
+          /(?:\bmin-w-\[\d{3,}px\]|\bw-\[\d{3,}px\]|\bw-screen\b|\boverflow-x-visible\b)/.test(code) ||
           (issue.viewport.width < 768 && /\bgrid-cols-[2-9]\b/.test(code) && !/\bsm:grid-cols\b/.test(code))
         ) {
           candidateFiles.add(path);
@@ -655,7 +655,7 @@ export function buildVisualRepairContext({ issues, files = {}, designSpec = null
     if (files['/styles.css']) candidateFiles.add('/styles.css');
     if (files['/App.js']) candidateFiles.add('/App.js');
     for (const key of Object.keys(files)) {
-      if (/navbar|header|hero/i.test(key)) {
+      if (/nav\b|navbar|header|hero/i.test(key)) {
         candidateFiles.add(key);
       }
     }
@@ -707,6 +707,7 @@ export async function performTargetedVisualRepair({
   prompt = '',
   designSpec = null,
   callbacks = {},
+  aiGenerator = generateStructuredObject,
 }) {
   const repairContext = buildVisualRepairContext({ issues, files, designSpec, prompt });
   const filesToRepair = repairContext.filesToRepair;
@@ -733,7 +734,7 @@ ${currentCode}
 Return only the complete repaired code for '${filePath}'.`;
 
     try {
-      const { object } = await generateStructuredObject({
+      const { object } = await aiGenerator({
         schema: FileCodeSchema,
         system,
         prompt: userPrompt,
@@ -760,6 +761,19 @@ Return only the complete repaired code for '${filePath}'.`;
       console.warn(`[Visual QA Repair] AI call failed for ${filePath}: ${err.message}`);
       repairLogs.push({ file: filePath, success: false, error: err.message });
     }
+  }
+
+  // If any file repair failed validation or threw an error, consider targeted repair unsuccessful and revert
+  const anyRepairFailed = repairLogs.length === 0 || repairLogs.some((l) => !l.success);
+  if (anyRepairFailed) {
+    console.warn(`[Visual QA Repair] Targeted repair failed for one or more files. Retaining best original files.`);
+    return {
+      success: false,
+      files,
+      repairedFiles: [],
+      repairLogs,
+      reverted: true,
+    };
   }
 
   // Cross-file validation check
@@ -794,6 +808,7 @@ export async function runVisualVerificationLoop({
   allPlannedFiles = [],
   renderViewportFn,
   callbacks = {},
+  aiGenerator = generateStructuredObject,
 }) {
   if (!renderViewportFn) {
     return {
@@ -883,6 +898,7 @@ export async function runVisualVerificationLoop({
     prompt,
     designSpec,
     callbacks,
+    aiGenerator,
   });
 
   const candidateRepairedFiles = repairResult.files;

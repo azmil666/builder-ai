@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { detectDependencies } from '../utils/sandpackUtils';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context/useAppContext';
 import SandpackErrorMonitor from './SandpackErrorMonitor';
 import QuickOpenModal from './QuickOpenModal';
 
@@ -55,10 +55,19 @@ function SandpackFileWatcher({ onLiveFilesChange, markFileDirty }) {
   const { activeProject, updateProjectFiles } = useAppContext();
 
   const activeProjectRef = useRef(activeProject);
+  const markFileDirtyRef = useRef(markFileDirty);
+  const updateProjectFilesRef = useRef(updateProjectFiles);
+  const onLiveFilesChangeRef = useRef(onLiveFilesChange);
 
   useEffect(() => {
     activeProjectRef.current = activeProject;
   }, [activeProject]);
+
+  useEffect(() => {
+    markFileDirtyRef.current = markFileDirty;
+    updateProjectFilesRef.current = updateProjectFiles;
+    onLiveFilesChangeRef.current = onLiveFilesChange;
+  });
 
   useEffect(() => {
     const project = activeProjectRef.current;
@@ -76,13 +85,15 @@ function SandpackFileWatcher({ onLiveFilesChange, markFileDirty }) {
 
       if (originalContent !== undefined && originalContent !== fileCode) {
         hasChanges = true;
-        if (markFileDirty) markFileDirty(path, true);
+        if (markFileDirtyRef.current) markFileDirtyRef.current(path, true);
       }
     }
 
-    onLiveFilesChange(updatedFiles);
-    if (hasChanges) {
-      updateProjectFiles(updatedFiles);
+    if (onLiveFilesChangeRef.current) {
+      onLiveFilesChangeRef.current(updatedFiles);
+    }
+    if (hasChanges && updateProjectFilesRef.current) {
+      updateProjectFilesRef.current(updatedFiles);
     }
   }, [files]);
 

@@ -1,10 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "../api/api";
 import toast from "react-hot-toast"
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
-
-const AppContext = createContext(undefined);
+import { AppContext } from "./useAppContext.js";
 
 export function AppContextProvider({children}){
     
@@ -419,7 +418,7 @@ export function AppContextProvider({children}){
         setChatLoading(false);
       }
     },
-    [activeProject, user],
+    [activeProject, user, loadProject],
   );
 
   const reportVisualVerification = useCallback(
@@ -660,13 +659,4 @@ export function AppContextProvider({children}){
         {children}
        </AppContext.Provider> 
     )
-}
-
-export function useAppContext(){
-    const context = useContext(AppContext);
-    if(context === undefined){
-        throw new Error("useAppContext must be used within an AppContextProvider");
-
-    }
-    return context;
 } 

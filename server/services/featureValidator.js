@@ -211,6 +211,12 @@ export function validateFeatureChecklist(files = {}, checklist = []) {
       items: [],
       score: 100,
       allMandatoryPassed: true,
+      methodology: "static_lexical_pattern_heuristic",
+      diagnosticLimitations: "Lexical pattern matching scans source code for expected identifiers and JSX patterns. It does not execute code, test user interactions, or verify runtime behavior. Passing pattern checks is not proof of working functionality.",
+      mandatoryCount: 0,
+      mandatoryPassed: 0,
+      optionalCount: 0,
+      optionalPassed: 0,
     };
   }
 
@@ -226,9 +232,30 @@ export function validateFeatureChecklist(files = {}, checklist = []) {
   const results = [];
   let passedCount = 0;
   let allMandatoryPassed = true;
+  let mandatoryCount = 0;
+  let mandatoryPassed = 0;
+  let optionalCount = 0;
+  let optionalPassed = 0;
 
   for (const item of checklist) {
-    const matchedPatterns = item.patterns.filter((pat) => pat.test(combinedCode));
+    const isMandatory = item.mandatory !== false;
+    if (isMandatory) {
+      mandatoryCount++;
+    } else {
+      optionalCount++;
+    }
+
+    const matchedPatterns = [];
+    const unmatchedPatterns = [];
+
+    for (const pat of item.patterns) {
+      if (pat.test(combinedCode)) {
+        matchedPatterns.push(pat.toString());
+      } else {
+        unmatchedPatterns.push(pat.toString());
+      }
+    }
+
     const matchRatio = matchedPatterns.length / item.patterns.length;
 
     let status = "unverified";
@@ -236,16 +263,21 @@ export function validateFeatureChecklist(files = {}, checklist = []) {
 
     if (matchRatio >= 0.75) {
       status = "implemented";
-      evidence = `Found strong evidence (${matchedPatterns.length}/${item.patterns.length} pattern matches).`;
+      evidence = `Static heuristic match (${matchedPatterns.length}/${item.patterns.length} patterns matched). Lexical presence detected; runtime verification deferred to visual and interaction QA.`;
       passedCount += 1;
+      if (isMandatory) mandatoryPassed++;
+      else optionalPassed++;
     } else if (matchRatio > 0) {
       status = "partially_implemented";
-      evidence = `Found partial evidence (${matchedPatterns.length}/${item.patterns.length} pattern matches).`;
+      evidence = `Partial static match (${matchedPatterns.length}/${item.patterns.length} patterns matched). Missing: ${unmatchedPatterns.join(", ")}`;
       passedCount += 0.5;
+      if (isMandatory) {
+        allMandatoryPassed = false;
+      }
     } else {
       status = "unverified";
-      evidence = `Missing required patterns for feature '${item.name}'.`;
-      if (item.mandatory) {
+      evidence = `Missing required patterns for feature '${item.name}'. Missing: ${unmatchedPatterns.join(", ")}`;
+      if (isMandatory) {
         allMandatoryPassed = false;
       }
     }
@@ -254,11 +286,13 @@ export function validateFeatureChecklist(files = {}, checklist = []) {
       id: item.id,
       name: item.name,
       description: item.description,
-      mandatory: item.mandatory,
+      mandatory: isMandatory,
       status,
       evidence,
       matchedPatterns: matchedPatterns.length,
       totalPatterns: item.patterns.length,
+      matchedList: matchedPatterns,
+      unmatchedList: unmatchedPatterns,
     });
   }
 
@@ -268,5 +302,11 @@ export function validateFeatureChecklist(files = {}, checklist = []) {
     items: results,
     score,
     allMandatoryPassed,
+    methodology: "static_lexical_pattern_heuristic",
+    diagnosticLimitations: "Lexical pattern matching scans source code for expected identifiers and JSX patterns. It does not execute code, test user interactions, or verify runtime behavior. Passing pattern checks is not proof of working functionality.",
+    mandatoryCount,
+    mandatoryPassed,
+    optionalCount,
+    optionalPassed,
   };
 }

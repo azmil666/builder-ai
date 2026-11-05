@@ -34,6 +34,23 @@ describe('Dark Mode & Revision Failure Resilience Suite', () => {
       assert.ok(result.code.includes('toggleDarkMode = () => {}'));
       assert.ok(result.code.includes('isDarkMode = false'));
     });
+
+    it('safely handles multiline parameters and nested destructuring without corrupting code', () => {
+      const input = `export default function Navbar({
+        cart,
+        darkMode,
+        user: { name, avatar } = {},
+        existingConfig = { theme: 'dark' }
+      }) {
+        return <nav>{name}</nav>;
+      }`;
+
+      const result = validateAndFixCode(input, '/components/Navbar.js');
+      assert.ok(result.code.includes('cart = []'));
+      assert.ok(result.code.includes('darkMode = false'));
+      assert.ok(result.code.includes('user: { name, avatar } = {}'), 'Nested destructuring must be preserved');
+      assert.ok(result.code.includes("existingConfig = { theme: 'dark' }"), 'Existing default must not be overwritten');
+    });
   });
 
   describe('2. AST Prop Contract Detection for Theme Function Props', () => {

@@ -35,12 +35,31 @@ function getModel() {
     return client(modelName);
 }
 
+let _aiGeneratorOverride = null;
+
+/**
+ * Sets a custom structured object generator mock for testing or isolated execution.
+ */
+export function setAiGeneratorOverride(fn) {
+    _aiGeneratorOverride = fn;
+}
+
+/**
+ * Resets any active structured object generator mock.
+ */
+export function resetAiGeneratorOverride() {
+    _aiGeneratorOverride = null;
+}
+
 /**
  * Universal structured object generator.
  * Automatically delegates to Google Gemini API (primary) or OpenRouter (fallback).
  * Preserves { object } return structure across all callers.
  */
 export async function generateStructuredObject({ schema, system, prompt, maxRetries = 2 }) {
+    if (_aiGeneratorOverride) {
+        return _aiGeneratorOverride({ schema, system, prompt, maxRetries });
+    }
     const provider = getActiveAiProvider();
     if (provider === "gemini") {
         return generateGeminiObject({ schema, system, prompt, maxRetries });
