@@ -5,9 +5,11 @@
  * state hooks, event handlers, UI components, and responsive interactions.
  */
 
-export function deriveFeatureChecklist(prompt = "", designSpec = null) {
+export function deriveFeatureChecklist(prompt = "", designSpec = null, contract = null) {
   const p = prompt.toLowerCase();
-  const category = designSpec?.category || "";
+  const category = contract?.identity?.category || designSpec?.category || "";
+
+  let checklist = [];
 
   // 1. E-Commerce Storefront
   const isEcommerce =
@@ -16,7 +18,7 @@ export function deriveFeatureChecklist(prompt = "", designSpec = null) {
     /\b(ecommerce|e-commerce|store|shop|storefront|cart|checkout|products?)\b/i.test(p);
 
   if (isEcommerce) {
-    return [
+    checklist = [
       {
         id: "navigation",
         name: "Navigation Bar with Cart Indicator",
@@ -74,16 +76,12 @@ export function deriveFeatureChecklist(prompt = "", designSpec = null) {
         patterns: [/md:|sm:|lg:/i, /grid-cols-1/i],
       },
     ];
-  }
-
-  // 2. Portfolio / Agency
-  const isPortfolio =
+  } else if (
     category === "agency_portfolio" ||
     category === "personal_brand" ||
-    /\b(portfolio|agency|showcase|works?|projects?)\b/i.test(p);
-
-  if (isPortfolio) {
-    return [
+    /\b(portfolio|agency|showcase|works?|projects?)\b/i.test(p)
+  ) {
+    checklist = [
       {
         id: "navigation",
         name: "Navigation Header",
@@ -120,15 +118,11 @@ export function deriveFeatureChecklist(prompt = "", designSpec = null) {
         patterns: [/md:|sm:|lg:/i],
       },
     ];
-  }
-
-  // 3. SaaS / Product Landing
-  const isSaaS =
+  } else if (
     category === "saas_landing" ||
-    /\b(saas|software|platform|pricing|features?|app)\b/i.test(p);
-
-  if (isSaaS) {
-    return [
+    /\b(saas|software|platform|pricing|features?|app)\b/i.test(p)
+  ) {
+    checklist = [
       {
         id: "navigation",
         name: "Header Navigation",
@@ -165,39 +159,59 @@ export function deriveFeatureChecklist(prompt = "", designSpec = null) {
         patterns: [/md:|sm:|lg:/i],
       },
     ];
+  } else {
+    checklist = [
+      {
+        id: "navigation",
+        name: "Header Navigation",
+        description: "Header navigation with brand name",
+        mandatory: true,
+        patterns: [/<nav\b/i, /<header\b/i],
+      },
+      {
+        id: "hero_or_header",
+        name: "Primary Header / Hero",
+        description: "Main heading introducing the page",
+        mandatory: true,
+        patterns: [/<h1\b/i],
+      },
+      {
+        id: "content_section",
+        name: "Main Content Section",
+        description: "Core content or interactive components",
+        mandatory: true,
+        patterns: [/<main\b|section|article/i],
+      },
+      {
+        id: "responsive_layout",
+        name: "Responsive Layout",
+        description: "Responsive styling for mobile and desktop",
+        mandatory: true,
+        patterns: [/md:|sm:|lg:/i],
+      },
+    ];
   }
 
-  // 4. General Default
-  return [
-    {
-      id: "navigation",
-      name: "Header Navigation",
-      description: "Header navigation with brand name",
-      mandatory: true,
-      patterns: [/<nav\b/i, /<header\b/i],
-    },
-    {
-      id: "hero_or_header",
-      name: "Primary Header / Hero",
-      description: "Main heading introducing the page",
-      mandatory: true,
-      patterns: [/<h1\b/i],
-    },
-    {
-      id: "content_section",
-      name: "Main Content Section",
-      description: "Core content or interactive components",
-      mandatory: true,
-      patterns: [/<main\b|section|article/i],
-    },
-    {
-      id: "responsive_layout",
-      name: "Responsive Layout",
-      description: "Responsive styling for mobile and desktop",
-      mandatory: true,
-      patterns: [/md:|sm:|lg:/i],
-    },
-  ];
+  // Augment with explicit functional requirements from Requirement Contract if available
+  if (contract?.functionalRequirements && Array.isArray(contract.functionalRequirements)) {
+    for (const fn of contract.functionalRequirements) {
+      if (!checklist.some((item) => item.id === fn.id)) {
+        const keyword = (fn.name.split(" ")[0] || "feature").replace(/[^a-zA-Z0-9]/g, "");
+        checklist.push({
+          id: fn.id,
+          name: fn.name,
+          description: fn.description || fn.expectedBehavior || fn.name,
+          mandatory: fn.priority === "mandatory",
+          patterns: [
+            new RegExp(keyword || "state", "i"),
+            /<button|<input|<form|useState|useEffect/i,
+          ],
+        });
+      }
+    }
+  }
+
+  return checklist;
 }
 
 /**

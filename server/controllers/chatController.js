@@ -3,6 +3,7 @@ import { Project } from "../models/Project.js";
 import { reviseProject, regenerateFileForRevision, repairProjectFiles } from "../services/ai.js";
 import { applyOperations, hashContent } from "../services/diff.js";
 import { validateProject, verifyProjectRuntime } from "../services/codeValidator.js";
+import { updateRequirementContractOnRevision } from "../services/requirementContract.js";
 
 export function buildManifest(files) {
   const manifest = [];
@@ -69,18 +70,33 @@ export async function chat(req, res) {
       content: m.content,
     }));
 
+    // Stage candidate requirement contract in memory BEFORE revision generation
+    // so the AI receives the updated requirements reflecting the user's latest revision instruction.
+    // The database contract remains untouched until revision and validation succeed.
+    let candidateContract = project.requirementContract;
+    try {
+      candidateContract = updateRequirementContractOnRevision(
+        project.requirementContract,
+        prompt,
+        project.designSpec,
+      );
+    } catch (contractUpdateErr) {
+      console.warn(`[AI Revision Candidate Contract] Failed to update candidate contract (${contractUpdateErr.message}). Retaining existing.`);
+    }
+
     console.log(
       `[AI] Revising project ${project._id}: "${prompt.slice(0, 80)}..." ` +
         `(${manifest.length} files, manifest ~${JSON.stringify(manifest).length} chars)`,
     );
 
-    // Call AI with manifest + relevant files + designSpec
+    // Call AI with manifest + relevant files + designSpec + candidateContract
     const result = await reviseProject(
       prompt,
       manifest,
       relevantFiles,
       recentMessages,
       project.designSpec,
+      candidateContract,
     );
 
     console.log(
@@ -203,11 +219,16 @@ export async function chat(req, res) {
       return;
     }
 
-    // Success: Update project in DB with incremented version
+    // Success: Update project in DB with incremented version and updated contract
     project.files = updatedFiles;
     project.markModified("files");
     project.version += 1;
     project.status = "completed";
+
+    // Commit candidate contract now that generation, validation, and repair succeeded
+    if (candidateContract) {
+      project.requirementContract = candidateContract;
+    }
 
     project.messages.push({
       role: "assistant",
@@ -235,6 +256,7 @@ export async function chat(req, res) {
       applied,
       errors: [],
       aiDescription: result.description,
+      requirementContract: project.requirementContract || null,
     });
   } catch (err) {
     console.error(`[AI Revision Error] ${err.message}`);

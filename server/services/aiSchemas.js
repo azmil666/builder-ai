@@ -186,10 +186,229 @@ export const DesignSpecSchema = z.object({
   signature: z.string().default("Polished micro-interactions and typographic hierarchy"),
 });
 
+// --- Requirement Contract Schemas (Phase 2 Quality Engine V2) ---
+
+export const RequirementIdentitySchema = z.object({
+  name: z.string().default("Generated Project"),
+  category: z.enum([
+    "interactive_app",
+    "saas_landing",
+    "agency_portfolio",
+    "ecommerce",
+    "editorial_blog",
+    "restaurant_hospitality",
+    "developer_tools",
+    "personal_brand",
+    "utility_game",
+    "other",
+  ]).default("saas_landing"),
+  purpose: z.string().default("Web application"),
+  targetAudience: z.string().default("General audience"),
+  intendedUserExperience: z.string().default("Intuitive, responsive, modern digital experience"),
+  mainConversionAction: z.string().default("Explore features and get started"),
+});
+
+export const RequirementSectionSchema = z.object({
+  id: z.string().default("section"),
+  name: z.string().default("Content Section"),
+  order: z.number().default(1),
+  purpose: z.string().default("Presents key content"),
+  requiredContent: z.array(z.string()).default([]),
+  callToAction: z.string().optional().default(""),
+  supportingElements: z.array(z.string()).default([]),
+  priority: z.enum(["mandatory", "optional", "inferred"]).default("mandatory"),
+});
+
+export const RequirementPageSchema = z.object({
+  id: z.string().default("home"),
+  name: z.string().default("Home"),
+  path: z.string().default("/"),
+  viewId: z.string().default("home"),
+  purpose: z.string().default("Main application entry and primary landing"),
+  isPrimary: z.boolean().default(true),
+  order: z.number().default(1),
+  sections: z.array(RequirementSectionSchema).default([]),
+});
+
+export const RequirementNavigationSchema = z.object({
+  type: z.enum(["sticky_header", "floating_island", "minimal_bar", "sidebar", "none"]).default("sticky_header"),
+  primaryItems: z.array(z.string()).default([]),
+  secondaryItems: z.array(z.string()).default([]),
+  callToAction: z.string().optional().default("Get Started"),
+  importantRoutes: z.array(z.string()).default(["/"]),
+  views: z.array(z.string()).default(["home"]),
+});
+
+export const RequirementDesignSchema = z.object({
+  visualStyle: z.string().default("Clean, modern, and accessible"),
+  colorPreferences: z.object({
+    theme: z.enum(["light", "dark", "custom", "adaptive"]).default("light"),
+    primaryAccent: z.string().optional().default(""),
+    explicitPalette: z.array(z.string()).default([]),
+    notes: z.string().default(""),
+    origin: z.enum(["explicit", "inferred", "unspecified"]).default("inferred"),
+  }).default(() => ({
+    theme: "light",
+    primaryAccent: "",
+    explicitPalette: [],
+    notes: "",
+    origin: "inferred",
+  })),
+  typographyDirection: z.object({
+    headingStyle: z.string().default("Modern sans-serif"),
+    bodyStyle: z.string().default("Legible clean sans-serif"),
+    preferredFonts: z.array(z.string()).default([]),
+    origin: z.enum(["explicit", "inferred", "unspecified"]).default("unspecified"),
+  }).default(() => ({
+    headingStyle: "Modern sans-serif",
+    bodyStyle: "Legible clean sans-serif",
+    preferredFonts: [],
+    origin: "unspecified",
+  })),
+  layoutPreferences: z.object({
+    density: z.enum(["compact", "comfortable", "spacious"]).default("comfortable"),
+    containerWidth: z.string().default("max-w-7xl"),
+    gridStyle: z.string().default("Responsive multi-column grid"),
+    origin: z.enum(["explicit", "inferred", "unspecified"]).default("inferred"),
+  }).default(() => ({
+    density: "comfortable",
+    containerWidth: "max-w-7xl",
+    gridStyle: "Responsive multi-column grid",
+    origin: "inferred",
+  })),
+  componentStyling: z.object({
+    cardRadius: z.string().default("rounded-2xl"),
+    buttonRadius: z.string().default("rounded-full"),
+    shadows: z.string().default("Subtle elevations with smooth hover transition"),
+    origin: z.enum(["explicit", "inferred", "unspecified"]).default("inferred"),
+  }).default(() => ({
+    cardRadius: "rounded-2xl",
+    buttonRadius: "rounded-full",
+    shadows: "Subtle elevations with smooth hover transition",
+    origin: "inferred",
+  })),
+  spacingAndHierarchy: z.string().default("Generous whitespace with clear visual priority"),
+  imageAndIllustration: z.string().default("High-resolution, topic-relevant photography and vector icons"),
+  animationAndMotion: z.string().default("Subtle entrance reveals and smooth hover micro-interactions"),
+  explicitDesignRequirements: z.array(z.string()).default([]),
+  inferredDesignDecisions: z.array(z.string()).default([]),
+});
+
+export const RequirementFunctionSchema = z.object({
+  id: z.string().default("feature"),
+  name: z.string().default("Interactive Feature"),
+  description: z.string().default("Interactive UI element or functional state"),
+  category: z.enum([
+    "forms_validation",
+    "navigation_routing",
+    "interactive_controls",
+    "search_filtering",
+    "tabs_accordions",
+    "authentication_ui",
+    "ecommerce_cart",
+    "data_display_state",
+    "game_logic",
+    "utility_calculation",
+    "other",
+  ]).default("interactive_controls"),
+  expectedBehavior: z.string().default(""),
+  priority: z.enum(["mandatory", "optional", "inferred"]).default("mandatory"),
+  implementationTarget: z.string().optional().default(""),
+});
+
+export const RequirementResponsiveSchema = z.object({
+  desktop: z.string().default("Full multi-column layout with expanded navigation"),
+  tablet: z.string().default("Adaptive 2-column layout with condensed controls"),
+  mobile: z.string().default("Single column stacked layout with touch-friendly targets and simplified navigation"),
+  importantAdaptations: z.array(z.string()).default([]),
+});
+
+export const RequirementContentSchema = z.object({
+  requiredCopy: z.array(z.string()).default([]),
+  toneOfVoice: z.string().default("Professional, clear, engaging"),
+  imageryRequirements: z.array(z.string()).default([]),
+  iconRequirements: z.array(z.string()).default(["lucide-react inline icons"]),
+  placeholderRestrictions: z.string().default("Avoid generic lorem ipsum; write contextual, realistic content"),
+  userProvidedAssets: z.array(z.string()).default([]),
+});
+
+export const RequirementContractSchema = z.object({
+  identity: RequirementIdentitySchema.default(() => ({
+    name: "Generated Project",
+    category: "saas_landing",
+    purpose: "Web application",
+    targetAudience: "General audience",
+    intendedUserExperience: "Intuitive, responsive, modern digital experience",
+    mainConversionAction: "Explore features and get started",
+  })),
+  navigation: RequirementNavigationSchema.default(() => ({
+    type: "sticky_header",
+    primaryItems: [],
+    secondaryItems: [],
+    callToAction: "Get Started",
+    importantRoutes: ["/"],
+  })),
+  pages: z.array(RequirementPageSchema).default([]),
+  design: RequirementDesignSchema.default(() => ({
+    visualStyle: "Clean, modern, and accessible",
+    colorPreferences: {
+      theme: "light",
+      primaryAccent: "",
+      explicitPalette: [],
+      notes: "",
+      origin: "inferred",
+    },
+    typographyDirection: {
+      headingStyle: "Modern sans-serif",
+      bodyStyle: "Legible clean sans-serif",
+      preferredFonts: [],
+      origin: "unspecified",
+    },
+    layoutPreferences: {
+      density: "comfortable",
+      containerWidth: "max-w-7xl",
+      gridStyle: "Responsive multi-column grid",
+      origin: "inferred",
+    },
+    componentStyling: {
+      cardRadius: "rounded-2xl",
+      buttonRadius: "rounded-full",
+      shadows: "Subtle elevations with smooth hover transition",
+      origin: "inferred",
+    },
+    spacingAndHierarchy: "Generous whitespace with clear visual priority",
+    imageAndIllustration: "High-resolution, topic-relevant photography and vector icons",
+    animationAndMotion: "Subtle entrance reveals and smooth hover micro-interactions",
+    explicitDesignRequirements: [],
+    inferredDesignDecisions: [],
+  })),
+  functionalRequirements: z.array(RequirementFunctionSchema).default([]),
+  responsive: RequirementResponsiveSchema.default(() => ({
+    desktop: "Full multi-column layout with expanded navigation",
+    tablet: "Adaptive 2-column layout with condensed controls",
+    mobile: "Single column stacked layout with touch-friendly targets and simplified navigation",
+    importantAdaptations: [],
+  })),
+  content: RequirementContentSchema.default(() => ({
+    requiredCopy: [],
+    toneOfVoice: "Professional, clear, engaging",
+    imageryRequirements: [],
+    iconRequirements: ["lucide-react inline icons"],
+    placeholderRestrictions: "Avoid generic lorem ipsum; write contextual, realistic content",
+    userProvidedAssets: [],
+  })),
+
+  // Prioritization buckets for immediate machine decision-making
+  mandatoryRequirements: z.array(z.string()).default([]),
+  optionalEnhancements: z.array(z.string()).default([]),
+  inferredRequirements: z.array(z.string()).default([]),
+});
+
 export const GenerationResultSchema = z.object({
     files: z.record(z.string(),  z.string()),
     description: z.string().default('Generated project'),
     designSpec: DesignSpecSchema.optional(),
+    requirementContract: RequirementContractSchema.optional(),
 });
 
 export const FileOpSchema = z.object({

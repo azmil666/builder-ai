@@ -182,6 +182,17 @@ export function AppContextProvider({children}){
         }
       });
 
+      eventSource.addEventListener("requirement_contract", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev ? { ...prev, requirementContract: data.requirementContract } : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse requirement_contract SSE event:", err);
+        }
+      });
+
       eventSource.addEventListener("design_spec", (e) => {
         try {
           const data = JSON.parse(e.data);
@@ -300,6 +311,7 @@ export function AppContextProvider({children}){
                   version: data.version || prev.version || 1,
                   name: data.name || prev.name,
                   designSpec: data.designSpec || prev.designSpec,
+                  requirementContract: data.requirementContract || prev.requirementContract,
                   visualVerification: data.visualVerification || prev.visualVerification,
                 }
               : prev,

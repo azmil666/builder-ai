@@ -17,6 +17,7 @@ import {
   FilePlanSchema,
   DesignSpecSchema,
   RevisionResultSchema,
+  RequirementContractSchema,
 } from '../services/aiSchemas.js';
 import { sanitizeError } from '../controllers/projectController.js';
 
@@ -88,6 +89,7 @@ describe('Gemini API Provider & Integration Suite', () => {
         { name: 'FilePlanSchema', schema: FilePlanSchema },
         { name: 'DesignSpecSchema', schema: DesignSpecSchema },
         { name: 'RevisionResultSchema', schema: RevisionResultSchema },
+        { name: 'RequirementContractSchema', schema: RequirementContractSchema },
       ];
 
       for (const { name, schema } of schemas) {

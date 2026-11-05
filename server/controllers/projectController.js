@@ -61,6 +61,7 @@ export async function createProject(req, res) {
     currentFile: null,
     CurrentFile: null,
     designSpec: null,
+    requirementContract: null,
     error: null,
   });
 
@@ -84,6 +85,7 @@ export async function createProject(req, res) {
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
+    requirementContract: project.requirementContract || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -95,6 +97,24 @@ async function runBackgroundGeneration(projectId, prompt) {
   try {
     console.log(`[Background AI] Starting generation for project ${projectId}`);
     const result = await generateProject(prompt, {
+      onRequirementContract: async (contract) => {
+        console.log(
+          `[Background AI] Requirement Contract established for project ${projectId}: category="${contract.identity?.category}", mandatory=${contract.mandatoryRequirements?.length}`,
+        );
+        await Project.findByIdAndUpdate(projectId, {
+          requirementContract: contract,
+          $push: {
+            messages: {
+              role: "assistant",
+              content: `Requirement contract established: **${contract.identity?.name || "Project"}** (${contract.identity?.category || "general"}) with ${contract.mandatoryRequirements?.length || 0} mandatory requirement(s).`,
+              timestamp: new Date(),
+            },
+          },
+        });
+        emitProjectEvent(projectId, "requirement_contract", {
+          requirementContract: contract,
+        });
+      },
       onDesignSpec: async (spec) => {
         console.log(
           `[Background AI] DesignSpec established for project ${projectId}: archetype="${spec.archetype}", aesthetic="${spec.aestheticDirection}"`,
@@ -231,6 +251,9 @@ async function runBackgroundGeneration(projectId, prompt) {
       }
       if (result.designSpec) {
         project.designSpec = result.designSpec;
+      }
+      if (result.requirementContract) {
+        project.requirementContract = result.requirementContract;
       }
 
       // Enter Visual Verification stage
@@ -420,6 +443,7 @@ export async function getProject(req, res) {
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
+    requirementContract: project.requirementContract || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -617,6 +641,7 @@ export async function streamProjectProgress(req, res) {
     name: project.name,
     version: project.version,
     designSpec: project.designSpec,
+    requirementContract: project.requirementContract || null,
     visualVerification: project.visualVerification || null,
     filesPlanned: project.filesPlanned || [],
     filesGenerated: project.filesGenerated || [],
