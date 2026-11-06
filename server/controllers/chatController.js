@@ -6,6 +6,7 @@ import { validateProject, verifyProjectRuntime } from "../services/codeValidator
 import { updateRequirementContractOnRevision } from "../services/requirementContract.js";
 import { verifyProjectRequirements } from "../services/requirementVerification.js";
 import { runEvidenceDrivenSelfRepairLoop } from "../services/selfRepair.js";
+import { emitProjectEvent } from "../services/projectEvents.js";
 
 export function buildManifest(files) {
   const manifest = [];
@@ -55,6 +56,12 @@ export async function chat(req, res) {
     timestamp: new Date(),
   });
   await project.save();
+
+  emitProjectEvent(project._id, "revising", {
+    status: "revising",
+    prompt,
+    version: project.version,
+  });
 
   try {
     // Build compact manifest (path + hash + size) instead of sending all code
@@ -213,6 +220,12 @@ export async function chat(req, res) {
       });
       await project.save();
 
+      emitProjectEvent(project._id, "revision_failed", {
+        status: "completed",
+        error: failureReason,
+        version: project.version,
+      });
+
       res.status(422).json({
         error: `Revision failed: ${failureReason}`,
         applied: [],
@@ -279,6 +292,15 @@ export async function chat(req, res) {
 
     await project.save();
 
+    emitProjectEvent(project._id, "completed", {
+      status: "completed",
+      version: project.version,
+      name: project.name,
+      applied,
+      requirementContract: project.requirementContract || null,
+      requirementVerification: project.requirementVerification || null,
+    });
+
     // Return updated project
     const filesObj = {};
 
@@ -306,6 +328,11 @@ export async function chat(req, res) {
     try {
       project.status = "completed";
       await project.save();
+      emitProjectEvent(project._id, "revision_failed", {
+        status: "completed",
+        error: err.message || "Failed to process revision request",
+        version: project.version,
+      });
     } catch (saveErr) {
       console.error(`[AI Revision Save Error] ${saveErr.message}`);
     }

@@ -729,12 +729,24 @@ export async function streamProjectProgress(req, res) {
       clearInterval(heartbeatTimer);
     }
   }, 15000);
+  if (typeof heartbeatTimer?.unref === "function") {
+    heartbeatTimer.unref();
+  }
 
-  // 5. Clean up on connection close
-  req.on("close", () => {
+  // 5. Clean up on connection close or stream termination
+  let isCleanedUp = false;
+  const cleanup = () => {
+    if (isCleanedUp) return;
+    isCleanedUp = true;
     clearInterval(heartbeatTimer);
     unsubscribe();
-  });
+  };
+
+  if (typeof req.on === "function") req.on("close", cleanup);
+  if (typeof res.on === "function") {
+    res.on("close", cleanup);
+    res.on("finish", cleanup);
+  }
 }
 
 // GET /api/projects/:id/qa

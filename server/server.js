@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectToDatabase } from "./config/db.js";
 import { Project } from "./models/Project.js";
+import { recoverOrphanedProjects } from "./services/recoveryService.js";
 import authRouter from "./routes/authRoutes.js";
 import projectRouter from "./routes/projectRoutes.js";
 
@@ -19,22 +20,7 @@ await connectToDatabase();
 
 // Clean up orphaned in-flight projects left behind if server restarted
 try {
-  const result = await Project.updateMany(
-    { status: { $in: ["pending", "generating", "validating", "repairing"] } },
-    {
-      $set: {
-        status: "failed",
-        error: "Generation was interrupted by a server restart. Please try again.",
-      },
-      $push: {
-        messages: {
-          role: "assistant",
-          content: "❌ Generation was interrupted by a server restart. Please try creating or regenerating the project.",
-          timestamp: new Date(),
-        },
-      },
-    }
-  );
+  const result = await recoverOrphanedProjects(Project);
   if (result.modifiedCount > 0) {
     console.log(`[Startup] Marked ${result.modifiedCount} orphaned project(s) as failed.`);
   }
