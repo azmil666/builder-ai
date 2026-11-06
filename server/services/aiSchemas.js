@@ -404,11 +404,72 @@ export const RequirementContractSchema = z.object({
   inferredRequirements: z.array(z.string()).default([]),
 });
 
+// --- Requirement Verification Schemas (Phase 3 Quality Engine V2) ---
+
+export const RequirementVerificationStatusSchema = z.enum(["PASS", "PARTIAL", "FAIL", "UNVERIFIABLE"]);
+
+export const RequirementVerificationItemSchema = z.object({
+  requirementId: z.string(),
+  requirementText: z.string(),
+  requirementType: z.enum([
+    "page_view",
+    "section",
+    "functional",
+    "design",
+    "responsive",
+    "mandatory",
+    "content",
+    "navigation",
+    "consistency",
+    "other",
+  ]),
+  priority: z.enum(["mandatory", "optional", "inferred"]).default("mandatory"),
+  status: RequirementVerificationStatusSchema,
+  confidence: z.number().min(0).max(1).default(1),
+  evidence: z.array(z.string()).default([]),
+  missingEvidence: z.array(z.string()).default([]),
+  explanation: z.string().default(""),
+  affectedFiles: z.array(z.string()).default([]),
+  recommendedAction: z.string().default(""),
+  source: z.enum(["deterministic_static", "ai_assisted", "infrastructure_fallback"]).default("deterministic_static"),
+});
+
+export const RequirementVerificationSummarySchema = z.object({
+  totalRequirements: z.number().default(0),
+  passed: z.number().default(0),
+  partial: z.number().default(0),
+  failed: z.number().default(0),
+  unverifiable: z.number().default(0),
+  mandatoryPassed: z.number().default(0),
+  mandatoryFailed: z.number().default(0),
+  mandatoryUnverifiable: z.number().default(0),
+  overallStatus: z.enum(["VERIFIED", "PARTIAL", "FAILED", "UNVERIFIABLE"]).default("VERIFIED"),
+  verificationWarnings: z.array(z.string()).default([]),
+  requirements: z.array(RequirementVerificationItemSchema).default([]),
+  evaluatedAt: z.string().optional(),
+  diagnosticLimitations: z.string().optional(),
+});
+
+export const AiVerificationBatchSchema = z.object({
+  evaluations: z.array(
+    z.object({
+      requirementId: z.string(),
+      status: RequirementVerificationStatusSchema,
+      confidence: z.number().min(0).max(1).default(0.8),
+      evidence: z.array(z.string()).default([]),
+      missingEvidence: z.array(z.string()).default([]),
+      explanation: z.string().default(""),
+      recommendedAction: z.string().default(""),
+    })
+  ),
+});
+
 export const GenerationResultSchema = z.object({
     files: z.record(z.string(),  z.string()),
     description: z.string().default('Generated project'),
     designSpec: DesignSpecSchema.optional(),
     requirementContract: RequirementContractSchema.optional(),
+    requirementVerification: RequirementVerificationSummarySchema.optional(),
 });
 
 export const FileOpSchema = z.object({

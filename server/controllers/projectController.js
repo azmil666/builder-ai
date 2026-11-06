@@ -62,6 +62,7 @@ export async function createProject(req, res) {
     CurrentFile: null,
     designSpec: null,
     requirementContract: null,
+    requirementVerification: null,
     error: null,
   });
 
@@ -86,6 +87,7 @@ export async function createProject(req, res) {
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
     requirementContract: project.requirementContract || null,
+    requirementVerification: project.requirementVerification || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -239,6 +241,14 @@ async function runBackgroundGeneration(projectId, prompt) {
           errors,
         });
       },
+      onRequirementVerification: async (verification) => {
+        console.log(
+          `[Background AI] Requirement verification completed for project ${projectId}: overallStatus=${verification.overallStatus}, passed=${verification.passed}/${verification.totalRequirements}`,
+        );
+        emitProjectEvent(projectId, "requirement_verification", {
+          requirementVerification: verification,
+        });
+      },
     });
 
     console.log(`[Background AI] Successfully generated project ${projectId}`);
@@ -254,6 +264,9 @@ async function runBackgroundGeneration(projectId, prompt) {
       }
       if (result.requirementContract) {
         project.requirementContract = result.requirementContract;
+      }
+      if (result.requirementVerification) {
+        project.requirementVerification = result.requirementVerification;
       }
 
       // Enter Visual Verification stage
@@ -444,6 +457,7 @@ export async function getProject(req, res) {
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
     requirementContract: project.requirementContract || null,
+    requirementVerification: project.requirementVerification || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -642,6 +656,7 @@ export async function streamProjectProgress(req, res) {
     version: project.version,
     designSpec: project.designSpec,
     requirementContract: project.requirementContract || null,
+    requirementVerification: project.requirementVerification || null,
     visualVerification: project.visualVerification || null,
     filesPlanned: project.filesPlanned || [],
     filesGenerated: project.filesGenerated || [],

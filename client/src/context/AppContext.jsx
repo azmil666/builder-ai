@@ -193,6 +193,17 @@ export function AppContextProvider({children}){
         }
       });
 
+      eventSource.addEventListener("requirement_verification", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev ? { ...prev, requirementVerification: data.requirementVerification } : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse requirement_verification SSE event:", err);
+        }
+      });
+
       eventSource.addEventListener("design_spec", (e) => {
         try {
           const data = JSON.parse(e.data);

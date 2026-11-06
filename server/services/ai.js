@@ -15,6 +15,7 @@ import {
   formatContractForDesignSpec,
   verifyFilePlanAlignment,
 } from './requirementContract.js';
+import { verifyProjectRequirements } from './requirementVerification.js';
 
 // --- AI Provider Resolution & Abstraction ---
 export function getActiveAiProvider() {
@@ -449,6 +450,18 @@ export async function generateProject(prompt, callbacks){
         }
     }
 
+    // Phase 4.5: Evidence-Based Requirement Verification (Phase 3 Quality Engine V2)
+    let requirementVerification = null;
+    try {
+        requirementVerification = await verifyProjectRequirements(files, requirementContract, plan);
+        console.log(`[RequirementVerification] Completed: status=${requirementVerification.overallStatus}, passed=${requirementVerification.passed}/${requirementVerification.totalRequirements}, mandatoryPassed=${requirementVerification.mandatoryPassed}`);
+        if (callbacks?.onRequirementVerification) {
+            await callbacks.onRequirementVerification(requirementVerification);
+        }
+    } catch (verifErr) {
+        console.warn(`[RequirementVerification] Verification failed with error: ${verifErr.message}`);
+    }
+
     // Phase 5: Feature-specific checklist verification informed by Requirement Contract
     const featureChecklist = deriveFeatureChecklist(prompt, designSpec, requirementContract);
     const featureReport = validateFeatureChecklist(files, featureChecklist);
@@ -459,6 +472,7 @@ export async function generateProject(prompt, callbacks){
         description: plan.projectDescription,
         designSpec,
         requirementContract,
+        requirementVerification,
         manifest: plan.manifest,
         featureReport,
     };

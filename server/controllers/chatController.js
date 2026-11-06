@@ -4,6 +4,7 @@ import { reviseProject, regenerateFileForRevision, repairProjectFiles } from "..
 import { applyOperations, hashContent } from "../services/diff.js";
 import { validateProject, verifyProjectRuntime } from "../services/codeValidator.js";
 import { updateRequirementContractOnRevision } from "../services/requirementContract.js";
+import { verifyProjectRequirements } from "../services/requirementVerification.js";
 
 export function buildManifest(files) {
   const manifest = [];
@@ -228,6 +229,15 @@ export async function chat(req, res) {
     // Commit candidate contract now that generation, validation, and repair succeeded
     if (candidateContract) {
       project.requirementContract = candidateContract;
+      try {
+        project.requirementVerification = await verifyProjectRequirements(
+          candidateFilesMap,
+          candidateContract,
+          null
+        );
+      } catch (revVerifErr) {
+        console.warn(`[AI Revision Verification] Could not reverify requirements: ${revVerifErr.message}`);
+      }
     }
 
     project.messages.push({
@@ -257,6 +267,7 @@ export async function chat(req, res) {
       errors: [],
       aiDescription: result.description,
       requirementContract: project.requirementContract || null,
+      requirementVerification: project.requirementVerification || null,
     });
   } catch (err) {
     console.error(`[AI Revision Error] ${err.message}`);
