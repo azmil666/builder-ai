@@ -26,6 +26,9 @@ const ProjectSchema = new Schema({
     currentFile: {type: String, default: null},
     CurrentFile: {type: String, default: null},
     designSpec: {type: Schema.Types.Mixed, default: null},
+    requirementContract: {type: Schema.Types.Mixed, default: null},
+    requirementVerification: {type: Schema.Types.Mixed, default: null},
+    selfRepair: {type: Schema.Types.Mixed, default: null},
     visualVerification: {type: Schema.Types.Mixed, default: null},
     error: {type: String, default: null},
 },{timestamps: true})

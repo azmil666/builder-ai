@@ -1,10 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "../api/api";
 import toast from "react-hot-toast"
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
-
-const AppContext = createContext(undefined);
+import { AppContext } from "./useAppContext.js";
+import { reconcileProjectState } from "../utils/projectReconciliation.js";
 
 export function AppContextProvider({children}){
     
@@ -102,7 +102,7 @@ export function AppContextProvider({children}){
        if (!silent) setLoadingActiveProject(true);
         try {
        const { data } = await api.get(`/api/projects/${id}`);
-       setActiveProject(data);
+       setActiveProject((prev) => reconcileProjectState(prev, data));
        
        //default file selection 
        const files = Object.keys(data.files || {});
@@ -125,19 +125,21 @@ export function AppContextProvider({children}){
         if(!silent) setLoadingActiveProject(false);
     }
     }, [user, navigate]);
+  // Track whether active project is currently in an ongoing generation/revision state
+  const isOngoing = Boolean(
+    activeProject?._id &&
+      (activeProject.status === "generating" ||
+        activeProject.status === "pending" ||
+        activeProject.status === "validating" ||
+        activeProject.status === "repairing" ||
+        activeProject.status === "revising" ||
+        activeProject.status === "visual_verifying")
+  );
+
   // Stream progress using Server-Sent Events (SSE) with resilient polling fallback
   useEffect(() => {
     const projectId = activeProject?._id;
-    const status = activeProject?.status;
-    if (!projectId || !user) {
-      setChatLoading(false);
-      return;
-    }
-
-    const isOngoing =
-      status === "generating" || status === "pending" || status === "validating" || status === "repairing" || status === "revising" || status === "visual_verifying";
-
-    if (!isOngoing) {
+    if (!projectId || !user || !isOngoing) {
       setChatLoading(false);
       return;
     }
@@ -147,16 +149,36 @@ export function AppContextProvider({children}){
     let eventSource = null;
     let fallbackInterval = null;
     let sseFailed = false;
+    let pollCount = 0;
+    const MAX_POLLS = 60; // 3 minutes maximum
+    let isPolling = false;
 
     // Start fallback polling if SSE fails or is unsupported
     const startFallbackPolling = () => {
       if (fallbackInterval) return;
       fallbackInterval = setInterval(async () => {
-        const proj = await loadProject(projectId, true);
-        if (proj && (proj.status === "completed" || proj.status === "failed")) {
+        if (isPolling) return; // Prevent overlapping requests
+        pollCount++;
+        if (pollCount > MAX_POLLS) {
           clearInterval(fallbackInterval);
           fallbackInterval = null;
           setChatLoading(false);
+          console.warn("[Polling] Max poll attempts reached without terminal state.");
+          return;
+        }
+
+        isPolling = true;
+        try {
+          const proj = await loadProject(projectId, true);
+          if (proj && (proj.status === "completed" || proj.status === "failed")) {
+            clearInterval(fallbackInterval);
+            fallbackInterval = null;
+            setChatLoading(false);
+          }
+        } catch (pollErr) {
+          console.warn("[Polling] Poll request error:", pollErr);
+        } finally {
+          isPolling = false;
         }
       }, 3000);
     };
@@ -174,12 +196,47 @@ export function AppContextProvider({children}){
       const streamUrl = `${baseUrl}/api/projects/${projectId}/stream`;
       eventSource = new EventSource(streamUrl, { withCredentials: true });
 
+      const stopFallbackPolling = () => {
+        if (fallbackInterval) {
+          clearInterval(fallbackInterval);
+          fallbackInterval = null;
+        }
+        sseFailed = false;
+      };
+
+      eventSource.onopen = () => {
+        stopFallbackPolling();
+      };
+
       eventSource.addEventListener("initial_state", (e) => {
+        stopFallbackPolling();
         try {
           const data = JSON.parse(e.data);
           setActiveProject((prev) => (prev ? { ...prev, ...data } : prev));
         } catch (err) {
           console.error("Failed to parse initial_state SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("requirement_contract", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev ? { ...prev, requirementContract: data.requirementContract } : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse requirement_contract SSE event:", err);
+        }
+      });
+
+      eventSource.addEventListener("requirement_verification", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev ? { ...prev, requirementVerification: data.requirementVerification } : prev,
+          );
+        } catch (err) {
+          console.error("Failed to parse requirement_verification SSE event:", err);
         }
       });
 
@@ -272,6 +329,38 @@ export function AppContextProvider({children}){
         }
       });
 
+      // Self-Repair Loop Events (Phase 4 Generation Quality Engine V2)
+      const selfRepairEventNames = [
+        "repair_started",
+        "repair_plan_created",
+        "repair_attempt_started",
+        "repair_attempt_failed",
+        "repair_candidate_verified",
+        "repair_completed",
+        "repair_exhausted",
+      ];
+      for (const evtName of selfRepairEventNames) {
+        eventSource.addEventListener(evtName, (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            setActiveProject((prev) => {
+              if (!prev) return prev;
+              const currentSelfRepair = prev.selfRepair || {};
+              return {
+                ...prev,
+                selfRepair: {
+                  ...currentSelfRepair,
+                  lastEvent: evtName,
+                  ...data,
+                },
+              };
+            });
+          } catch (err) {
+            console.error(`Failed to parse ${evtName} SSE event:`, err);
+          }
+        });
+      }
+
       eventSource.addEventListener("visual_verifying", (e) => {
         try {
           const data = JSON.parse(e.data);
@@ -301,6 +390,7 @@ export function AppContextProvider({children}){
                   version: data.version || prev.version || 1,
                   name: data.name || prev.name,
                   designSpec: data.designSpec || prev.designSpec,
+                  requirementContract: data.requirementContract || prev.requirementContract,
                   visualVerification: data.visualVerification || prev.visualVerification,
                 }
               : prev,
@@ -341,10 +431,9 @@ export function AppContextProvider({children}){
       });
 
       eventSource.onerror = (err) => {
-        console.warn("[SSE] Stream disconnected, falling back to polling:", err);
+        console.warn("[SSE] Stream disconnected or error, activating polling fallback:", err);
         if (!sseFailed) {
           sseFailed = true;
-          eventSource?.close();
           startFallbackPolling();
         }
       };
@@ -361,7 +450,7 @@ export function AppContextProvider({children}){
         clearInterval(fallbackInterval);
       }
     };
-  }, [activeProject?._id, activeProject?.status, loadProject, user]);
+  }, [activeProject?._id, isOngoing, loadProject, user]);
 
     const handleGenerate = useCallback(
         async (prompt) => {
@@ -419,7 +508,7 @@ export function AppContextProvider({children}){
         setChatLoading(false);
       }
     },
-    [activeProject, user],
+    [activeProject, user, loadProject],
   );
 
   const reportVisualVerification = useCallback(
@@ -660,13 +749,4 @@ export function AppContextProvider({children}){
         {children}
        </AppContext.Provider> 
     )
-}
-
-export function useAppContext(){
-    const context = useContext(AppContext);
-    if(context === undefined){
-        throw new Error("useAppContext must be used within an AppContextProvider");
-
-    }
-    return context;
 } 

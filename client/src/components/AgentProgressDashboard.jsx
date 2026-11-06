@@ -5,7 +5,7 @@ import {
   Loader2Icon,
   ShieldCheckIcon,
 } from "lucide-react";
-import { useAppContext } from "../context/AppContext";
+import { useAppContext } from "../context/useAppContext";
 import VisualVerificationRunner from "./VisualVerificationRunner";
 
 export default function AgentProgressDashboard({ project }) {

@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import mongoose from 'mongoose';
 import {
@@ -6,12 +6,28 @@ import {
   evaluateViewportRender,
   aggregateVisualVerificationResults,
   buildVisualRepairContext,
+  performTargetedVisualRepair,
   runVisualVerificationLoop,
 } from '../services/visualQa.js';
 import { handleVisualVerification } from '../controllers/projectController.js';
 import { Project } from '../models/Project.js';
+import { setAiGeneratorOverride, resetAiGeneratorOverride } from '../services/ai.js';
 
 describe('Post-Generation Visual Verification Render-and-Fix Loop Suite', () => {
+  beforeEach(() => {
+    // Provide a deterministic mock AI generator to prevent real network calls during tests
+    setAiGeneratorOverride(async ({ prompt }) => {
+      return {
+        object: {
+          code: 'export default function Nav() { return <div className="w-full max-w-5xl mx-auto px-4 flex">Logo</div>; }',
+        },
+      };
+    });
+  });
+
+  afterEach(() => {
+    resetAiGeneratorOverride();
+  });
   describe('1. Viewport Standards & Structured Issue Evaluation', () => {
     it('verifies standard viewport requirements: desktop (1440x900) and mobile (375x812)', () => {
       assert.strictEqual(VERIFICATION_VIEWPORTS.length, 2);
@@ -219,6 +235,69 @@ describe('Post-Generation Visual Verification Render-and-Fix Loop Suite', () => 
     });
   });
 
+  describe('3b. Targeted Visual Repair Function Tests', () => {
+    it('performs targeted repair on candidate files and returns repaired files', async () => {
+      const files = {
+        '/App.js': 'import Header from "./components/Header"; export default function App() { return <Header />; }',
+        '/components/Header.js': 'export default function Header() { return <div className="w-[900px]">Header</div>; }',
+      };
+      const issues = [
+        {
+          type: 'overflow',
+          viewport: { name: 'mobile', width: 375, height: 812 },
+          message: 'overflow detected',
+        },
+      ];
+
+      const res = await performTargetedVisualRepair({
+        files,
+        allPlannedFiles: [{ path: '/App.js' }, { path: '/components/Header.js' }],
+        issues,
+        prompt: 'Fix header',
+        aiGenerator: async () => ({
+          object: {
+            code: 'export default function Header() { return <div className="w-full max-w-5xl mx-auto px-4">Header</div>; }',
+          },
+        }),
+      });
+
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.reverted, false);
+      assert.ok(res.files['/components/Header.js'].includes('max-w-5xl'));
+      assert.strictEqual(res.repairLogs[0].success, true);
+    });
+
+    it('reverts to original files when repaired file fails project validation', async () => {
+      const files = {
+        '/App.js': 'import Header from "./components/Header"; export default function App() { return <Header />; }',
+        '/components/Header.js': 'export default function Header() { return <div className="w-[900px]">Header</div>; }',
+      };
+      const issues = [
+        {
+          type: 'overflow',
+          viewport: { name: 'mobile', width: 375, height: 812 },
+          message: 'overflow detected',
+        },
+      ];
+
+      const res = await performTargetedVisualRepair({
+        files,
+        allPlannedFiles: [{ path: '/App.js' }, { path: '/components/Header.js' }],
+        issues,
+        prompt: 'Fix header',
+        aiGenerator: async () => ({
+          object: {
+            code: 'import NonExistent from "./NonExistent"; export default function Header() { return <div />; }',
+          },
+        }),
+      });
+
+      assert.strictEqual(res.success, false);
+      assert.strictEqual(res.reverted, true);
+      assert.strictEqual(res.files['/components/Header.js'], files['/components/Header.js']);
+    });
+  });
+
   describe('4. Full Render-and-Fix Loop Simulation', () => {
     it('Scenario A: Verified on initial render when all viewports pass without defect', async () => {
       const files = {
@@ -284,10 +363,9 @@ describe('Post-Generation Visual Verification Render-and-Fix Loop Suite', () => 
       assert.strictEqual(repairAttemptCount, 1, 'Exactly 1 repair attempt must be made');
       assert.ok(renderPass >= 3, 'Both initial and re-verification viewports must be rendered');
       assert.ok(loopResult.visualVerification.repairAttempted, 'Repair must have been attempted');
-      assert.ok(
-        loopResult.status === 'repaired' || loopResult.status === 'unresolved',
-        'Outcome must be either repaired or unresolved',
-      );
+      assert.strictEqual(loopResult.status, 'repaired', 'Defect was fixed by mock AI, status must be repaired');
+      assert.strictEqual(loopResult.visualVerification.status, 'repaired');
+      assert.ok(loopResult.files['/components/Nav.js'].includes('max-w-5xl'));
     });
 
     it('Scenario B2: Repair success verified when targeted repair fixes overflow', async () => {
@@ -415,6 +493,34 @@ describe('Post-Generation Visual Verification Render-and-Fix Loop Suite', () => 
 
       assert.strictEqual(loopResult.status, 'skipped');
       assert.strictEqual(loopResult.visualVerification.status, 'skipped');
+    });
+
+    it('Scenario F: Unresolved when targeted AI repair throws an error (handled safely without crash)', async () => {
+      setAiGeneratorOverride(async () => {
+        throw new Error('Simulated model rate limit or timeout during repair');
+      });
+
+      const originalFiles = {
+        '/App.js': 'import Nav from "./components/Nav"; export default function App() { return <Nav />; }',
+        '/components/Nav.js': 'export default function Nav() { return <div className="w-[800px]">Logo</div>; }',
+      };
+
+      const loopResult = await runVisualVerificationLoop({
+        files: originalFiles,
+        prompt: 'Create landing page',
+        allPlannedFiles: [{ path: '/App.js' }, { path: '/components/Nav.js' }],
+        renderViewportFn: async ({ viewport }) => {
+          if (viewport.name === 'mobile') {
+            return { metrics: { scrollWidth: 800, clientWidth: 375 }, errors: [] };
+          }
+          return { metrics: { scrollWidth: 1440, clientWidth: 1440 }, errors: [] };
+        },
+      });
+
+      assert.strictEqual(loopResult.status, 'unresolved');
+      assert.strictEqual(loopResult.visualVerification.status, 'unresolved');
+      assert.strictEqual(loopResult.visualVerification.repairAttempted, true);
+      assert.ok(loopResult.files['/components/Nav.js']);
     });
   });
 

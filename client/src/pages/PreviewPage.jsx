@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Loading from "../components/Loading";
 import FullPagePreview from "../components/FullPagePreview";
-import { useAppContext } from "../context/AppContext";
+import { useAppContext } from "../context/useAppContext";
 
 const PreviewPage = () => {
   const { id } = useParams();

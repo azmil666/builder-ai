@@ -50,3 +50,13 @@ export function subscribeProjectEvents(projectId, listener) {
   };
 }
 
+/**
+ * Returns the current active subscriber count for a project channel.
+ */
+export function getProjectSubscriberCount(projectId) {
+  if (!projectId) return 0;
+  const channel = `project:${projectId.toString()}`;
+  return projectEventBus.listenerCount(channel);
+}
+
+

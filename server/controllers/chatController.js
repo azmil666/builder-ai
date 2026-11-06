@@ -3,6 +3,10 @@ import { Project } from "../models/Project.js";
 import { reviseProject, regenerateFileForRevision, repairProjectFiles } from "../services/ai.js";
 import { applyOperations, hashContent } from "../services/diff.js";
 import { validateProject, verifyProjectRuntime } from "../services/codeValidator.js";
+import { updateRequirementContractOnRevision } from "../services/requirementContract.js";
+import { verifyProjectRequirements } from "../services/requirementVerification.js";
+import { runEvidenceDrivenSelfRepairLoop } from "../services/selfRepair.js";
+import { emitProjectEvent } from "../services/projectEvents.js";
 
 export function buildManifest(files) {
   const manifest = [];
@@ -53,6 +57,12 @@ export async function chat(req, res) {
   });
   await project.save();
 
+  emitProjectEvent(project._id, "revising", {
+    status: "revising",
+    prompt,
+    version: project.version,
+  });
+
   try {
     // Build compact manifest (path + hash + size) instead of sending all code
     const manifest = buildManifest(project.files);
@@ -69,18 +79,33 @@ export async function chat(req, res) {
       content: m.content,
     }));
 
+    // Stage candidate requirement contract in memory BEFORE revision generation
+    // so the AI receives the updated requirements reflecting the user's latest revision instruction.
+    // The database contract remains untouched until revision and validation succeed.
+    let candidateContract = project.requirementContract;
+    try {
+      candidateContract = updateRequirementContractOnRevision(
+        project.requirementContract,
+        prompt,
+        project.designSpec,
+      );
+    } catch (contractUpdateErr) {
+      console.warn(`[AI Revision Candidate Contract] Failed to update candidate contract (${contractUpdateErr.message}). Retaining existing.`);
+    }
+
     console.log(
       `[AI] Revising project ${project._id}: "${prompt.slice(0, 80)}..." ` +
         `(${manifest.length} files, manifest ~${JSON.stringify(manifest).length} chars)`,
     );
 
-    // Call AI with manifest + relevant files + designSpec
+    // Call AI with manifest + relevant files + designSpec + candidateContract
     const result = await reviseProject(
       prompt,
       manifest,
       relevantFiles,
       recentMessages,
       project.designSpec,
+      candidateContract,
     );
 
     console.log(
@@ -195,6 +220,12 @@ export async function chat(req, res) {
       });
       await project.save();
 
+      emitProjectEvent(project._id, "revision_failed", {
+        status: "completed",
+        error: failureReason,
+        version: project.version,
+      });
+
       res.status(422).json({
         error: `Revision failed: ${failureReason}`,
         applied: [],
@@ -203,11 +234,55 @@ export async function chat(req, res) {
       return;
     }
 
-    // Success: Update project in DB with incremented version
+    // Success: Update project in DB with incremented version and updated contract
     project.files = updatedFiles;
     project.markModified("files");
     project.version += 1;
     project.status = "completed";
+
+    // Commit candidate contract now that generation, validation, and repair succeeded
+    let selfRepairReport = null;
+    if (candidateContract) {
+      project.requirementContract = candidateContract;
+      try {
+        let revVerification = await verifyProjectRequirements(
+          candidateFilesMap,
+          candidateContract,
+          null
+        );
+
+        if (revVerification.mandatoryFailed > 0) {
+          console.log(`[AI Revision] Candidate files failed ${revVerification.mandatoryFailed} mandatory requirement(s). Running self-repair loop...`);
+          const repairLoopResult = await runEvidenceDrivenSelfRepairLoop({
+            files: candidateFilesMap,
+            prompt,
+            requirementContract: candidateContract,
+            designSpec: project.designSpec,
+            filePlan: null,
+            maxAttempts: 2,
+          });
+
+          if (repairLoopResult.success) {
+            for (const [p, code] of Object.entries(repairLoopResult.files)) {
+              if (candidateFilesMap[p] !== code) {
+                updatedFiles[p] = { content: code, hash: hashContent(code) };
+                candidateFilesMap[p] = code;
+                applied.push(`repaired ${p}`);
+              }
+            }
+            revVerification = repairLoopResult.verification;
+          }
+          selfRepairReport = repairLoopResult.report;
+        }
+
+        project.requirementVerification = revVerification;
+        if (selfRepairReport) {
+          project.selfRepair = selfRepairReport;
+        }
+      } catch (revVerifErr) {
+        console.warn(`[AI Revision Verification] Could not reverify requirements: ${revVerifErr.message}`);
+      }
+    }
 
     project.messages.push({
       role: "assistant",
@@ -216,6 +291,15 @@ export async function chat(req, res) {
     });
 
     await project.save();
+
+    emitProjectEvent(project._id, "completed", {
+      status: "completed",
+      version: project.version,
+      name: project.name,
+      applied,
+      requirementContract: project.requirementContract || null,
+      requirementVerification: project.requirementVerification || null,
+    });
 
     // Return updated project
     const filesObj = {};
@@ -235,12 +319,20 @@ export async function chat(req, res) {
       applied,
       errors: [],
       aiDescription: result.description,
+      requirementContract: project.requirementContract || null,
+      requirementVerification: project.requirementVerification || null,
+      selfRepair: project.selfRepair || null,
     });
   } catch (err) {
     console.error(`[AI Revision Error] ${err.message}`);
     try {
       project.status = "completed";
       await project.save();
+      emitProjectEvent(project._id, "revision_failed", {
+        status: "completed",
+        error: err.message || "Failed to process revision request",
+        version: project.version,
+      });
     } catch (saveErr) {
       console.error(`[AI Revision Save Error] ${saveErr.message}`);
     }

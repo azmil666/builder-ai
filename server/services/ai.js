@@ -2,13 +2,21 @@ import "dotenv/config";
 import {createOpenAI} from '@ai-sdk/openai'
 import { generateObject } from 'ai';
 import pMap from "p-map";
-import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema } from './aiSchemas.js';
+import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema, RequirementContractSchema } from './aiSchemas.js';
 import { buildFileCodeSystem, buildFilePlanSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
 import { validateAndFixCode, validateRevisionContent, validateProject, verifyProjectRuntime } from './codeValidator.js';
 import { deriveFeatureChecklist, validateFeatureChecklist } from './featureValidator.js';
 import { generateGeminiObject } from './gemini.js';
 import { loadCraftworkSkill } from './craftworkSkill.js';
+import {
+  generateRequirementContract,
+  createDefaultRequirementContract,
+  formatContractForDesignSpec,
+  verifyFilePlanAlignment,
+} from './requirementContract.js';
+import { verifyProjectRequirements } from './requirementVerification.js';
+import { runEvidenceDrivenSelfRepairLoop } from './selfRepair.js';
 
 // --- AI Provider Resolution & Abstraction ---
 export function getActiveAiProvider() {
@@ -35,12 +43,31 @@ function getModel() {
     return client(modelName);
 }
 
+let _aiGeneratorOverride = null;
+
+/**
+ * Sets a custom structured object generator mock for testing or isolated execution.
+ */
+export function setAiGeneratorOverride(fn) {
+    _aiGeneratorOverride = fn;
+}
+
+/**
+ * Resets any active structured object generator mock.
+ */
+export function resetAiGeneratorOverride() {
+    _aiGeneratorOverride = null;
+}
+
 /**
  * Universal structured object generator.
  * Automatically delegates to Google Gemini API (primary) or OpenRouter (fallback).
  * Preserves { object } return structure across all callers.
  */
 export async function generateStructuredObject({ schema, system, prompt, maxRetries = 2 }) {
+    if (_aiGeneratorOverride) {
+        return _aiGeneratorOverride({ schema, system, prompt, maxRetries });
+    }
     const provider = getActiveAiProvider();
     if (provider === "gemini") {
         return generateGeminiObject({ schema, system, prompt, maxRetries });
@@ -59,8 +86,8 @@ const defaultConcurrency = getActiveAiProvider() === "gemini" ? "2" : "6";
 const MAX_CONCURRENCY = parseInt(process.env.AI_MAX_CONCURRENCY || defaultConcurrency, 10);
 
 // Generate a single file's code
-async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles, designSpec){
-     const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec);
+async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles, designSpec, contract = null){
+     const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec, contract, file);
 
      const userMsg = `Project: ${prompt}\n\nWrite the complete code for: ${file.path}\nPurpose: ${file.description}`;
 
@@ -131,7 +158,8 @@ export async function repairProjectFiles(
     prompt,
     designSpec,
     callbacks = {},
-    maxAttempts = 2
+    maxAttempts = 2,
+    requirementContract = null
 ) {
     let currentFiles = { ...files };
     let currentErrors = [...errors];
@@ -167,7 +195,7 @@ export async function repairProjectFiles(
             const fileErrors = currentErrors.filter((e) => e.file === filePath);
             const errorSummary = fileErrors.map((e) => `- [${e.type.toUpperCase()}] ${e.message}`).join("\n");
             const currentCode = currentFiles[filePath];
-            const system = buildFileCodeSystem(allPlannedFiles, currentFiles, designSpec);
+            const system = buildFileCodeSystem(allPlannedFiles, currentFiles, designSpec, requirementContract, filePath);
 
             const repairPrompt = `Project: ${prompt}\n\nThe file '${filePath}' failed validation with these errors:\n${errorSummary}\n\nCurrent code for ${filePath}:\n\`\`\`javascript\n${currentCode}\n\`\`\`\n\nRepair only the code for '${filePath}'. Fix all syntax, import, export, and contract errors while preserving visual styling, Craftwork design guidance, and DesignSpec tokens. Return the complete corrected code.`;
 
@@ -224,34 +252,50 @@ export async function repairProjectFiles(
     };
 }
 
-// Generate project files: DesignSpec first, then plan, then build files in order with fallback retries
+// Generate project files: RequirementContract first, then DesignSpec, then plan, then build files in order with fallback retries
 export async function generateProject(prompt, callbacks){
     // Ensure runtime Craftwork design guidance is loaded and available
     loadCraftworkSkill();
 
-    // Phase 1: Design Intelligence - Establish visual identity and design tokens
+    // Phase 0: Requirement Intelligence - Establish Structured Requirement Contract
+    console.log(`[AI] Phase 0: Establishing Requirement Contract for: "${prompt.slice(0, 80)}..."`);
+    let requirementContract = null;
+    try {
+        requirementContract = await generateRequirementContract(prompt);
+    } catch (contractErr) {
+        console.warn(`[AI] RequirementContract generation failed: ${contractErr.message}. Using intelligent default.`);
+        requirementContract = createDefaultRequirementContract(prompt);
+    }
+
+    if (callbacks?.onRequirementContract) {
+        await callbacks.onRequirementContract(requirementContract);
+    }
+
+    // Phase 1: Design Intelligence - Establish visual identity and design tokens informed by Contract
     console.log(`[AI] Phase 1: Generating DesignSpec for: "${prompt.slice(0,80)}..."`);
     let designSpec = null;
     try {
+        const contractSpecContext = formatContractForDesignSpec(requirementContract);
+        const specPrompt = `Create a comprehensive, production-grade DesignSpec for: ${prompt}\n\n${contractSpecContext}`;
         const { object: spec } = await generateStructuredObject({
             schema: DesignSpecSchema,
             system: DESIGN_SPEC_SYSTEM,
-            prompt: `Create a comprehensive, production-grade DesignSpec for: ${prompt}`,
+            prompt: specPrompt,
             maxRetries: 2,
         });
         designSpec = spec;
     } catch (err) {
         console.warn(`[AI] DesignSpec generation failed: ${err.message}. Using intelligent default spec.`);
-        designSpec = createDefaultDesignSpec(prompt);
+        designSpec = createDefaultDesignSpec(prompt, requirementContract);
     }
 
     if(callbacks?.onDesignSpec){
         await callbacks.onDesignSpec(designSpec);
     }
 
-    // Phase 2: Technical File Planning informed by DesignSpec
+    // Phase 2: Technical File Planning informed by DesignSpec & RequirementContract
     console.log(`[AI] Phase 2: Planning file structure for: "${prompt.slice(0,80)}..."`);
-    const filePlanSystem = buildFilePlanSystem(designSpec);
+    const filePlanSystem = buildFilePlanSystem(designSpec, requirementContract);
     const { object: plan } = await generateStructuredObject({
         schema: FilePlanSchema,
         system: filePlanSystem,
@@ -277,6 +321,12 @@ export async function generateProject(prompt, callbacks){
         })
     }
 
+    // Consistency Check: Verify FilePlan alignment with Requirement Contract
+    const alignmentCheck = verifyFilePlanAlignment(plan, requirementContract);
+    if (alignmentCheck.warnings && alignmentCheck.warnings.length > 0) {
+        console.log(`[AI Plan Alignment] ${alignmentCheck.warnings.join("; ")}`);
+    }
+
     if(callbacks?.onPlan){
         await callbacks.onPlan(plan)
     }
@@ -291,7 +341,7 @@ export async function generateProject(prompt, callbacks){
             if (callbacks?.onFileStart) {
                 await callbacks.onFileStart(stylesFile.path);
             }
-            const stylesResult = await generateSingleFile(stylesFile, plan.files, prompt, files, designSpec);
+            const stylesResult = await generateSingleFile(stylesFile, plan.files, prompt, files, designSpec, requirementContract);
             files[stylesFile.path] = stylesResult.code;
             if (callbacks?.onFileComplete) {
                 await callbacks.onFileComplete(stylesFile.path, stylesResult.code);
@@ -329,7 +379,7 @@ export async function generateProject(prompt, callbacks){
                         await callbacks.onFileStart(file.path)
                     }
 
-                    const singleResult = await generateSingleFile(file, plan.files, prompt, files, designSpec)
+                    const singleResult = await generateSingleFile(file, plan.files, prompt, files, designSpec, requirementContract)
 
                     if(callbacks?.onFileComplete){
                         await callbacks.onFileComplete(file.path, singleResult.code)
@@ -390,7 +440,8 @@ export async function generateProject(prompt, callbacks){
             prompt,
             designSpec,
             callbacks,
-            2
+            2,
+            requirementContract
         );
 
         files = repairResult.files;
@@ -400,8 +451,46 @@ export async function generateProject(prompt, callbacks){
         }
     }
 
-    // Phase 5: Feature-specific checklist verification
-    const featureChecklist = deriveFeatureChecklist(prompt, designSpec);
+    // Phase 4.5: Evidence-Based Requirement Verification (Phase 3 Quality Engine V2)
+    let requirementVerification = null;
+    try {
+        requirementVerification = await verifyProjectRequirements(files, requirementContract, plan);
+        console.log(`[RequirementVerification] Completed: status=${requirementVerification.overallStatus}, passed=${requirementVerification.passed}/${requirementVerification.totalRequirements}, mandatoryPassed=${requirementVerification.mandatoryPassed}`);
+        if (callbacks?.onRequirementVerification) {
+            await callbacks.onRequirementVerification(requirementVerification);
+        }
+    } catch (verifErr) {
+        console.warn(`[RequirementVerification] Verification failed with error: ${verifErr.message}`);
+    }
+
+    // Phase 4.6: Evidence-Driven Targeted Self-Repair Loop (Phase 4 Quality Engine V2)
+    let selfRepairReport = null;
+    if (requirementVerification && (requirementVerification.mandatoryFailed > 0 || requirementVerification.overallStatus === "FAILED")) {
+        console.log(`[SelfRepair] Mandatory requirements failed (${requirementVerification.mandatoryFailed} failed). Starting targeted self-repair loop...`);
+        try {
+            const repairLoopResult = await runEvidenceDrivenSelfRepairLoop({
+                files,
+                prompt,
+                requirementContract,
+                designSpec,
+                filePlan: plan,
+                callbacks,
+                maxAttempts: 2,
+            });
+            files = repairLoopResult.files;
+            requirementVerification = repairLoopResult.verification;
+            selfRepairReport = repairLoopResult.report;
+
+            if (callbacks?.onRequirementVerification) {
+                await callbacks.onRequirementVerification(requirementVerification);
+            }
+        } catch (repairErr) {
+            console.warn(`[SelfRepair] Self-repair loop encountered error: ${repairErr.message}`);
+        }
+    }
+
+    // Phase 5: Feature-specific checklist verification informed by Requirement Contract
+    const featureChecklist = deriveFeatureChecklist(prompt, designSpec, requirementContract);
     const featureReport = validateFeatureChecklist(files, featureChecklist);
     console.log(`[Validator] Feature checklist verified: score=${featureReport.score}%, allMandatoryPassed=${featureReport.allMandatoryPassed}`);
 
@@ -409,14 +498,27 @@ export async function generateProject(prompt, callbacks){
         files,
         description: plan.projectDescription,
         designSpec,
+        requirementContract,
+        requirementVerification,
+        selfRepair: selfRepairReport,
         manifest: plan.manifest,
         featureReport,
     };
 }
 
-export async function reviseProject(prompt, manifest, relevantFiles, recentMessages, designSpec){
+export async function reviseProject(prompt, manifest, relevantFiles, recentMessages, designSpec, requirementContract = null){
     loadCraftworkSkill();
     const contextParts = [];
+
+    if (requirementContract) {
+        contextParts.push("## Active Requirement Contract (PRESERVE UNLESS EXPLICITLY MODIFIED)");
+        contextParts.push(`- Category: ${requirementContract.identity?.category || "saas_landing"}`);
+        contextParts.push(`- Purpose: ${requirementContract.identity?.purpose || "Web application"}`);
+        if (requirementContract.mandatoryRequirements?.length > 0) {
+            contextParts.push(`- Mandatory Requirements to preserve: ${requirementContract.mandatoryRequirements.join("; ")}`);
+        }
+        contextParts.push("");
+    }
 
     if (designSpec) {
         contextParts.push("## Active Design Specification & Craftwork Guidance (MUST PRESERVE UNLESS EXPLICITLY ASKED TO REDESIGN)");

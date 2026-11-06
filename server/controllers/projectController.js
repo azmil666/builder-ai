@@ -61,6 +61,8 @@ export async function createProject(req, res) {
     currentFile: null,
     CurrentFile: null,
     designSpec: null,
+    requirementContract: null,
+    requirementVerification: null,
     error: null,
   });
 
@@ -84,6 +86,9 @@ export async function createProject(req, res) {
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
+    requirementContract: project.requirementContract || null,
+    requirementVerification: project.requirementVerification || null,
+    selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -95,6 +100,24 @@ async function runBackgroundGeneration(projectId, prompt) {
   try {
     console.log(`[Background AI] Starting generation for project ${projectId}`);
     const result = await generateProject(prompt, {
+      onRequirementContract: async (contract) => {
+        console.log(
+          `[Background AI] Requirement Contract established for project ${projectId}: category="${contract.identity?.category}", mandatory=${contract.mandatoryRequirements?.length}`,
+        );
+        await Project.findByIdAndUpdate(projectId, {
+          requirementContract: contract,
+          $push: {
+            messages: {
+              role: "assistant",
+              content: `Requirement contract established: **${contract.identity?.name || "Project"}** (${contract.identity?.category || "general"}) with ${contract.mandatoryRequirements?.length || 0} mandatory requirement(s).`,
+              timestamp: new Date(),
+            },
+          },
+        });
+        emitProjectEvent(projectId, "requirement_contract", {
+          requirementContract: contract,
+        });
+      },
       onDesignSpec: async (spec) => {
         console.log(
           `[Background AI] DesignSpec established for project ${projectId}: archetype="${spec.archetype}", aesthetic="${spec.aestheticDirection}"`,
@@ -219,6 +242,35 @@ async function runBackgroundGeneration(projectId, prompt) {
           errors,
         });
       },
+      onRequirementVerification: async (verification) => {
+        console.log(
+          `[Background AI] Requirement verification completed for project ${projectId}: overallStatus=${verification.overallStatus}, passed=${verification.passed}/${verification.totalRequirements}`,
+        );
+        emitProjectEvent(projectId, "requirement_verification", {
+          requirementVerification: verification,
+        });
+      },
+      onRepairStarted: async (data) => {
+        emitProjectEvent(projectId, "repair_started", data);
+      },
+      onRepairPlanCreated: async (data) => {
+        emitProjectEvent(projectId, "repair_plan_created", data);
+      },
+      onRepairAttemptStarted: async (data) => {
+        emitProjectEvent(projectId, "repair_attempt_started", data);
+      },
+      onRepairAttemptFailed: async (data) => {
+        emitProjectEvent(projectId, "repair_attempt_failed", data);
+      },
+      onRepairCandidateVerified: async (data) => {
+        emitProjectEvent(projectId, "repair_candidate_verified", data);
+      },
+      onRepairCompleted: async (data) => {
+        emitProjectEvent(projectId, "repair_completed", data);
+      },
+      onRepairExhausted: async (data) => {
+        emitProjectEvent(projectId, "repair_exhausted", data);
+      },
     });
 
     console.log(`[Background AI] Successfully generated project ${projectId}`);
@@ -231,6 +283,15 @@ async function runBackgroundGeneration(projectId, prompt) {
       }
       if (result.designSpec) {
         project.designSpec = result.designSpec;
+      }
+      if (result.requirementContract) {
+        project.requirementContract = result.requirementContract;
+      }
+      if (result.requirementVerification) {
+        project.requirementVerification = result.requirementVerification;
+      }
+      if (result.selfRepair) {
+        project.selfRepair = result.selfRepair;
       }
 
       // Enter Visual Verification stage
@@ -420,6 +481,9 @@ export async function getProject(req, res) {
     filesGenerated: project.filesGenerated,
     currentFile: project.currentFile ?? project.CurrentFile ?? null,
     designSpec: project.designSpec || null,
+    requirementContract: project.requirementContract || null,
+    requirementVerification: project.requirementVerification || null,
+    selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -617,6 +681,9 @@ export async function streamProjectProgress(req, res) {
     name: project.name,
     version: project.version,
     designSpec: project.designSpec,
+    requirementContract: project.requirementContract || null,
+    requirementVerification: project.requirementVerification || null,
+    selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     filesPlanned: project.filesPlanned || [],
     filesGenerated: project.filesGenerated || [],
@@ -662,12 +729,24 @@ export async function streamProjectProgress(req, res) {
       clearInterval(heartbeatTimer);
     }
   }, 15000);
+  if (typeof heartbeatTimer?.unref === "function") {
+    heartbeatTimer.unref();
+  }
 
-  // 5. Clean up on connection close
-  req.on("close", () => {
+  // 5. Clean up on connection close or stream termination
+  let isCleanedUp = false;
+  const cleanup = () => {
+    if (isCleanedUp) return;
+    isCleanedUp = true;
     clearInterval(heartbeatTimer);
     unsubscribe();
-  });
+  };
+
+  if (typeof req.on === "function") req.on("close", cleanup);
+  if (typeof res.on === "function") {
+    res.on("close", cleanup);
+    res.on("finish", cleanup);
+  }
 }
 
 // GET /api/projects/:id/qa

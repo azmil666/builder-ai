@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   SandpackPreview,
   SandpackProvider,
@@ -67,35 +67,46 @@ const OBSERVER_INDEX_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
-function SandpackInspector({ onBundlerStatus, onBundlerError }) {
-  const { sandpack } = useSandpack();
-  const { status, error } = sandpack;
+export function SandpackInspector({ onBundlerStatus, onBundlerError }) {
+  let sandpackContext = null;
+  try {
+    sandpackContext = useSandpack();
+  } catch {
+    sandpackContext = null;
+  }
+
+  const status = sandpackContext?.sandpack?.status;
+  const error = sandpackContext?.sandpack?.error;
 
   useEffect(() => {
-    if (error) {
+    if (error && typeof onBundlerError === 'function') {
       onBundlerError(error);
     }
   }, [error, onBundlerError]);
 
   useEffect(() => {
-    onBundlerStatus(status);
+    if (typeof onBundlerStatus === 'function') {
+      return onBundlerStatus(status);
+    }
   }, [status, onBundlerStatus]);
 
   return null;
 }
 
 export default function VisualVerificationRunner({
-  project,
+  project = {},
   onReport,
   onProgressUpdate,
+  handleBundleVisualVerificationRunner: propHandleBundleVisualVerificationRunner,
 }) {
-  const [activeFiles, setActiveFiles] = useState(project.files || {});
+  const [activeFiles, setActiveFiles] = useState(project?.files || {});
   const [viewportIndex, setViewportIndex] = useState(0);
   const [round, setRound] = useState(1); // 1 = initial, 2 = after repair
   const [collectedResults, setCollectedResults] = useState([]);
   const [activeError, setActiveError] = useState(null);
   const [isVerifying, setIsVerifying] = useState(true);
 
+  const containerRef = useRef(null);
   const currentVp = VERIFY_VIEWPORTS[viewportIndex] || VERIFY_VIEWPORTS[0];
   const activeFilesRef = useRef(activeFiles);
   activeFilesRef.current = activeFiles;
@@ -103,7 +114,7 @@ export default function VisualVerificationRunner({
   // Prepare sandpack files
   const sandpackFiles = useMemo(() => {
     const spFiles = {};
-    for (const [path, content] of Object.entries(activeFiles)) {
+    for (const [path, content] of Object.entries(activeFiles || {})) {
       const code = typeof content === 'string' ? content : content?.content || '';
       spFiles[path] = { code, active: path === '/App.js' };
     }
@@ -116,7 +127,7 @@ export default function VisualVerificationRunner({
   }, [activeFiles]);
 
   const dependencies = useMemo(() => {
-    return detectDependencies(activeFiles);
+    return detectDependencies(activeFiles || {});
   }, [activeFiles]);
 
   const handleViewportCompleteRef = useRef(null);
@@ -126,7 +137,7 @@ export default function VisualVerificationRunner({
     setCollectedResults(updated);
     setActiveError(null);
 
-    if (onProgressUpdate) {
+    if (typeof onProgressUpdate === 'function') {
       onProgressUpdate({
         round,
         completedViewport: viewportEntry.viewport.name,
@@ -144,6 +155,74 @@ export default function VisualVerificationRunner({
   };
 
   handleViewportCompleteRef.current = handleViewportComplete;
+
+  // Helper to dispatch metric collection request into the Sandpack preview iframe
+  const requestMetrics = useCallback(() => {
+    const iframes = containerRef.current?.querySelectorAll('iframe');
+    if (iframes && iframes.length > 0) {
+      iframes.forEach((ifr) => {
+        try {
+          ifr.contentWindow?.postMessage(
+            {
+              type: 'BUILDER_AI_REQUEST_METRICS',
+              viewportName: currentVp.name,
+            },
+            '*',
+          );
+        } catch {
+          // Cross-origin safe ignore
+        }
+      });
+    }
+  }, [currentVp.name]);
+
+  // Bundle status handler: connects Sandpack bundler state to the visual verification flow
+  const handleBundleVisualVerificationRunner = useCallback(
+    (status) => {
+      if (typeof propHandleBundleVisualVerificationRunner === 'function') {
+        return propHandleBundleVisualVerificationRunner(status);
+      }
+
+      if (status === 'idle' || status === 'done') {
+        requestMetrics();
+        const retryTimer = setTimeout(requestMetrics, 350);
+        return () => clearTimeout(retryTimer);
+      }
+    },
+    [propHandleBundleVisualVerificationRunner, requestMetrics],
+  );
+
+  const handleBundlerStatus = handleBundleVisualVerificationRunner;
+
+  // Bundle error handler: records compilation errors and triggers recovery
+  const handleBundlerError = useCallback(
+    (error) => {
+      const errorMsg =
+        error?.message ||
+        (typeof error === 'string' ? error : 'Bundler compilation error');
+      const bundlerErr = {
+        message: errorMsg,
+        file: error?.file || error?.path || null,
+        type: 'compilation',
+      };
+      setActiveError(bundlerErr);
+
+      if (handleViewportCompleteRef.current) {
+        handleViewportCompleteRef.current({
+          viewport: currentVp,
+          metrics: {
+            scrollWidth: currentVp.width,
+            clientWidth: currentVp.width,
+            scrollHeight: currentVp.height,
+            clientHeight: currentVp.height,
+          },
+          errors: [bundlerErr],
+          compilationError: errorMsg,
+        });
+      }
+    },
+    [currentVp],
+  );
 
   // Listen to postMessage from the iframe
   useEffect(() => {
@@ -183,18 +262,25 @@ export default function VisualVerificationRunner({
     const safetyTimer = setTimeout(() => {
       console.warn('[Visual QA] Viewport check safety timeout triggered.');
       setIsVerifying(false);
-      onReport(project._id, {
-        viewportResults: collectedResults,
-        timedOut: true,
-      });
+      if (typeof onReport === 'function') {
+        onReport(project?._id, {
+          viewportResults: collectedResults,
+          timedOut: true,
+        });
+      }
     }, 12000);
 
     return () => clearTimeout(safetyTimer);
-  }, [isVerifying, collectedResults, project._id, onReport]);
+  }, [isVerifying, collectedResults, project?._id, onReport]);
 
   const submitRoundResults = async (roundResults) => {
     try {
-      const response = await onReport(project._id, {
+      if (typeof onReport !== 'function') {
+        setIsVerifying(false);
+        return;
+      }
+
+      const response = await onReport(project?._id, {
         viewportResults: roundResults,
       });
 
@@ -216,6 +302,7 @@ export default function VisualVerificationRunner({
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: 'fixed',
         top: '-9999px',
@@ -242,7 +329,7 @@ export default function VisualVerificationRunner({
         }}
       >
         <SandpackInspector
-          onBundlerStatus={handleBundlerStatus}
+          onBundlerStatus={handleBundleVisualVerificationRunner || handleBundlerStatus}
           onBundlerError={handleBundlerError}
         />
         <div style={{ width: `${currentVp.width}px`, height: `${currentVp.height}px` }}>

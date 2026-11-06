@@ -190,6 +190,15 @@ async function getReactHarness() {
 async function getParser() {
   if (_parserLoaded) return _parseAst;
   try {
+    const directMod = await import("rolldown/dist/parse-ast-index.mjs").catch(() => null);
+    if (directMod && directMod.parseAst) {
+      _parseAst = directMod.parseAst;
+      _parserLoaded = true;
+      return _parseAst;
+    }
+  } catch {}
+
+  try {
     const candidates = [
       path.resolve(process.cwd(), "client/node_modules/rolldown/dist/parse-ast-index.mjs"),
       path.resolve(process.cwd(), "../client/node_modules/rolldown/dist/parse-ast-index.mjs"),
@@ -215,6 +224,15 @@ async function getParser() {
 async function getCompiler() {
   if (_compilerLoaded) return _transformWithOxc;
   try {
+    const directMod = await import("vite").catch(() => null);
+    if (directMod && directMod.transformWithOxc) {
+      _transformWithOxc = directMod.transformWithOxc;
+      _compilerLoaded = true;
+      return _transformWithOxc;
+    }
+  } catch {}
+
+  try {
     const candidates = [
       path.resolve(process.cwd(), "client/node_modules/vite/dist/node/index.js"),
       path.resolve(process.cwd(), "../client/node_modules/vite/dist/node/index.js"),
@@ -239,6 +257,15 @@ async function getCompiler() {
 
 async function getLucideIcons() {
   if (_lucideLoaded) return _lucideIconsSet;
+  try {
+    const directMod = await import("lucide-react").catch(() => null);
+    if (directMod && Object.keys(directMod).length > 20) {
+      _lucideIconsSet = new Set(Object.keys(directMod));
+      _lucideLoaded = true;
+      return _lucideIconsSet;
+    }
+  } catch {}
+
   try {
     const candidates = [
       path.resolve(process.cwd(), "client/node_modules/lucide-react/dist/esm/lucide-react.mjs"),
@@ -388,12 +415,36 @@ export function validateAndFixLucideIcons(code, filePath, options = {}) {
 }
 
 /**
+ * Returns the active readiness status of the server-side parsing and compilation engines.
+ */
+export function getValidationEngineStatus() {
+  return {
+    parserAvailable: Boolean(_parseAst),
+    compilerAvailable: Boolean(_transformWithOxc),
+    lucideAvailable: Boolean(_lucideIconsSet && _lucideIconsSet.size > 50),
+    runtimeAvailable: Boolean(_react && _reactDomServer),
+    rolldownAvailable: Boolean(_rolldown),
+  };
+}
+
+/**
  * Runs real JSX/JS compilation check using Vite transformWithOxc.
+ * Fails explicitly when compiler is unavailable rather than silently degrading.
  */
 export async function compileModuleCode(code, filePath = "file.jsx") {
   const compiler = await compilerPromise;
   if (!compiler) {
-    return { success: true, compiledCode: code, errors: [] };
+    return {
+      success: false,
+      compiledCode: null,
+      errors: [
+        {
+          type: "compilation_unavailable",
+          file: filePath,
+          message: "JSX compilation engine is unavailable in the current runtime environment. Ensure compiler dependencies are accessible.",
+        },
+      ],
+    };
   }
   try {
     // Ensure .jsx extension is used for React JSX files so Oxc enables JSX parsing mode
@@ -434,6 +485,139 @@ export async function parseModuleAst(code, filePath = "file.jsx") {
 function parseModuleAstSync(code, filePath = "file.jsx") {
   if (!_parseAst) return null;
   return _parseAst(code, { lang: "jsx" }, filePath);
+}
+
+export const DEFENSIVE_PROP_DEFAULTS = {
+  storeConfig: 'storeConfig = (typeof STORE_CONFIG !== "undefined" ? STORE_CONFIG : {})',
+  config: 'config = (typeof STORE_CONFIG !== "undefined" ? STORE_CONFIG : typeof config !== "undefined" ? config : {})',
+  cart: "cart = []",
+  products: "products = []",
+  categories: "categories = []",
+  items: "items = []",
+  onClose: "onClose = () => {}",
+  setDarkMode: "setDarkMode = () => {}",
+  onToggleDarkMode: "onToggleDarkMode = () => {}",
+  toggleDarkMode: "toggleDarkMode = () => {}",
+  setIsDarkMode: "setIsDarkMode = () => {}",
+  darkMode: "darkMode = false",
+  isDarkMode: "isDarkMode = false",
+};
+
+/**
+ * AST-aware component parameter transformation:
+ * Safely injects defensive fallback defaults into destructured function props.
+ * Preserves existing default parameters, multiline parameters, and nested destructuring.
+ * Falls back to regex-based transformation if AST parser is unavailable.
+ */
+export function injectDefensivePropDefaultsAST(code, filePath, warnings = []) {
+  if (_parseAst) {
+    try {
+      const ast = _parseAst(code, { lang: "jsx" }, filePath);
+      if (ast && Array.isArray(ast.body)) {
+        const functionNodes = [];
+
+        function collectFunctions(node) {
+          if (!node || typeof node !== "object") return;
+          if (node.type === "FunctionDeclaration") {
+            functionNodes.push({ name: node.id?.name || "Component", params: node.params });
+          } else if (node.type === "VariableDeclaration") {
+            for (const decl of node.declarations || []) {
+              if (decl.init && (decl.init.type === "ArrowFunctionExpression" || decl.init.type === "FunctionExpression")) {
+                functionNodes.push({ name: decl.id?.name || "Component", params: decl.init.params });
+              }
+            }
+          } else if (node.type === "ExportDefaultDeclaration") {
+            if (node.declaration) {
+              if (node.declaration.type === "FunctionDeclaration") {
+                functionNodes.push({ name: node.declaration.id?.name || "default", params: node.declaration.params });
+              } else if (node.declaration.type === "ArrowFunctionExpression" || node.declaration.type === "FunctionExpression") {
+                functionNodes.push({ name: "default", params: node.declaration.params });
+              }
+            }
+          } else if (node.type === "ExportNamedDeclaration" && node.declaration) {
+            collectFunctions(node.declaration);
+          }
+        }
+
+        for (const node of ast.body) {
+          collectFunctions(node);
+        }
+
+        const replacements = [];
+        for (const fn of functionNodes) {
+          const firstParam = fn.params?.[0];
+          if (firstParam && firstParam.type === "ObjectPattern" && Array.isArray(firstParam.properties)) {
+            for (const prop of firstParam.properties) {
+              if (prop.type === "Property" && prop.key && prop.value) {
+                // Only transform bare identifiers that do NOT already have an AssignmentPattern default
+                if (prop.value.type === "Identifier") {
+                  const propName = prop.key.name;
+                  if (DEFENSIVE_PROP_DEFAULTS[propName]) {
+                    replacements.push({
+                      start: prop.start,
+                      end: prop.end,
+                      replacement: DEFENSIVE_PROP_DEFAULTS[propName],
+                      propName,
+                      funcName: fn.name,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (replacements.length > 0) {
+          replacements.sort((a, b) => b.start - a.start);
+          let updated = code;
+          for (const r of replacements) {
+            updated = updated.slice(0, r.start) + r.replacement + updated.slice(r.end);
+            warnings.push(`${filePath}: Added defensive default for prop '${r.propName}' in '${r.funcName}'`);
+          }
+          return updated;
+        }
+        return code;
+      }
+    } catch {
+      // Fall through to regex-based fallback if AST parsing fails
+    }
+  }
+
+  // Regex-based fallback for environments without AST parser
+  let updatedCode = code;
+  updatedCode = updatedCode.replace(
+    /function\s+([A-Za-z0-9_]+)\s*\(\s*\{([^}]+)\}\s*\)/g,
+    (match, funcName, propsBlock) => {
+      const parts = propsBlock.split(",").map((p) => p.trim()).filter(Boolean);
+      const updated = parts.map((part) => {
+        if (part.includes("=")) return part;
+        if (DEFENSIVE_PROP_DEFAULTS[part]) {
+          warnings.push(`${filePath}: Added defensive default for prop '${part}' in '${funcName}'`);
+          return DEFENSIVE_PROP_DEFAULTS[part];
+        }
+        return part;
+      });
+      return `function ${funcName}({ ${updated.join(", ")} })`;
+    }
+  );
+
+  updatedCode = updatedCode.replace(
+    /const\s+([A-Za-z0-9_]+)\s*=\s*\(\s*\{([^}]+)\}\s*\)\s*=>/g,
+    (match, funcName, propsBlock) => {
+      const parts = propsBlock.split(",").map((p) => p.trim()).filter(Boolean);
+      const updated = parts.map((part) => {
+        if (part.includes("=")) return part;
+        if (DEFENSIVE_PROP_DEFAULTS[part]) {
+          warnings.push(`${filePath}: Added defensive default for prop '${part}' in '${funcName}'`);
+          return DEFENSIVE_PROP_DEFAULTS[part];
+        }
+        return part;
+      });
+      return `const ${funcName} = ({ ${updated.join(", ")} }) =>`;
+    }
+  );
+
+  return updatedCode;
 }
 
 /**
@@ -553,134 +737,8 @@ export function validateAndFixCode(code, filePath, context = {}) {
 
   // 8c. Defensive Prop & Configuration Hardening
   if (isJS) {
-    // Provide safe defaults for common props in function parameters if not already assigned
-    code = code.replace(
-      /function\s+([A-Za-z0-9_]+)\s*\(\s*\{([^}]+)\}\s*\)/g,
-      (match, funcName, propsBlock) => {
-        const parts = propsBlock.split(",").map((p) => p.trim()).filter(Boolean);
-        const updated = parts.map((part) => {
-          if (part.includes("=")) return part;
-          if (part === "storeConfig") {
-            warnings.push(`${filePath}: Added defensive default for prop 'storeConfig' in '${funcName}'`);
-            return 'storeConfig = (typeof STORE_CONFIG !== "undefined" ? STORE_CONFIG : {})';
-          }
-          if (part === "config") {
-            warnings.push(`${filePath}: Added defensive default for prop 'config' in '${funcName}'`);
-            return 'config = (typeof STORE_CONFIG !== "undefined" ? STORE_CONFIG : typeof config !== "undefined" ? config : {})';
-          }
-          if (part === "cart") {
-            warnings.push(`${filePath}: Added defensive default 'cart = []' in '${funcName}'`);
-            return "cart = []";
-          }
-          if (part === "products") {
-            warnings.push(`${filePath}: Added defensive default 'products = []' in '${funcName}'`);
-            return "products = []";
-          }
-          if (part === "categories") {
-            warnings.push(`${filePath}: Added defensive default 'categories = []' in '${funcName}'`);
-            return "categories = []";
-          }
-          if (part === "items") {
-            warnings.push(`${filePath}: Added defensive default 'items = []' in '${funcName}'`);
-            return "items = []";
-          }
-          if (part === "onClose") {
-            warnings.push(`${filePath}: Added defensive default 'onClose = () => {}' in '${funcName}'`);
-            return "onClose = () => {}";
-          }
-          if (part === "setDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'setDarkMode = () => {}' in '${funcName}'`);
-            return "setDarkMode = () => {}";
-          }
-          if (part === "onToggleDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'onToggleDarkMode = () => {}' in '${funcName}'`);
-            return "onToggleDarkMode = () => {}";
-          }
-          if (part === "toggleDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'toggleDarkMode = () => {}' in '${funcName}'`);
-            return "toggleDarkMode = () => {}";
-          }
-          if (part === "setIsDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'setIsDarkMode = () => {}' in '${funcName}'`);
-            return "setIsDarkMode = () => {}";
-          }
-          if (part === "darkMode") {
-            warnings.push(`${filePath}: Added defensive default 'darkMode = false' in '${funcName}'`);
-            return "darkMode = false";
-          }
-          if (part === "isDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'isDarkMode = false' in '${funcName}'`);
-            return "isDarkMode = false";
-          }
-          return part;
-        });
-        return `function ${funcName}({ ${updated.join(", ")} })`;
-      }
-    );
-
-    code = code.replace(
-      /const\s+([A-Za-z0-9_]+)\s*=\s*\(\s*\{([^}]+)\}\s*\)\s*=>/g,
-      (match, funcName, propsBlock) => {
-        const parts = propsBlock.split(",").map((p) => p.trim()).filter(Boolean);
-        const updated = parts.map((part) => {
-          if (part.includes("=")) return part;
-          if (part === "storeConfig") {
-            warnings.push(`${filePath}: Added defensive default for prop 'storeConfig' in '${funcName}'`);
-            return 'storeConfig = (typeof STORE_CONFIG !== "undefined" ? STORE_CONFIG : {})';
-          }
-          if (part === "config") {
-            warnings.push(`${filePath}: Added defensive default for prop 'config' in '${funcName}'`);
-            return 'config = (typeof STORE_CONFIG !== "undefined" ? STORE_CONFIG : typeof config !== "undefined" ? config : {})';
-          }
-          if (part === "cart") {
-            warnings.push(`${filePath}: Added defensive default 'cart = []' in '${funcName}'`);
-            return "cart = []";
-          }
-          if (part === "products") {
-            warnings.push(`${filePath}: Added defensive default 'products = []' in '${funcName}'`);
-            return "products = []";
-          }
-          if (part === "categories") {
-            warnings.push(`${filePath}: Added defensive default 'categories = []' in '${funcName}'`);
-            return "categories = []";
-          }
-          if (part === "items") {
-            warnings.push(`${filePath}: Added defensive default 'items = []' in '${funcName}'`);
-            return "items = []";
-          }
-          if (part === "onClose") {
-            warnings.push(`${filePath}: Added defensive default 'onClose = () => {}' in '${funcName}'`);
-            return "onClose = () => {}";
-          }
-          if (part === "setDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'setDarkMode = () => {}' in '${funcName}'`);
-            return "setDarkMode = () => {}";
-          }
-          if (part === "onToggleDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'onToggleDarkMode = () => {}' in '${funcName}'`);
-            return "onToggleDarkMode = () => {}";
-          }
-          if (part === "toggleDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'toggleDarkMode = () => {}' in '${funcName}'`);
-            return "toggleDarkMode = () => {}";
-          }
-          if (part === "setIsDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'setIsDarkMode = () => {}' in '${funcName}'`);
-            return "setIsDarkMode = () => {}";
-          }
-          if (part === "darkMode") {
-            warnings.push(`${filePath}: Added defensive default 'darkMode = false' in '${funcName}'`);
-            return "darkMode = false";
-          }
-          if (part === "isDarkMode") {
-            warnings.push(`${filePath}: Added defensive default 'isDarkMode = false' in '${funcName}'`);
-            return "isDarkMode = false";
-          }
-          return part;
-        });
-        return `const ${funcName} = ({ ${updated.join(", ")} }) =>`;
-      }
-    );
+    // Provide safe defaults for common props in function parameters using AST-aware transformation
+    code = injectDefensivePropDefaultsAST(code, filePath, warnings);
 
     // Safe dereferencing for common nested configuration fields
     if (/\bstoreConfig\.freeShippingThreshold\b/.test(code)) {

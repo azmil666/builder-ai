@@ -11,7 +11,7 @@ import {
   SparklesIcon,
   XIcon,
 } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context/useAppContext';
 import Promptinput from '../components/Promptinput';
 import { curatedPrompts } from '../assets/assets';
 import DashboardHeader from '../components/dashboard/DashboardHeader';

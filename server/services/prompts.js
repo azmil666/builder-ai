@@ -35,7 +35,19 @@ Before planning or writing code, ALWAYS determine the user's intent:
 
 ---
 
-## 2. DESIGN ARCHETYPE & AESTHETIC FREEDOM
+## 2. PREVIEW RUNTIME & REACTIVE VIEW NAVIGATION (Sandpack Compatibility)
+
+Builder AI renders and previews code directly inside a client-side Sandpack container:
+- There is NO backend server or multi-page server router.
+- NEVER use native browser links like \`<a href="/catalog">\` or unconfigured React Router BrowserRouter that triggers 404s or resets the preview.
+- Use a **Single-Page Reactive View Architecture**:
+  * Represent multiple pages or views via state in \`/App.js\` (e.g. \`const [activeView, setActiveView] = useState("home")\` or tab state \`const [activeTab, setActiveTab] = useState(...)\`).
+  * Modal dialogs, slide-over drawers (such as cart drawers, checkout sheets, reservation modals), and view switches must be driven by React state and passed to children as props/callbacks (\`onNavigate\`, \`onOpenCart\`, etc.).
+  * Internal navigation actions should use buttons with state updates (e.g. \`<button onClick={() => setActiveView("catalog")}>\`), never broken full-page reload links.
+
+---
+
+## 3. DESIGN ARCHETYPE & AESTHETIC FREEDOM
 
 NEVER force a generic default template. The visual design must be dictated entirely by the user's requirements and the established DesignSpec:
 
@@ -266,6 +278,34 @@ When a revision asks for dark mode toggle or theme switching:
 PRESERVE DESIGN CONSISTENCY: Keep color tokens, typography, component styling, and layout structure consistent with the project's DesignSpec.
 Be minimal: only touch files that NEED to change.`;
 
+export const REQUIREMENT_CONTRACT_SYSTEM = `You are a Principal Software Architect and Requirements Engineer.
+Your task is to analyze the user's natural-language website request and synthesize a comprehensive, machine-readable Requirement Contract JSON object adhering strictly to RequirementContractSchema.
+
+### REQUIREMENTS ANALYSIS FRAMEWORK:
+1. **Identity & Categorization**:
+   - Determine category ("interactive_app", "ecommerce", "saas_landing", "agency_portfolio", "restaurant_hospitality", "editorial_blog", "developer_tools", "personal_brand", "utility_game", "other").
+   - Clearly define primary purpose, target audience, intended UX, and main conversion action.
+2. **Pages and Navigation (Single-Page Reactive View Architecture)**:
+   - Identify ONLY the required pages or views. The Sandpack preview is a single-page React app.
+   - For each page, provide a unique \`viewId\` (e.g. "home", "catalog", "checkout") and record available views in \`navigation.views\`.
+   - For small apps or games, plan 1 primary page (viewId: "home", path: "/").
+   - Define navigation structure, primary items, secondary items, and CTA.
+3. **Sections and Content**:
+   - For each page, specify ordered sections, their purpose, required content points, and CTAs.
+4. **Design Requirements (Distinguish Explicit vs Inferred)**:
+   - Identify explicit user design requests (e.g. "dark theme", "sneaker brand", specific colors or layout).
+   - Provide brand-aligned design inferences when unspecified.
+   - Never mark an inferred design choice as an explicit user instruction.
+5. **Functional Requirements**:
+   - Capture real interactive behaviors (e.g. form validation, cart state, item filtering, tab toggling).
+   - Only include functionality relevant to the user's domain.
+6. **Prioritization**:
+   - "mandatoryRequirements": Array of essential requested items that MUST NOT be omitted.
+   - "optionalEnhancements": Complementary improvements that enhance UX without overriding mandatory items.
+   - "inferredRequirements": Sensible defaults derived from website category conventions.
+
+Return ONLY valid JSON matching the RequirementContractSchema.`;
+
 export const DESIGN_SPEC_SYSTEM = `You are a Principal Design Systems Architect and Creative Director.
 Your task is to analyze the user's project request and synthesize a world-class, structured DesignSpec JSON object.
 
@@ -306,10 +346,12 @@ ${getCraftworkDesignSpecGuidance()}
 
 Return ONLY valid JSON matching the DesignSpecSchema.`;
 
-export function createDefaultDesignSpec(prompt = "") {
+export function createDefaultDesignSpec(prompt = "", contract = null) {
   const lower = prompt.toLowerCase();
-  const isAppOrGame = /game|calculator|todo|tictactoe|tic tac toe|stopwatch|counter|quiz|weather|unit converter|chess|tracker/.test(lower);
-  const wantsDark = /dark|night|nocturnal|black|cyber|neon|matrix|space|void/.test(lower);
+  const contractCategory = contract?.identity?.category;
+  const contractTheme = contract?.design?.colorPreferences?.theme;
+  const isAppOrGame = contractCategory ? contractCategory === "interactive_app" || contractCategory === "utility_game" : /game|calculator|todo|tictactoe|tic tac toe|stopwatch|counter|quiz|weather|unit converter|chess|tracker/.test(lower);
+  const wantsDark = contractTheme ? contractTheme === "dark" : /dark|night|nocturnal|black|cyber|neon|matrix|space|void/.test(lower);
 
   // 1. Interactive Application / Game / Utility
   if (isAppOrGame) {
@@ -393,7 +435,7 @@ export function createDefaultDesignSpec(prompt = "") {
   }
 
   // 2. Restaurant / Culinary / Hospitality
-  if (/restaurant|cafe|coffee|bistro|dining|culinary|food|bakery|bar|kitchen/.test(lower)) {
+  if (contractCategory === "restaurant_hospitality" || /restaurant|cafe|coffee|bistro|dining|culinary|food|bakery|bar|kitchen/.test(lower)) {
     return {
       purpose: "Atmospheric culinary & dining destination website",
       targetAudience: "Guests seeking memorable culinary dining experiences and reservations",
@@ -642,19 +684,21 @@ export function createDefaultDesignSpec(prompt = "") {
   }
 
   // 5. Ecommerce Storefront / D2C Brand
-  if (/ecommerce|store|shop|apparel|clothing|boutique|merch|sneaker|product shop/.test(lower)) {
+  if (contractCategory === "ecommerce" || /ecommerce|store|shop|apparel|clothing|boutique|merch|sneaker|product shop/.test(lower)) {
     return {
       purpose: "High-converting modern boutique ecommerce storefront",
       targetAudience: "Discerning shoppers seeking curated, premium design goods",
       category: "ecommerce",
-      visualDirection: "Modern editorial storefront with clean product grids, crisp typography, and seamless checkout indicators",
+      visualDirection: wantsDark
+        ? "Nocturnal editorial storefront with deep obsidian backgrounds, high-contrast product showcases, and glowing accent highlights"
+        : "Modern editorial storefront with clean product grids, crisp typography, and seamless checkout indicators",
       archetype: "modern_ecommerce",
       brandPersonality: ["curated", "premium", "effortless"],
       colorPalette: {
-        theme: "light",
-        bg: "#ffffff",
-        fg: "#09090b",
-        muted: "#71717a",
+        theme: wantsDark ? "dark" : "light",
+        bg: wantsDark ? "#09090b" : "#ffffff",
+        fg: wantsDark ? "#fafafa" : "#09090b",
+        muted: wantsDark ? "#a1a1aa" : "#71717a",
         line: "#e4e4e7",
         accent: "#18181b",
         accentForeground: "#ffffff",
@@ -1059,7 +1103,7 @@ export function createDefaultDesignSpec(prompt = "") {
   };
 }
 
-export function buildFilePlanSystem(designSpec) {
+export function buildFilePlanSystem(designSpec, contract = null) {
   loadCraftworkSkill();
   const craftworkPlanGuidance = getCraftworkFilePlanGuidance();
   const specContext = designSpec
@@ -1083,9 +1127,42 @@ You MUST build a file plan that directly implements this design specification:
 `
     : "";
 
+  let contractContext = "";
+  if (contract) {
+    if (typeof contract === "string") {
+      contractContext = contract;
+    } else {
+      const parts = ["---", "## REQUIREMENT CONTRACT DIRECTIVES"];
+      if (contract.pages && contract.pages.length > 0) {
+        parts.push("### Required Pages & Sections to Plan:");
+        for (const p of contract.pages) {
+          parts.push(`- Page "${p.name}" (Route: ${p.path}):`);
+          for (const s of p.sections || []) {
+            parts.push(`  * ${s.name} (${s.priority}): ${s.purpose}`);
+          }
+        }
+      }
+      if (contract.mandatoryRequirements && contract.mandatoryRequirements.length > 0) {
+        parts.push("### Mandatory Requirements (Must have implementation destinations in planned files):");
+        for (const m of contract.mandatoryRequirements) {
+          parts.push(`- ${m}`);
+        }
+      }
+      if (contract.functionalRequirements && contract.functionalRequirements.length > 0) {
+        parts.push("### Mandatory Functional Requirements:");
+        for (const f of contract.functionalRequirements) {
+          parts.push(`- ${f.name} (${f.category}): ${f.description}. Expected: ${f.expectedBehavior}`);
+        }
+      }
+      parts.push("---");
+      contractContext = parts.join("\n");
+    }
+  }
+
   return `${BASE_SYSTEM}
 ${craftworkPlanGuidance}
 ${specContext}
+${contractContext}
 You are planning which files to create for a React project based on the Design Specification.
 Respond with a JSON object listing every file needed, including their contract of imports and exports (so different files don't have mismatched component or default export signatures):
 {
@@ -1119,6 +1196,7 @@ Rules:
 - Match the component plan to the DesignSpec category:
   * For "interactive_app" or "utility_game": Plan ONLY /App.js and /styles.css! Write all state, logic, and UI components inside /App.js.
   * For marketing landing pages and brand sites: Plan /App.js, /styles.css, and modular component files in /components/ (e.g. Header.js, Hero.js, Content sections, CTA.js, Footer.js).
+- Preview Runtime Compatibility: The Sandpack runtime executes a single-page React app. Coordinate multi-view or multi-page flows via reactive view state in /App.js (e.g. activeView, activeTab, drawers, modals). Never generate multiple unlinked router pages or rely on server-side URL routing.
 - Define "exports" indicating what this file will export (Every JS component file must have EXACTLY ONE default export).
 - Define "imports" listing relative file imports this component relies on from the plan.
 - Do NOT write any code — only plan the file list.`;
@@ -1126,7 +1204,7 @@ Rules:
 
 export const FILE_PLAN_SYSTEM = buildFilePlanSystem(null);
 
-export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec) {
+export function buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec, contract = null, currentFile = null) {
     loadCraftworkSkill();
     const craftworkCodeGuidance = getCraftworkCodeGuidance();
     const fileList = allFiles
@@ -1167,12 +1245,55 @@ Every component you write MUST conform to this exact design specification:
 `;
     }
 
+    let contractSliceStr = "";
+    if (contract) {
+      const filePath = typeof currentFile === "string" ? currentFile : currentFile?.path || "";
+      if (filePath) {
+        const parts = ["\n---", `## REQUIREMENT CONTRACT DIRECTIVE FOR ${filePath}`];
+        if (filePath === "/App.js") {
+          parts.push("- You are assembling the main application entry (/App.js).");
+          parts.push(`- Requested Theme: ${contract.design?.colorPreferences?.theme || "light"}`);
+          if (contract.mandatoryRequirements?.length > 0) {
+            parts.push(`- Mandatory Requirements to integrate:\n  * ${contract.mandatoryRequirements.join("\n  * ")}`);
+          }
+          if (contract.functionalRequirements?.length > 0) {
+            parts.push("- Core Functional States to manage in /App.js:");
+            for (const fn of contract.functionalRequirements) {
+              parts.push(`  * ${fn.name}: ${fn.expectedBehavior || fn.description}`);
+            }
+          }
+        } else if (filePath === "/styles.css") {
+          parts.push("- Define root variables matching the DesignSpec palette and fonts.");
+          parts.push(`- Target Theme: ${contract.design?.colorPreferences?.theme || "light"}`);
+        } else {
+          const base = filePath.split("/").pop().replace(/\.jsx?$/, "").toLowerCase();
+          const matchingFns = (contract.functionalRequirements || []).filter((fn) => {
+            const target = (fn.implementationTarget || "").toLowerCase();
+            const fnName = (fn.name || "").toLowerCase();
+            const fnId = (fn.id || "").toLowerCase();
+            return target.includes(base) || fnName.includes(base) || fnId.includes(base);
+          });
+          if (matchingFns.length > 0) {
+            parts.push("- Functional Requirements mapped to this component:");
+            for (const fn of matchingFns) {
+              parts.push(`  * ${fn.name}: ${fn.expectedBehavior || fn.description}`);
+            }
+          }
+          if (contract.content?.toneOfVoice) {
+            parts.push(`- Tone of Voice: ${contract.content.toneOfVoice}`);
+          }
+        }
+        parts.push("---\n");
+        contractSliceStr = parts.join("\n");
+      }
+    }
+
     return `${BASE_SYSTEM}
 ${craftworkCodeGuidance}
 
 You are writing a SINGLE file for a React project.
 The full project file structure is:
-${fileList}${contextStr}${designSpecStr}
+${fileList}${contextStr}${designSpecStr}${contractSliceStr}
 
 Write ONLY the code for the specific file the user requests.
 Return a JSON object with exactly this shape:

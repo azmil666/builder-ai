@@ -10,7 +10,7 @@ import {
   SettingsIcon,
   ShieldCheckIcon,
 } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context/useAppContext';
 import Loading from '../components/Loading';
 import BuilderHeader from '../components/BuilderHeader';
 import ChatPanel from '../components/ChatPanel';
