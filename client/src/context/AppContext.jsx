@@ -293,6 +293,38 @@ export function AppContextProvider({children}){
         }
       });
 
+      // Self-Repair Loop Events (Phase 4 Generation Quality Engine V2)
+      const selfRepairEventNames = [
+        "repair_started",
+        "repair_plan_created",
+        "repair_attempt_started",
+        "repair_attempt_failed",
+        "repair_candidate_verified",
+        "repair_completed",
+        "repair_exhausted",
+      ];
+      for (const evtName of selfRepairEventNames) {
+        eventSource.addEventListener(evtName, (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            setActiveProject((prev) => {
+              if (!prev) return prev;
+              const currentSelfRepair = prev.selfRepair || {};
+              return {
+                ...prev,
+                selfRepair: {
+                  ...currentSelfRepair,
+                  lastEvent: evtName,
+                  ...data,
+                },
+              };
+            });
+          } catch (err) {
+            console.error(`Failed to parse ${evtName} SSE event:`, err);
+          }
+        });
+      }
+
       eventSource.addEventListener("visual_verifying", (e) => {
         try {
           const data = JSON.parse(e.data);

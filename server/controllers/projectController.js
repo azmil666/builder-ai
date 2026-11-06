@@ -88,6 +88,7 @@ export async function createProject(req, res) {
     designSpec: project.designSpec || null,
     requirementContract: project.requirementContract || null,
     requirementVerification: project.requirementVerification || null,
+    selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -249,6 +250,27 @@ async function runBackgroundGeneration(projectId, prompt) {
           requirementVerification: verification,
         });
       },
+      onRepairStarted: async (data) => {
+        emitProjectEvent(projectId, "repair_started", data);
+      },
+      onRepairPlanCreated: async (data) => {
+        emitProjectEvent(projectId, "repair_plan_created", data);
+      },
+      onRepairAttemptStarted: async (data) => {
+        emitProjectEvent(projectId, "repair_attempt_started", data);
+      },
+      onRepairAttemptFailed: async (data) => {
+        emitProjectEvent(projectId, "repair_attempt_failed", data);
+      },
+      onRepairCandidateVerified: async (data) => {
+        emitProjectEvent(projectId, "repair_candidate_verified", data);
+      },
+      onRepairCompleted: async (data) => {
+        emitProjectEvent(projectId, "repair_completed", data);
+      },
+      onRepairExhausted: async (data) => {
+        emitProjectEvent(projectId, "repair_exhausted", data);
+      },
     });
 
     console.log(`[Background AI] Successfully generated project ${projectId}`);
@@ -267,6 +289,9 @@ async function runBackgroundGeneration(projectId, prompt) {
       }
       if (result.requirementVerification) {
         project.requirementVerification = result.requirementVerification;
+      }
+      if (result.selfRepair) {
+        project.selfRepair = result.selfRepair;
       }
 
       // Enter Visual Verification stage
@@ -458,6 +483,7 @@ export async function getProject(req, res) {
     designSpec: project.designSpec || null,
     requirementContract: project.requirementContract || null,
     requirementVerification: project.requirementVerification || null,
+    selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
     createdAt: project.createdAt,
@@ -657,6 +683,7 @@ export async function streamProjectProgress(req, res) {
     designSpec: project.designSpec,
     requirementContract: project.requirementContract || null,
     requirementVerification: project.requirementVerification || null,
+    selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     filesPlanned: project.filesPlanned || [],
     filesGenerated: project.filesGenerated || [],

@@ -5,6 +5,7 @@ import { applyOperations, hashContent } from "../services/diff.js";
 import { validateProject, verifyProjectRuntime } from "../services/codeValidator.js";
 import { updateRequirementContractOnRevision } from "../services/requirementContract.js";
 import { verifyProjectRequirements } from "../services/requirementVerification.js";
+import { runEvidenceDrivenSelfRepairLoop } from "../services/selfRepair.js";
 
 export function buildManifest(files) {
   const manifest = [];
@@ -227,14 +228,44 @@ export async function chat(req, res) {
     project.status = "completed";
 
     // Commit candidate contract now that generation, validation, and repair succeeded
+    let selfRepairReport = null;
     if (candidateContract) {
       project.requirementContract = candidateContract;
       try {
-        project.requirementVerification = await verifyProjectRequirements(
+        let revVerification = await verifyProjectRequirements(
           candidateFilesMap,
           candidateContract,
           null
         );
+
+        if (revVerification.mandatoryFailed > 0) {
+          console.log(`[AI Revision] Candidate files failed ${revVerification.mandatoryFailed} mandatory requirement(s). Running self-repair loop...`);
+          const repairLoopResult = await runEvidenceDrivenSelfRepairLoop({
+            files: candidateFilesMap,
+            prompt,
+            requirementContract: candidateContract,
+            designSpec: project.designSpec,
+            filePlan: null,
+            maxAttempts: 2,
+          });
+
+          if (repairLoopResult.success) {
+            for (const [p, code] of Object.entries(repairLoopResult.files)) {
+              if (candidateFilesMap[p] !== code) {
+                updatedFiles[p] = { content: code, hash: hashContent(code) };
+                candidateFilesMap[p] = code;
+                applied.push(`repaired ${p}`);
+              }
+            }
+            revVerification = repairLoopResult.verification;
+          }
+          selfRepairReport = repairLoopResult.report;
+        }
+
+        project.requirementVerification = revVerification;
+        if (selfRepairReport) {
+          project.selfRepair = selfRepairReport;
+        }
       } catch (revVerifErr) {
         console.warn(`[AI Revision Verification] Could not reverify requirements: ${revVerifErr.message}`);
       }
@@ -268,6 +299,7 @@ export async function chat(req, res) {
       aiDescription: result.description,
       requirementContract: project.requirementContract || null,
       requirementVerification: project.requirementVerification || null,
+      selfRepair: project.selfRepair || null,
     });
   } catch (err) {
     console.error(`[AI Revision Error] ${err.message}`);

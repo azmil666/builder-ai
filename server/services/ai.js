@@ -16,6 +16,7 @@ import {
   verifyFilePlanAlignment,
 } from './requirementContract.js';
 import { verifyProjectRequirements } from './requirementVerification.js';
+import { runEvidenceDrivenSelfRepairLoop } from './selfRepair.js';
 
 // --- AI Provider Resolution & Abstraction ---
 export function getActiveAiProvider() {
@@ -462,6 +463,32 @@ export async function generateProject(prompt, callbacks){
         console.warn(`[RequirementVerification] Verification failed with error: ${verifErr.message}`);
     }
 
+    // Phase 4.6: Evidence-Driven Targeted Self-Repair Loop (Phase 4 Quality Engine V2)
+    let selfRepairReport = null;
+    if (requirementVerification && (requirementVerification.mandatoryFailed > 0 || requirementVerification.overallStatus === "FAILED")) {
+        console.log(`[SelfRepair] Mandatory requirements failed (${requirementVerification.mandatoryFailed} failed). Starting targeted self-repair loop...`);
+        try {
+            const repairLoopResult = await runEvidenceDrivenSelfRepairLoop({
+                files,
+                prompt,
+                requirementContract,
+                designSpec,
+                filePlan: plan,
+                callbacks,
+                maxAttempts: 2,
+            });
+            files = repairLoopResult.files;
+            requirementVerification = repairLoopResult.verification;
+            selfRepairReport = repairLoopResult.report;
+
+            if (callbacks?.onRequirementVerification) {
+                await callbacks.onRequirementVerification(requirementVerification);
+            }
+        } catch (repairErr) {
+            console.warn(`[SelfRepair] Self-repair loop encountered error: ${repairErr.message}`);
+        }
+    }
+
     // Phase 5: Feature-specific checklist verification informed by Requirement Contract
     const featureChecklist = deriveFeatureChecklist(prompt, designSpec, requirementContract);
     const featureReport = validateFeatureChecklist(files, featureChecklist);
@@ -473,6 +500,7 @@ export async function generateProject(prompt, callbacks){
         designSpec,
         requirementContract,
         requirementVerification,
+        selfRepair: selfRepairReport,
         manifest: plan.manifest,
         featureReport,
     };

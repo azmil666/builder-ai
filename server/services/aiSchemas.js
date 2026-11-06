@@ -464,12 +464,94 @@ export const AiVerificationBatchSchema = z.object({
   ),
 });
 
+// --- Targeted Self-Repair Schemas (Phase 4 Quality Engine V2) ---
+
+export const FailureCategorySchema = z.enum([
+  "REQUIREMENT_FAIL",
+  "REQUIREMENT_PARTIAL",
+  "REQUIREMENT_UNVERIFIABLE",
+  "CODE_VALIDATION_ERROR",
+  "RUNTIME_ERROR",
+  "VISUAL_OVERFLOW",
+  "FILE_PLAN_MISMATCH",
+]);
+
+export const RepairabilitySchema = z.enum([
+  "REPAIRABLE",
+  "UNREPAIRABLE_UNVERIFIABLE",
+  "NON_ACTIONABLE",
+  "COMPLEX_MANUAL",
+]);
+
+export const ClassifiedFailureSchema = z.object({
+  id: z.string(),
+  category: FailureCategorySchema,
+  requirementId: z.string().nullable().optional(),
+  requirementDescription: z.string(),
+  severity: z.enum(["critical", "high", "medium", "low"]),
+  evidence: z.array(z.string()).default([]),
+  missingEvidence: z.array(z.string()).default([]),
+  affectedFiles: z.array(z.string()).default([]),
+  diagnosticExplanation: z.string(),
+  repairabilityClassification: RepairabilitySchema,
+});
+
+export const RepairTaskSchema = z.object({
+  taskId: z.string(),
+  failureCategory: FailureCategorySchema,
+  requirementId: z.string().nullable().optional(),
+  failureIds: z.array(z.string()).default([]),
+  targetFile: z.string().optional(),
+  affectedFiles: z.array(z.string()),
+  expectedBehavior: z.string(),
+  specificMissingImplementation: z.string(),
+  constraints: z.array(z.string()).default([]),
+  verificationCriteria: z.array(z.string()).default([]),
+});
+
+export const RepairPlanSchema = z.object({
+  planId: z.string(),
+  tasks: z.array(RepairTaskSchema),
+  prioritizedFiles: z.array(z.string()),
+  createdAt: z.string(),
+});
+
+export const RepairedFileItemSchema = z.object({
+  path: z.string(),
+  code: z.string(),
+  explanation: z.string().optional().default(""),
+});
+
+export const TargetedRepairBatchSchema = z.object({
+  files: z.array(RepairedFileItemSchema),
+  summary: z.string().default("Applied targeted repairs"),
+});
+
+export const SelfRepairReportSchema = z.object({
+  repairTriggered: z.boolean(),
+  initialStatus: z.string(),
+  finalStatus: z.string(),
+  attemptCount: z.number().default(0),
+  maxAttempts: z.number().default(2),
+  failures: z.array(ClassifiedFailureSchema).default([]),
+  repairPlan: RepairPlanSchema.nullable().optional(),
+  filesChanged: z.array(z.string()).default([]),
+  accepted: z.boolean().default(false),
+  rollbackPerformed: z.boolean().default(false),
+  rollbackReason: z.string().nullable().optional(),
+  beforeVerificationSummary: z.any().nullable().optional(),
+  afterVerificationSummary: z.any().nullable().optional(),
+  attempts: z.array(z.any()).default([]),
+  completedAt: z.string().optional(),
+});
+
 export const GenerationResultSchema = z.object({
     files: z.record(z.string(),  z.string()),
     description: z.string().default('Generated project'),
     designSpec: DesignSpecSchema.optional(),
     requirementContract: RequirementContractSchema.optional(),
     requirementVerification: RequirementVerificationSummarySchema.optional(),
+    selfRepair: SelfRepairReportSchema.optional(),
 });
 
 export const FileOpSchema = z.object({

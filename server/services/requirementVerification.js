@@ -1447,9 +1447,11 @@ export function verifyContractFilePlanConsistency(contract, files, plan, analysi
 
   // Check 3: Top-level Mandatory Contract Requirements Coverage
   for (let i = 0; i < (contract?.mandatoryRequirements || []).length; i++) {
-    const mandText = contract.mandatoryRequirements[i];
-    const reqId = `mandatory_req_${i}`;
-    const lower = mandText.toLowerCase();
+    const rawMand = contract.mandatoryRequirements[i];
+    const mandText = typeof rawMand === "string" ? rawMand : (rawMand?.description || rawMand?.id || "");
+    const reqId = typeof rawMand === "object" && rawMand?.id ? rawMand.id : `mandatory_req_${i}`;
+    const lower = (mandText || "").toLowerCase();
+    const keyWords = lower.split(/\s+/).filter((w) => w.length >= 3 && !/^(the|and|for|with)$/.test(w));
 
     // Check if covered by sections, functional, or code
     let isCovered = false;
@@ -1457,7 +1459,6 @@ export function verifyContractFilePlanConsistency(contract, files, plan, analysi
 
     for (const [p, code] of Object.entries(files || {})) {
       if (p === "/styles.css") continue;
-      const keyWords = lower.split(/\s+/).filter((w) => w.length > 3);
       const matches = keyWords.filter((w) => code.toLowerCase().includes(w));
       if (matches.length >= Math.min(2, keyWords.length)) {
         isCovered = true;
@@ -1482,6 +1483,11 @@ export function verifyContractFilePlanConsistency(contract, files, plan, analysi
         source: "deterministic_static",
       });
     } else {
+      const candidateByPath = allPaths.find((p) => {
+        if (p === "/styles.css" || p === "/package.json") return false;
+        const lowerPath = p.toLowerCase();
+        return keyWords.some((kw) => lowerPath.includes(kw));
+      });
       items.push({
         requirementId: reqId,
         requirementText: `Mandatory: ${mandText}`,
@@ -1492,7 +1498,7 @@ export function verifyContractFilePlanConsistency(contract, files, plan, analysi
         evidence: [],
         missingEvidence: [`No code or component evidence for mandatory requirement "${mandText}"`],
         explanation: `Mandatory requirement "${mandText}" is not satisfied in generated project.`,
-        affectedFiles: allPaths,
+        affectedFiles: candidateByPath ? [candidateByPath] : ["/App.js"],
         recommendedAction: `Implement the missing mandatory requirement: ${mandText}.`,
         source: "deterministic_static",
       });
