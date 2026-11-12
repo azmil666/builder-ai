@@ -52,49 +52,52 @@ const Promptinput = ({
     return (
       <form
         onSubmit={handleSubmit}
-        className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl shadow-2xl focus-within:border-zinc-700 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all duration-200 overflow-hidden"
+        className="group relative w-full overflow-hidden rounded-2xl border border-hairline bg-surface/90 backdrop-blur-xl transition-all duration-200 focus-within:border-white/25 focus-within:bg-surface-elevated/90"
       >
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={loading}
-          rows={3}
-          className="w-full p-4 sm:p-5 pb-2 resize-none placeholder:text-zinc-500 outline-none bg-transparent text-zinc-100 text-sm sm:text-base leading-relaxed"
-        />
+        <div className="flex items-start gap-3 px-5 pt-5 pb-2">
+          <SparklesIcon
+            size={16}
+            className="mt-1 shrink-0 text-ink-muted transition-colors group-focus-within:text-ink"
+          />
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={loading}
+            rows={3}
+            className="w-full resize-none bg-transparent text-sm sm:text-[15px] leading-relaxed text-ink placeholder:text-ink-subtle outline-none"
+          />
+        </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-5 pb-4 pt-1 gap-3 border-t border-zinc-800/60 bg-zinc-950/40">
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
-            <span className="hidden sm:inline-flex items-center gap-1 font-mono text-[11px] bg-zinc-800/80 px-2 py-0.5 rounded text-zinc-300">
-              <CornerDownLeftIcon size={11} /> Enter
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-hairline px-5 py-3 bg-canvas/40">
+          <div className="flex items-center gap-2 text-[11px] text-ink-muted">
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-hairline bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-ink-secondary">
+              <CornerDownLeftIcon size={10} /> Enter
             </span>
-            <span className="hidden sm:inline">to build</span>
-            <span className="hidden sm:inline text-zinc-600">·</span>
-            <span className="text-zinc-500 text-[11px]">Shift + Enter for newline</span>
+            <span className="hidden sm:inline">to generate</span>
+            <span className="hidden sm:inline text-ink-subtle">·</span>
+            <span className="text-ink-subtle">Shift + Enter for newline</span>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="submit"
-              disabled={!value.trim() || loading}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed font-medium text-sm transition-all duration-150 shadow-md cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2Icon size={16} className="animate-spin text-zinc-900" />
-                  <span>Planning & Building...</span>
-                </>
-              ) : (
-                <>
-                  <SparklesIcon size={16} className="text-zinc-900" />
-                  <span>Build Website</span>
-                  <ArrowRightIcon size={14} className="text-zinc-600 hidden sm:inline" />
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={!value.trim() || loading}
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-ink px-5 py-2 text-xs font-medium text-canvas transition-all duration-150 hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35 cursor-pointer"
+          >
+            {loading ? (
+              <>
+                <Loader2Icon size={14} className="animate-spin" />
+                <span>Building...</span>
+              </>
+            ) : (
+              <>
+                <span>Build Website</span>
+                <ArrowRightIcon size={13} />
+              </>
+            )}
+          </button>
         </div>
       </form>
     );
