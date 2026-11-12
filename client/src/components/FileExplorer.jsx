@@ -42,14 +42,14 @@ function buildTree(paths) {
 }
 
 function getFileIcon(name) {
-  if (name.endsWith('.css')) return <FileTextIcon size={13} className="text-sky-400 shrink-0" />;
+  if (name.endsWith('.css')) return <FileTextIcon size={13} className="text-ink-muted shrink-0" />;
   if (name.endsWith('.jsx') || name.endsWith('.js'))
-    return <FileCodeIcon size={13} className="text-amber-400 shrink-0" />;
+    return <FileCodeIcon size={13} className="text-ink-secondary shrink-0" />;
   if (name.endsWith('.json'))
-    return <FileTextIcon size={13} className="text-emerald-400 shrink-0" />;
+    return <FileTextIcon size={13} className="text-ink-muted shrink-0" />;
   if (name.endsWith('.html'))
-    return <FileCodeIcon size={13} className="text-orange-400 shrink-0" />;
-  return <FileTextIcon size={13} className="text-zinc-400 shrink-0" />;
+    return <FileCodeIcon size={13} className="text-ink-secondary shrink-0" />;
+  return <FileTextIcon size={13} className="text-ink-muted shrink-0" />;
 }
 
 function TreeItem({
@@ -83,20 +83,20 @@ function TreeItem({
       <div>
         <div
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5 py-1 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 rounded-md select-none cursor-pointer group transition-colors"
+          className="flex items-center gap-1.5 py-1 px-2 text-[12px] text-ink-secondary hover:text-ink hover:bg-surface-elevated rounded-md select-none cursor-pointer group transition-colors"
           style={{ paddingLeft: `${depth * 12 + 6}px` }}
         >
           {isOpen ? (
-            <ChevronDownIcon size={12} className="text-zinc-500" />
+            <ChevronDownIcon size={12} className="text-ink-muted" />
           ) : (
-            <ChevronRightIcon size={12} className="text-zinc-500" />
+            <ChevronRightIcon size={12} className="text-ink-muted" />
           )}
           {isOpen ? (
-            <FolderOpenIcon size={13} className="text-indigo-400/80" />
+            <FolderOpenIcon size={13} className="text-ink-secondary" />
           ) : (
-            <FolderIcon size={13} className="text-zinc-500" />
+            <FolderIcon size={13} className="text-ink-muted" />
           )}
-          <span className="font-medium text-zinc-300">{node.name}</span>
+          <span className="font-medium tracking-tight">{node.name}</span>
         </div>
 
         {isOpen && (
@@ -120,10 +120,10 @@ function TreeItem({
 
   return (
     <div
-      className={`group w-full flex items-center justify-between py-1.5 px-2 text-xs rounded-lg cursor-pointer transition-colors ${
+      className={`group w-full flex items-center justify-between py-1 px-2 text-[12px] rounded-md cursor-pointer transition-colors ${
         isActive
-          ? 'bg-zinc-800 text-white font-medium border-l-2 border-indigo-500'
-          : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+          ? 'bg-surface-active text-ink font-medium border-l-2 border-ink'
+          : 'text-ink-muted hover:bg-surface-elevated hover:text-ink'
       }`}
       style={{ paddingLeft: `${depth * 12 + 12}px` }}
       onClick={() => onFileSelect(node.path)}
@@ -142,25 +142,25 @@ function TreeItem({
               onChange={(e) => setRenameValue(e.target.value)}
               onBlur={handleRenameSubmit}
               autoFocus
-              className="w-full bg-zinc-950 border border-indigo-500 rounded px-1.5 py-0.5 text-xs text-white outline-none"
+              className="w-full bg-canvas border border-white/30 rounded px-1.5 py-0.5 text-[12px] text-ink outline-none"
             />
           </form>
         ) : (
-          <span className="truncate">{node.name}</span>
+          <span className="truncate font-mono text-[11.5px]">{node.name}</span>
         )}
       </div>
 
       {/* Action buttons on hover */}
       {!isRenaming && (
         <div
-          className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
+          className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
           onClick={(e) => e.stopPropagation()}
         >
           {node.path !== '/App.js' && onRename && (
             <button
               type="button"
               onClick={() => setIsRenaming(true)}
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 cursor-pointer"
+              className="p-1 rounded text-ink-muted hover:text-ink hover:bg-surface-hover cursor-pointer"
               title="Rename file"
             >
               <PencilIcon size={11} />
@@ -171,7 +171,7 @@ function TreeItem({
             <button
               type="button"
               onClick={() => onDeleteRequest(node.path)}
-              className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
+              className="p-1 rounded text-ink-muted hover:text-red-400 hover:bg-surface-hover cursor-pointer"
               title="Delete file"
             >
               <Trash2Icon size={11} />
@@ -206,14 +206,14 @@ const FileExplorer = ({
   const tree = useMemo(() => buildTree(filteredKeys), [filteredKeys]);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-200 border-r border-zinc-850">
+    <div className="flex flex-col h-full bg-surface text-ink border-r border-white/10">
       {/* Top Header */}
-      <div className="px-3 py-2.5 border-b border-zinc-850 flex items-center justify-between shrink-0 bg-zinc-950/80">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            Files
+      <div className="px-3.5 py-2.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-canvas/60 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <span className="font-display text-xs font-medium tracking-tight text-ink">
+            Explorer
           </span>
-          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated border border-white/10 text-ink-muted">
             {allFileKeys.length}
           </span>
         </div>
@@ -222,7 +222,7 @@ const FileExplorer = ({
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
-            className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+            className="flex size-6 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-elevated transition-colors cursor-pointer"
             title="Create new file with template"
           >
             <FilePlusIcon size={14} />
@@ -231,21 +231,21 @@ const FileExplorer = ({
       </div>
 
       {/* Quick Search */}
-      <div className="p-2 border-b border-zinc-850/60 shrink-0">
+      <div className="p-2.5 border-b border-white/10 shrink-0">
         <div className="relative">
-          <SearchIcon size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <SearchIcon size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
             type="text"
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
             placeholder="Filter files..."
-            className="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg pl-7 pr-6 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-500 outline-none focus:border-zinc-700 transition"
+            className="w-full bg-surface-elevated border border-white/10 rounded-md pl-7 pr-6 py-1 text-[11px] text-ink placeholder:text-ink-subtle outline-none focus:border-white/25 transition-colors"
           />
           {filterQuery && (
             <button
               onClick={() => setFilterQuery('')}
               type="button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink cursor-pointer"
             >
               <XIcon size={11} />
             </button>
@@ -256,7 +256,7 @@ const FileExplorer = ({
       {/* File Tree */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5 hide-scrollbar">
         {tree.length === 0 && (
-          <div className="py-8 text-center text-xs text-zinc-500">
+          <div className="py-8 text-center text-xs text-ink-muted">
             {filterQuery ? `No files matching "${filterQuery}"` : 'No files in workspace'}
           </div>
         )}

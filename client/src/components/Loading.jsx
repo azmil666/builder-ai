@@ -5,11 +5,12 @@ const Loading = () => {
     <div
       role="status"
       aria-label="Loading"
-      className="h-screen flex items-center justify-center bg-white"
+      className="flex h-screen w-full items-center justify-center bg-canvas text-ink animate-fade-in"
     >
       <Loader2Icon
-        size={26}
-        className="animate-spin text-zinc-950"
+        size={20}
+        strokeWidth={1.5}
+        className="animate-spin text-ink-secondary"
       />
     </div>
   )

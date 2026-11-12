@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   FolderTreeIcon,
   MessageSquareIcon,
@@ -120,8 +121,16 @@ const BuilderPage = () => {
     activeProject.status === 'visual_verifying';
   const isFailed = activeProject.status === 'failed';
 
+  const railTabs = [
+    { key: 'chat', icon: MessageSquareIcon, title: 'AI Revisions & Chat' },
+    { key: 'files', icon: FolderTreeIcon, title: 'Project Files' },
+    { key: 'qa', icon: ShieldCheckIcon, title: 'Visual QA Engine' },
+    { key: 'design', icon: PaletteIcon, title: 'Design Intelligence & Archetype' },
+    { key: 'settings', icon: SettingsIcon, title: 'Project Settings' },
+  ];
+
   return (
-    <div className="h-screen flex flex-col bg-zinc-950 overflow-hidden text-zinc-100 relative font-sans">
+    <div className="h-screen flex flex-col bg-canvas overflow-hidden text-ink relative font-sans">
       {/* Top Bar Header */}
       <BuilderHeader
         projectName={activeProject.name}
@@ -143,141 +152,113 @@ const BuilderPage = () => {
       {/* Main Workspace Layout */}
       <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {/* Left Activity Rail (Icon Bar) */}
-        <div className="w-12 shrink-0 bg-zinc-950 border-r border-zinc-850 flex flex-col items-center justify-between py-3 z-20 select-none">
-          <div className="flex flex-col items-center gap-1.5 w-full px-1">
-            {/* Chat Tab */}
-            <button
-              type="button"
-              onClick={() => handleTabClick('chat')}
-              className={`p-2.5 rounded-xl transition cursor-pointer ${
-                leftTab === 'chat' && !sidebarCollapsed
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-              title="AI Revisions & Chat"
-            >
-              <MessageSquareIcon size={17} />
-            </button>
-
-            {/* Files Tab */}
-            <button
-              type="button"
-              onClick={() => handleTabClick('files')}
-              className={`p-2.5 rounded-xl transition cursor-pointer ${
-                leftTab === 'files' && !sidebarCollapsed
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-              title="Project Files"
-            >
-              <FolderTreeIcon size={17} />
-            </button>
-
-            {/* Visual QA Tab */}
-            <button
-              type="button"
-              onClick={() => handleTabClick('qa')}
-              className={`p-2.5 rounded-xl transition cursor-pointer ${
-                leftTab === 'qa' && !sidebarCollapsed
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-              title="Visual QA Engine"
-            >
-              <ShieldCheckIcon size={17} />
-            </button>
-
-            {/* Design Information Tab */}
-            <button
-              type="button"
-              onClick={() => handleTabClick('design')}
-              className={`p-2.5 rounded-xl transition cursor-pointer ${
-                leftTab === 'design' && !sidebarCollapsed
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-              title="Design Intelligence & Archetype"
-            >
-              <PaletteIcon size={17} />
-            </button>
-
-            {/* Project Settings Tab */}
-            <button
-              type="button"
-              onClick={() => handleTabClick('settings')}
-              className={`p-2.5 rounded-xl transition cursor-pointer ${
-                leftTab === 'settings' && !sidebarCollapsed
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-              title="Project Settings"
-            >
-              <SettingsIcon size={17} />
-            </button>
+        <aside className="w-12 shrink-0 bg-canvas border-r border-white/10 flex flex-col items-center justify-between py-3 z-20 select-none">
+          <div className="flex flex-col items-center gap-1.5 w-full px-1.5">
+            {railTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = leftTab === tab.key && !sidebarCollapsed;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => handleTabClick(tab.key)}
+                  className={`relative flex size-9 items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                    isActive
+                      ? 'text-ink'
+                      : 'text-ink-muted hover:text-ink-secondary hover:bg-surface-elevated'
+                  }`}
+                  title={tab.title}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="builder-rail-active"
+                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                      className="absolute inset-0 rounded-lg bg-surface-active border border-white/10"
+                    />
+                  )}
+                  <Icon size={16} className="relative z-10" />
+                </button>
+              );
+            })}
           </div>
 
           {/* Toggle Sidebar Collapse */}
           <button
             type="button"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition cursor-pointer"
+            className="flex size-8 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-surface-elevated transition-colors cursor-pointer"
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {sidebarCollapsed ? (
-              <PanelLeftOpenIcon size={16} />
+              <PanelLeftOpenIcon size={15} />
             ) : (
-              <PanelLeftCloseIcon size={16} />
+              <PanelLeftCloseIcon size={15} />
             )}
           </button>
-        </div>
+        </aside>
 
-        {/* Left Drawer Panel */}
-        {!sidebarCollapsed && (
-          <div className="w-[310px] shrink-0 h-full overflow-hidden bg-zinc-950 transition-all duration-200 z-10">
-            {leftTab === 'chat' && (
-              <ChatPanel
-                messages={activeProject.messages}
-                onSend={handleChat}
-                loading={chatLoading}
-                onFileSelect={(path) => openFile(path)}
-              />
-            )}
+        {/* Fluid Collapsible Left Drawer Panel */}
+        <AnimatePresence initial={false}>
+          {!sidebarCollapsed && (
+            <motion.aside
+              key="builder-sidebar"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 310, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+              className="shrink-0 h-full overflow-hidden bg-surface z-10"
+            >
+              <div className="w-[310px] h-full overflow-hidden">
+                {leftTab === 'chat' && (
+                  <ChatPanel
+                    messages={activeProject.messages}
+                    onSend={handleChat}
+                    loading={chatLoading}
+                    onFileSelect={(path) => openFile(path)}
+                  />
+                )}
 
-            {leftTab === 'files' && (
-              <FileExplorer
-                files={activeProject.files}
-                activeFile={activeFile}
-                onFileSelect={(path) => openFile(path)}
-                onCreateFile={createFile}
-                onRenameFile={renameFile}
-                onDeleteFile={deleteFile}
-              />
-            )}
+                {leftTab === 'files' && (
+                  <FileExplorer
+                    files={activeProject.files}
+                    activeFile={activeFile}
+                    onFileSelect={(path) => openFile(path)}
+                    onCreateFile={createFile}
+                    onRenameFile={renameFile}
+                    onDeleteFile={deleteFile}
+                  />
+                )}
 
-            {leftTab === 'qa' && (
-              <VisualQAPanel
-                projectId={activeProject._id}
-                onApplyFix={handleChat}
-                onFileSelect={(path) => openFile(path)}
-              />
-            )}
+                {leftTab === 'qa' && (
+                  <VisualQAPanel
+                    projectId={activeProject._id}
+                    onApplyFix={handleChat}
+                    onFileSelect={(path) => openFile(path)}
+                  />
+                )}
 
-            {leftTab === 'design' && (
-              <DesignSpecPanel designSpec={activeProject.designSpec} />
-            )}
+                {leftTab === 'design' && (
+                  <DesignSpecPanel designSpec={activeProject.designSpec} />
+                )}
 
-            {leftTab === 'settings' && (
-              <ProjectSettingsPanel
-                project={activeProject}
-                onUpdateName={updateProjectName}
-                onDelete={setDeleteTarget}
-              />
-            )}
-          </div>
-        )}
+                {leftTab === 'settings' && (
+                  <ProjectSettingsPanel
+                    project={activeProject}
+                    onUpdateName={updateProjectName}
+                    onDelete={setDeleteTarget}
+                  />
+                )}
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
-        {/* Center Preview & Editor Canvas */}
-        <div className="flex-1 h-full min-w-0 min-h-0 overflow-hidden flex flex-col bg-zinc-950">
+        {/* Center Preview & Editor Canvas (Hero) */}
+        <motion.main
+          layout
+          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          className="flex-1 h-full min-w-0 min-h-0 overflow-hidden flex flex-col bg-canvas"
+        >
           {isOngoingBuild ? (
             <AgentProgressDashboard project={activeProject} />
           ) : isFailed && !inspectPartialFiles ? (
@@ -313,7 +294,7 @@ const BuilderPage = () => {
               />
             </>
           )}
-        </div>
+        </motion.main>
       </div>
 
       {/* Publish Live Link Modal */}

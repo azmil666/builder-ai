@@ -10,9 +10,38 @@ import PublishPage from './pages/PublishPage'
 
 const App = () => {
   return (
-  <>
-   <Toaster />
-    <Routes>
+    <div className="min-h-screen bg-canvas text-ink font-sans antialiased">
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: 'rgba(17, 17, 17, 0.85)',
+            color: '#fafafa',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            fontSize: '13px',
+            letterSpacing: '-0.01em',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            boxShadow: 'none',
+          },
+          success: {
+            iconTheme: {
+              primary: '#fafafa',
+              secondary: '#050505',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#fafafa',
+              secondary: '#050505',
+            },
+          },
+        }}
+      />
+      <Routes>
       {/* Login Routes */}
       <Route element={<GuestLayout/>}>
         <Route path='/login' element={<AuthPage mode="login"/>}/>
@@ -33,7 +62,7 @@ const App = () => {
       {/* Catch-all */}
       <Route path='*' element={<Navigate to="/" replace />}/>
     </Routes>
-    </>
+    </div>
   )
 }
 
