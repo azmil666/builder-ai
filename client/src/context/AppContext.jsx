@@ -550,6 +550,71 @@ export function AppContextProvider({children}){
     [loadProject],
   );
 
+  const fetchProjectVersions = useCallback(
+    async (projectId) => {
+      if (!projectId || !user) return [];
+      try {
+        const { data } = await api.get(`/api/projects/${projectId}/versions`);
+        return Array.isArray(data) ? data : [];
+      } catch (err) {
+        console.error("Failed to fetch project versions:", err);
+        toast.error(err?.response?.data?.error || "Failed to load version history");
+        return [];
+      }
+    },
+    [user],
+  );
+
+  const restoreProjectVersion = useCallback(
+    async (projectId, targetVersion) => {
+      if (!projectId || targetVersion === undefined || !user) return null;
+      try {
+        // Cancel any pending debounced manual file saves so they don't overwrite restored files
+        debouncedSave.cancel();
+
+        const { data } = await api.post(
+          `/api/projects/${projectId}/versions/${targetVersion}/restore`,
+        );
+
+        // Update active project state cleanly
+        setActiveProject(data);
+
+        // Reset dirty file flags and sync state
+        setDirtyFiles(new Set());
+        setSyncStatus("saved");
+
+        // Verify and update active file and open tabs if current file was removed in that snapshot
+        const files = Object.keys(data.files || {});
+        if (files.length > 0) {
+          const fallbackTarget = files.includes("/App.js") ? "/App.js" : files[0];
+          setActiveFile((prev) => (files.includes(prev) ? prev : fallbackTarget));
+          setOpenTabs((prev) => {
+            const valid = prev.filter((p) => files.includes(p));
+            return valid.length > 0 ? valid : [fallbackTarget];
+          });
+        }
+
+        toast.success(`Restored to v${targetVersion}`);
+
+        // Keep local projects list in sync
+        setProjects((prev) =>
+          prev.map((p) =>
+            p._id === data._id ? { ...p, version: data.version, name: data.name } : p,
+          ),
+        );
+
+        return data;
+      } catch (err) {
+        console.error("Failed to restore version:", err);
+        const errMsg =
+          err?.response?.data?.error || `Failed to restore version ${targetVersion}`;
+        toast.error(errMsg);
+        throw err;
+      }
+    },
+    [user, debouncedSave],
+  );
+
   const debouncedSave = React.useMemo(
     () =>
       debounce(async (files, id) => {
@@ -733,6 +798,8 @@ export function AppContextProvider({children}){
         logout,
         handleChat,
         reportVisualVerification,
+        fetchProjectVersions,
+        restoreProjectVersion,
         updateProjectFiles,
         syncStatus,
         openTabs,

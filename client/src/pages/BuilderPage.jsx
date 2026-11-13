@@ -133,8 +133,10 @@ const BuilderPage = () => {
     <div className="h-screen flex flex-col bg-canvas overflow-hidden text-ink relative font-sans">
       {/* Top Bar Header */}
       <BuilderHeader
+        projectId={activeProject._id}
         projectName={activeProject.name}
         version={activeProject.version}
+        isOngoing={isOngoingBuild || chatLoading}
         showCode={showCode}
         deviceViewport={deviceViewport}
         syncStatus={syncStatus}
