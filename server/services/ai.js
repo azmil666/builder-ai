@@ -3,9 +3,9 @@ import {createOpenAI} from '@ai-sdk/openai'
 import { generateObject } from 'ai';
 import pMap from "p-map";
 import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema, RequirementContractSchema } from './aiSchemas.js';
-import { buildFileCodeSystem, buildFilePlanSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
+import { buildFileCodeSystem, buildFilePlanSystem, buildReviseSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
-import { validateAndFixCode, validateRevisionContent, validateProject, verifyProjectRuntime } from './codeValidator.js';
+import { validateAndFixCode, validateRevisionContent, validateProject, verifyProjectRuntime, inferFramework } from './codeValidator.js';
 import { deriveFeatureChecklist, validateFeatureChecklist } from './featureValidator.js';
 import { generateGeminiObject } from './gemini.js';
 import { loadCraftworkSkill } from './craftworkSkill.js';
@@ -86,8 +86,9 @@ const defaultConcurrency = getActiveAiProvider() === "gemini" ? "2" : "6";
 const MAX_CONCURRENCY = parseInt(process.env.AI_MAX_CONCURRENCY || defaultConcurrency, 10);
 
 // Generate a single file's code
-async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles, designSpec, contract = null){
-     const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec, contract, file);
+async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles, designSpec, contract = null, framework = null){
+     const resolvedFw = framework || contract?.framework || (allFiles?.some?.(f => (f?.path || f) === "/index.html") && !allFiles?.some?.(f => (f?.path || f) === "/App.js" || (f?.path || f) === "/App.jsx") ? "vanilla" : "react");
+     const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles, designSpec, contract, file, resolvedFw);
 
      const userMsg = `Project: ${prompt}\n\nWrite the complete code for: ${file.path}\nPurpose: ${file.description}`;
 
@@ -106,7 +107,7 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles,
      }
 
      // Apply post-generation validation and auto-fixing
-     let validation = validateAndFixCode(code, file.path, {allPlannedFiles: allFiles});
+     let validation = validateAndFixCode(code, file.path, {allPlannedFiles: allFiles, framework: resolvedFw});
 
      code = validation.code;
 
@@ -127,7 +128,7 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles,
                 maxRetries: 1,
             });
             const repairedCode = normalizeContent(repairedObj.code);
-            const revalidation = validateAndFixCode(repairedCode, file.path, {allPlannedFiles: allFiles});
+            const revalidation = validateAndFixCode(repairedCode, file.path, {allPlannedFiles: allFiles, framework: resolvedFw});
             if(revalidation.valid){
                 console.log(`[Validator] Targeted correction SUCCEEDED for ${file.path}`);
                 code = revalidation.code;
@@ -159,8 +160,10 @@ export async function repairProjectFiles(
     designSpec,
     callbacks = {},
     maxAttempts = 2,
-    requirementContract = null
+    requirementContract = null,
+    framework = null
 ) {
+    const targetFramework = framework || requirementContract?.framework || inferFramework(files);
     let currentFiles = { ...files };
     let currentErrors = [...errors];
     const repairLogs = [];
@@ -211,6 +214,7 @@ export async function repairProjectFiles(
                 const reval = validateAndFixCode(repairedCode, filePath, {
                     allPlannedFiles,
                     existingFiles: Object.keys(currentFiles),
+                    framework: targetFramework,
                 });
 
                 currentFiles[filePath] = reval.code;
@@ -234,13 +238,13 @@ export async function repairProjectFiles(
             }
         }
 
-        const recheck = validateProject(currentFiles, allPlannedFiles);
-        const rerunt = await verifyProjectRuntime(currentFiles);
+        const recheck = validateProject(currentFiles, allPlannedFiles, targetFramework);
+        const rerunt = await verifyProjectRuntime(currentFiles, targetFramework);
         currentErrors = [...recheck.errors, ...rerunt.errors];
     }
 
-    const finalCheck = validateProject(currentFiles, allPlannedFiles);
-    const finalRunt = await verifyProjectRuntime(currentFiles);
+    const finalCheck = validateProject(currentFiles, allPlannedFiles, targetFramework);
+    const finalRunt = await verifyProjectRuntime(currentFiles, targetFramework);
     const combinedFinalErrors = [...finalCheck.errors, ...finalRunt.errors];
 
     return {
@@ -253,18 +257,20 @@ export async function repairProjectFiles(
 }
 
 // Generate project files: RequirementContract first, then DesignSpec, then plan, then build files in order with fallback retries
-export async function generateProject(prompt, callbacks){
+export async function generateProject(prompt, callbacks = {}, options = {}){
     // Ensure runtime Craftwork design guidance is loaded and available
     loadCraftworkSkill();
 
+    const framework = (typeof options === "string" ? options : options?.framework) || callbacks?.framework || (/\b(react|jsx|tsx|component-based|single[- ]page app|spa)\b/i.test(prompt) ? "react" : "vanilla");
+
     // Phase 0: Requirement Intelligence - Establish Structured Requirement Contract
-    console.log(`[AI] Phase 0: Establishing Requirement Contract for: "${prompt.slice(0, 80)}..."`);
+    console.log(`[AI] Phase 0: Establishing Requirement Contract for: "${prompt.slice(0, 80)}..." (framework=${framework})`);
     let requirementContract = null;
     try {
-        requirementContract = await generateRequirementContract(prompt);
+        requirementContract = await generateRequirementContract(prompt, { framework });
     } catch (contractErr) {
         console.warn(`[AI] RequirementContract generation failed: ${contractErr.message}. Using intelligent default.`);
-        requirementContract = createDefaultRequirementContract(prompt);
+        requirementContract = createDefaultRequirementContract(prompt, framework);
     }
 
     if (callbacks?.onRequirementContract) {
@@ -286,7 +292,7 @@ export async function generateProject(prompt, callbacks){
         designSpec = spec;
     } catch (err) {
         console.warn(`[AI] DesignSpec generation failed: ${err.message}. Using intelligent default spec.`);
-        designSpec = createDefaultDesignSpec(prompt, requirementContract);
+        designSpec = createDefaultDesignSpec(prompt, requirementContract, framework);
     }
 
     if(callbacks?.onDesignSpec){
@@ -294,31 +300,67 @@ export async function generateProject(prompt, callbacks){
     }
 
     // Phase 2: Technical File Planning informed by DesignSpec & RequirementContract
-    console.log(`[AI] Phase 2: Planning file structure for: "${prompt.slice(0,80)}..."`);
-    const filePlanSystem = buildFilePlanSystem(designSpec, requirementContract);
+    console.log(`[AI] Phase 2: Planning file structure for: "${prompt.slice(0,80)}..." (framework=${framework})`);
+    const filePlanSystem = buildFilePlanSystem(designSpec, requirementContract, framework);
+    const planPrompt = framework === "vanilla"
+        ? `Plan a modern semantic Vanilla HTML5, CSS, and JavaScript website for: ${prompt}`
+        : `Plan a modern React website for: ${prompt}`;
     const { object: plan } = await generateStructuredObject({
         schema: FilePlanSchema,
         system: filePlanSystem,
-        prompt: `Plan a React website for: ${prompt}`,
+        prompt: planPrompt,
         maxRetries: 2,
     });
 
-    if(!plan.files.find((f)=> f.path === "/App.js")){
-        plan.files.unshift({
-            path: "/App.js",
-            description: "Main application entry point",
-            exports: "default App",
-            imports: ["./styles.css"],
-        })
+    // Fallback guarantees: ensure essential entry points exist in FilePlan
+    let resolvedFramework = framework;
+    if (plan.files?.some((f) => f.path === "/App.js" || f.path === "/App.jsx") && !plan.files?.some((f) => f.path === "/index.html")) {
+        resolvedFramework = "react";
     }
 
-    if(!plan.files.find((f)=> f.path === "/styles.css")){
-        plan.files.push({
-             path: "/styles.css",
-            description: "Global CSS: Google Font import, design tokens, keyframe animations, utility classes",
-            exports: "none",
-            imports: [],
-        })
+    if (resolvedFramework === "vanilla") {
+        if (!plan.files.find((f) => f.path === "/index.html")) {
+            plan.files.unshift({
+                path: "/index.html",
+                description: "Main semantic HTML5 entry point linking ./styles.css, Tailwind CDN, and ./script.js",
+                exports: "none",
+                imports: ["./styles.css", "./script.js"],
+            });
+        }
+        if (!plan.files.find((f) => f.path === "/styles.css")) {
+            plan.files.push({
+                path: "/styles.css",
+                description: "Global CSS: Google Font import, design tokens, keyframe animations, utility classes",
+                exports: "none",
+                imports: [],
+            });
+        }
+        if (!plan.files.find((f) => f.path === "/script.js")) {
+            plan.files.push({
+                path: "/script.js",
+                description: "Vanilla ES6+ JavaScript handling DOM manipulation, event listeners, and interactive UI logic",
+                exports: "none",
+                imports: [],
+            });
+        }
+    } else {
+        const hasApp = plan.files.find((f) => f.path === "/App.jsx" || f.path === "/App.js");
+        if (!hasApp) {
+            plan.files.unshift({
+                path: "/App.jsx",
+                description: "Main application entry point",
+                exports: "default App",
+                imports: ["./styles.css"],
+            });
+        }
+        if (!plan.files.find((f) => f.path === "/styles.css")) {
+            plan.files.push({
+                path: "/styles.css",
+                description: "Global CSS: Google Font import, design tokens, keyframe animations, utility classes",
+                exports: "none",
+                imports: [],
+            });
+        }
     }
 
     // Consistency Check: Verify FilePlan alignment with Requirement Contract
@@ -341,7 +383,7 @@ export async function generateProject(prompt, callbacks){
             if (callbacks?.onFileStart) {
                 await callbacks.onFileStart(stylesFile.path);
             }
-            const stylesResult = await generateSingleFile(stylesFile, plan.files, prompt, files, designSpec, requirementContract);
+            const stylesResult = await generateSingleFile(stylesFile, plan.files, prompt, files, designSpec, requirementContract, resolvedFramework);
             files[stylesFile.path] = stylesResult.code;
             if (callbacks?.onFileComplete) {
                 await callbacks.onFileComplete(stylesFile.path, stylesResult.code);
@@ -379,7 +421,7 @@ export async function generateProject(prompt, callbacks){
                         await callbacks.onFileStart(file.path)
                     }
 
-                    const singleResult = await generateSingleFile(file, plan.files, prompt, files, designSpec, requirementContract)
+                    const singleResult = await generateSingleFile(file, plan.files, prompt, files, designSpec, requirementContract, resolvedFramework)
 
                     if(callbacks?.onFileComplete){
                         await callbacks.onFileComplete(file.path, singleResult.code)
@@ -413,16 +455,22 @@ export async function generateProject(prompt, callbacks){
         throw new Error(`Failed to generate mandatory planned file(s): ${failedPaths}${errorDetail}`);
     }
 
-    if(!files["/App.js"]){
-        throw new Error("AI did not generate /App.js entry point");
+    if (resolvedFramework === "vanilla") {
+        if (!files["/index.html"]) {
+            throw new Error("AI did not generate /index.html entry point");
+        }
+    } else {
+        if (!files["/App.jsx"] && !files["/App.js"]) {
+            throw new Error("AI did not generate /App.jsx entry point");
+        }
     }
 
     // Phase 4: Final project-level semantic, contract & active-state runtime validation
     if (callbacks?.onValidationStart) {
         await callbacks.onValidationStart();
     }
-    let projectValidation = validateProject(files, plan.files);
-    let runtimeValidation = await verifyProjectRuntime(files);
+    let projectValidation = validateProject(files, plan.files, resolvedFramework);
+    let runtimeValidation = await verifyProjectRuntime(files, resolvedFramework);
     let combinedErrors = [...projectValidation.errors, ...runtimeValidation.errors];
 
     // If validation fails, initiate targeted AI self-repair loop
@@ -441,7 +489,8 @@ export async function generateProject(prompt, callbacks){
             designSpec,
             callbacks,
             2,
-            requirementContract
+            requirementContract,
+            resolvedFramework
         );
 
         files = repairResult.files;
@@ -454,7 +503,7 @@ export async function generateProject(prompt, callbacks){
     // Phase 4.5: Evidence-Based Requirement Verification (Phase 3 Quality Engine V2)
     let requirementVerification = null;
     try {
-        requirementVerification = await verifyProjectRequirements(files, requirementContract, plan);
+        requirementVerification = await verifyProjectRequirements(files, requirementContract, plan, { framework: resolvedFramework });
         console.log(`[RequirementVerification] Completed: status=${requirementVerification.overallStatus}, passed=${requirementVerification.passed}/${requirementVerification.totalRequirements}, mandatoryPassed=${requirementVerification.mandatoryPassed}`);
         if (callbacks?.onRequirementVerification) {
             await callbacks.onRequirementVerification(requirementVerification);
@@ -476,6 +525,7 @@ export async function generateProject(prompt, callbacks){
                 filePlan: plan,
                 callbacks,
                 maxAttempts: 2,
+                framework: resolvedFramework,
             });
             files = repairLoopResult.files;
             requirementVerification = repairLoopResult.verification;
@@ -503,15 +553,20 @@ export async function generateProject(prompt, callbacks){
         selfRepair: selfRepairReport,
         manifest: plan.manifest,
         featureReport,
+        framework: resolvedFramework,
     };
 }
 
-export async function reviseProject(prompt, manifest, relevantFiles, recentMessages, designSpec, requirementContract = null){
+export async function reviseProject(prompt, manifest, relevantFiles, recentMessages, designSpec, requirementContract = null, framework = null){
     loadCraftworkSkill();
+    const targetFramework = framework || requirementContract?.framework || designSpec?.framework || (
+        manifest.some((f) => f.path === "/index.html" || f.path === "/script.js") ? "vanilla" : "react"
+    );
     const contextParts = [];
 
     if (requirementContract) {
         contextParts.push("## Active Requirement Contract (PRESERVE UNLESS EXPLICITLY MODIFIED)");
+        contextParts.push(`- Framework: ${targetFramework}`);
         contextParts.push(`- Category: ${requirementContract.identity?.category || "saas_landing"}`);
         contextParts.push(`- Purpose: ${requirementContract.identity?.purpose || "Web application"}`);
         if (requirementContract.mandatoryRequirements?.length > 0) {
@@ -554,11 +609,13 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
 
     contextParts.push(`\n## Revision Request\n${prompt}`);
 
-    console.log("[AI] Revising project...");
+    console.log(`[AI] Revising project (framework=${targetFramework})...`);
+
+    const system = buildReviseSystem(targetFramework, designSpec);
 
     const { object: rawParsed } = await generateStructuredObject({
         schema: RevisionResultSchema,
-        system: REVISE_SYSTEM,
+        system,
         prompt: contextParts.join("\n"),
         maxRetries: 2
     });
@@ -567,7 +624,7 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
         rawParsed.operations = rawParsed.operations.map((op)=>{
             if(!op || typeof op !== "object") return op;
 
-            let opStr = String(op.op || "").trim().toLowerCase();
+            let opStr = String(op.op || op.type || "").trim().toLowerCase();
 
             if(["create", "add", "new"].includes(opStr)) op.op = "create";
             else if (["update", "edit", "modify", "patch"].includes(opStr)) op.op = "update";
@@ -582,19 +639,19 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
             if (op.replace) op.replace = normalizeContent(op.replace);
 
             if (op.op === "create" && op.content){
-                const validation = validateRevisionContent(op.content, op.path, "create");
+                const validation = validateRevisionContent(op.content, op.path, "create", framework);
                 op.content = validation.content;
                 if(validation.warnings.length > 0){
                     console.log(`[Validator] Revision Create adjustments for ${op.path}:\n  - ${validation.warnings.join("\n  - ")}`);
                 }
             }else if(op.op === "update" && op.content){
-                const validation = validateRevisionContent(op.content, op.path, "create");
+                const validation = validateRevisionContent(op.content, op.path, "create", framework);
                 op.content = validation.content;
                 if(validation.warnings.length > 0){
                     console.log(`[Validator] Revision Update (full content) adjustments for ${op.path}:\n  - ${validation.warnings.join("\n  - ")}`);
                 }
             }else if(op.op === "update" && op.replace){
-                 const validation = validateRevisionContent(op.replace, op.path, "update");
+                 const validation = validateRevisionContent(op.replace, op.path, "update", framework);
                  op.replace = validation.content;
                  if(validation.warnings.length > 0){
                     console.log(`[Validator] Revision Update adjustments for ${op.path}:\n  - ${validation.warnings.join("\n  - ")}`);
@@ -610,14 +667,17 @@ export async function reviseProject(prompt, manifest, relevantFiles, recentMessa
  * Regenerates the full content of a file during project revisions when search/replace fails.
  * Avoids brittle exact-text diff matching and guarantees valid, working component code.
  */
-export async function regenerateFileForRevision(filePath, currentCode, prompt, allFiles, designSpec) {
+export async function regenerateFileForRevision(filePath, currentCode, prompt, allFiles, designSpec, framework = null) {
     loadCraftworkSkill();
+    const targetFramework = framework || (
+        Object.keys(allFiles).some((p) => p === "/index.html" || p === "/script.js") ? "vanilla" : "react"
+    );
     const plannedList = Object.keys(allFiles).map((p) => ({
         path: p,
         description: `Component/File ${p}`,
     }));
 
-    const system = buildFileCodeSystem(plannedList, allFiles, designSpec);
+    const system = buildFileCodeSystem(plannedList, allFiles, designSpec, null, filePath, targetFramework);
 
     const userMsg = `Project Revision Request: ${prompt}
 
@@ -641,9 +701,11 @@ CRITICAL: Return the COMPLETE updated file code.
     });
 
     let code = normalizeContent(object.code);
+    const regFramework = (allFiles["/index.html"] && !allFiles["/App.js"] && !allFiles["/App.jsx"]) ? "vanilla" : "react";
     const validation = validateAndFixCode(code, filePath, {
         allPlannedFiles: plannedList,
         existingFiles: Object.keys(allFiles),
+        framework: regFramework,
     });
 
     return validation.code;

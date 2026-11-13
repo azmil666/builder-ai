@@ -207,6 +207,68 @@ export async function analyzeFileCode(filePath, code, options = {}) {
     return analysis;
   }
 
+  // 1. If HTML file, parse HTML structure, elements, attributes, and classes without JS AST parser
+  if (filePath.endsWith(".html")) {
+    const htmlClassMatches = code.match(/\bclass=["']([^"']+)["']/gi) || [];
+    for (const m of htmlClassMatches) {
+      const rawVal = m.replace(/^class=["']/i, "").replace(/["']$/, "");
+      for (const cls of rawVal.split(/\s+/)) {
+        if (cls) analysis.cssClasses.add(cls);
+      }
+    }
+    const htmlIdMatches = code.match(/\bid=["']([^"']+)["']/gi) || [];
+    for (const m of htmlIdMatches) {
+      const idVal = m.replace(/^id=["']/i, "").replace(/["']$/, "");
+      if (idVal) analysis.cssClasses.add(`#${idVal}`);
+    }
+
+    // Extract HTML tags and attributes into analysis.jsxElements
+    const tagRegex = /<([a-zA-Z0-9-]+)([^>]*)>/g;
+    let tMatch;
+    while ((tMatch = tagRegex.exec(code)) !== null) {
+      const tagName = tMatch[1].toLowerCase();
+      if (tagName.startsWith("!")) continue; // skip doctype/comments
+      const attrString = tMatch[2];
+      const attrMap = {};
+
+      const attrRegex = /([a-zA-Z0-9_-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+      let aMatch;
+      while ((aMatch = attrRegex.exec(attrString)) !== null) {
+        const attrName = aMatch[1];
+        const attrVal = aMatch[2] !== undefined ? aMatch[2] : (aMatch[3] !== undefined ? aMatch[3] : (aMatch[4] !== undefined ? aMatch[4] : true));
+        attrMap[attrName] = attrVal;
+
+        if (attrName.toLowerCase().startsWith("on")) {
+          const evtType = attrName.toLowerCase().slice(2);
+          analysis.eventHandlers.push(evtType);
+          analysis.detailedEventHandlers.push({
+            eventType: evtType,
+            handlerType: "inline_html",
+            handlerName: String(attrVal),
+            sourceFile: filePath,
+          });
+        }
+      }
+
+      analysis.jsxElements.push({
+        tag: tagName,
+        attributes: attrMap,
+      });
+    }
+
+    return analysis;
+  }
+
+  // 2. If CSS file, extract class selectors without JS AST parser
+  if (filePath.endsWith(".css")) {
+    const classSelectorMatches = code.match(/\.([a-zA-Z0-9_-]+)/g) || [];
+    for (const m of classSelectorMatches) {
+      const cls = m.replace(/^\./, "");
+      if (cls) analysis.cssClasses.add(cls);
+    }
+    return analysis;
+  }
+
   // Extract Tailwind / CSS classes from raw code (broad heuristic to support Layer C)
   const classMatches = code.match(/className\s*=\s*["'`]([^"'`]+)["'`]|className\s*=\s*{([^}]+)}/g) || [];
   for (const m of classMatches) {
@@ -520,8 +582,11 @@ export async function buildProjectAnalysisMap(files = {}, options = {}) {
 export function verifyFileAndComponentEvidence(contract, files, plan, analysisMap) {
   const items = [];
   const allPaths = Object.keys(files || {});
-  const appAnalysis = analysisMap["/App.js"];
+  const rootEntry = files["/index.html"] ? "/index.html" : (files["/App.jsx"] ? "/App.jsx" : (files["/App.js"] ? "/App.js" : null));
+  const isVanilla = rootEntry === "/index.html";
+  const appAnalysis = rootEntry ? analysisMap[rootEntry] : null;
   const appImports = appAnalysis?.imports?.map((i) => i.source) || [];
+  const appCode = rootEntry ? (files[rootEntry] || "") : "";
 
   // Check 1: Mandatory Pages / Views
   for (const page of contract?.pages || []) {
@@ -547,31 +612,35 @@ export function verifyFileAndComponentEvidence(contract, files, plan, analysisMa
 
     if (dedicatedFile) {
       affectedFiles.push(dedicatedFile);
-      // Verify if the dedicated file is actually imported and reachable
-      const isImportedInApp = appImports.some((src) => src.includes(dedicatedFile.replace(/\.jsx?$/, "")));
-      const appCode = files["/App.js"] || "";
-      const isRenderedInApp = isImportedInApp && new RegExp(`<[A-Z][A-Za-z0-9]*`, "i").test(appCode);
-
-      if (isImportedInApp && isRenderedInApp) {
+      if (isVanilla) {
         status = "PASS";
         evidence.push(`Page component created at ${dedicatedFile}`);
-        evidence.push(`Component is imported in /App.js and integrated into component tree`);
-        explanation = `Page "${page.name}" has dedicated file ${dedicatedFile} connected to application entry.`;
-      } else if (!isImportedInApp && !appCode.toLowerCase().includes(pageId.toLowerCase())) {
-        status = "PARTIAL";
-        confidence = 0.7;
-        evidence.push(`Dedicated file exists at ${dedicatedFile}`);
-        missingEvidence.push(`File ${dedicatedFile} is not imported in /App.js component tree`);
-        explanation = `Page file ${dedicatedFile} exists on disk but is unlinked and unreachable from /App.js.`;
+        explanation = `Page "${page.name}" has dedicated file ${dedicatedFile}.`;
       } else {
-        status = "PASS";
-        evidence.push(`Page component referenced in /App.js`);
-        explanation = `Page "${page.name}" is represented in main app structure.`;
+        // Verify if the dedicated file is actually imported and reachable
+        const isImportedInApp = appImports.some((src) => src.includes(dedicatedFile.replace(/\.jsx?$/, "")));
+        const isRenderedInApp = isImportedInApp && new RegExp(`<[A-Z][A-Za-z0-9]*`, "i").test(appCode);
+
+        if (isImportedInApp && isRenderedInApp) {
+          status = "PASS";
+          evidence.push(`Page component created at ${dedicatedFile}`);
+          evidence.push(`Component is imported in ${rootEntry} and integrated into component tree`);
+          explanation = `Page "${page.name}" has dedicated file ${dedicatedFile} connected to application entry.`;
+        } else if (!isImportedInApp && !appCode.toLowerCase().includes(pageId.toLowerCase())) {
+          status = "PARTIAL";
+          confidence = 0.7;
+          evidence.push(`Dedicated file exists at ${dedicatedFile}`);
+          missingEvidence.push(`File ${dedicatedFile} is not imported in ${rootEntry} component tree`);
+          explanation = `Page file ${dedicatedFile} exists on disk but is unlinked and unreachable from ${rootEntry}.`;
+        } else {
+          status = "PASS";
+          evidence.push(`Page component referenced in ${rootEntry}`);
+          explanation = `Page "${page.name}" is represented in main app structure.`;
+        }
       }
-    } else if (allPaths.includes("/App.js")) {
-      // In single-page architectures (or interactive tools), page may be directly in /App.js
-      affectedFiles.push("/App.js");
-      const appCode = files["/App.js"] || "";
+    } else if (rootEntry) {
+      // In single-page architectures (or interactive tools), page may be directly in root entry
+      affectedFiles.push(rootEntry);
       const representsPage =
         pageId === "home" ||
         pageId === "app" ||
@@ -580,17 +649,17 @@ export function verifyFileAndComponentEvidence(contract, files, plan, analysisMa
 
       if (representsPage) {
         status = "PASS";
-        evidence.push(`Page structure implemented directly in /App.js`);
-        explanation = `Primary view "${page.name}" is mounted in /App.js.`;
+        evidence.push(`Page structure implemented directly in ${rootEntry}`);
+        explanation = `Primary view "${page.name}" is mounted in ${rootEntry}.`;
       } else {
         status = isPrimary ? "PARTIAL" : "FAIL";
         missingEvidence.push(`No dedicated file or explicit view representation for "${page.name}"`);
-        explanation = `Page "${page.name}" lacks dedicated file and is not explicitly mapped in /App.js.`;
+        explanation = `Page "${page.name}" lacks dedicated file and is not explicitly mapped in ${rootEntry}.`;
       }
     } else {
       status = "FAIL";
-      missingEvidence.push("Missing /App.js entry point");
-      explanation = `Page "${page.name}" cannot be mounted because /App.js does not exist.`;
+      missingEvidence.push("Missing project entry point (/index.html or /App.jsx)");
+      explanation = `Page "${page.name}" cannot be mounted because entry point does not exist.`;
     }
 
     items.push({
@@ -607,7 +676,7 @@ export function verifyFileAndComponentEvidence(contract, files, plan, analysisMa
       recommendedAction:
         status === "PASS"
           ? "None"
-          : `Ensure page view "${page.name}" has a dedicated component imported in /App.js.`,
+          : `Ensure page view "${page.name}" has a dedicated component or view in project entry.`,
       source: "deterministic_static",
     });
   }
@@ -648,34 +717,37 @@ export function verifyFileAndComponentEvidence(contract, files, plan, analysisMa
           explanation = `Section "${sec.name}" is implemented in ${matchingFile}.`;
         } else {
           status = "PARTIAL";
-          missingEvidence.push(`Component ${matchingFile} is empty or lacks JSX body`);
+          missingEvidence.push(`Component ${matchingFile} is empty or lacks implementation body`);
           explanation = `Section file ${matchingFile} exists but contains minimal implementation.`;
         }
-      } else {
-        // Fallback check inside /App.js
-        const appCode = files["/App.js"] || "";
-        const appHasSec =
+      } else if (rootEntry) {
+        // Fallback check inside root entry file
+        const rootHasSec =
           appCode.toLowerCase().includes(secKey) || appCode.toLowerCase().includes(secId);
 
-        if (appHasSec) {
-          affectedFiles.push("/App.js");
-          if (isComplex) {
-            // Complex section implemented inside /App.js without dedicated component
+        if (rootHasSec) {
+          affectedFiles.push(rootEntry);
+          if (isComplex && !isVanilla) {
+            // Complex section implemented inside /App without dedicated component in React
             status = "PARTIAL";
             confidence = 0.7;
-            evidence.push(`Section references found in /App.js`);
+            evidence.push(`Section references found in ${rootEntry}`);
             missingEvidence.push(`Complex section "${sec.name}" lacks a dedicated component`);
-            explanation = `Complex section "${sec.name}" is implemented directly in /App.js rather than a modular component.`;
+            explanation = `Complex section "${sec.name}" is implemented directly in ${rootEntry} rather than a modular component.`;
           } else {
             status = "PASS";
-            evidence.push(`Section content integrated in /App.js`);
-            explanation = `Section "${sec.name}" is assembled inside /App.js.`;
+            evidence.push(`Section content integrated in ${rootEntry}`);
+            explanation = `Section "${sec.name}" is assembled inside ${rootEntry}.`;
           }
         } else {
           status = "FAIL";
-          missingEvidence.push(`No component or JSX block implementing section "${sec.name}"`);
+          missingEvidence.push(`No component or markup block implementing section "${sec.name}"`);
           explanation = `Required section "${sec.name}" is completely missing from generated code.`;
         }
+      } else {
+        status = "FAIL";
+        missingEvidence.push(`No component or entry point implementing section "${sec.name}"`);
+        explanation = `Required section "${sec.name}" is missing because project has no entry point.`;
       }
 
       items.push({
@@ -692,7 +764,7 @@ export function verifyFileAndComponentEvidence(contract, files, plan, analysisMa
         recommendedAction:
           status === "PASS"
             ? "None"
-            : `Implement section "${sec.name}" in a dedicated component or inside /App.js.`,
+            : `Implement section "${sec.name}" in a dedicated component or inside ${rootEntry || "/App.js"}.`,
         source: "deterministic_static",
       });
     }
@@ -1150,6 +1222,7 @@ export function verifyFunctionalEvidence(contract, files, analysisMap) {
       let hasTabState = false;
       let hasToggleHandler = false;
       let hasConditionalDisplay = false;
+      const isVanilla = Boolean(files["/index.html"] && !files["/App.js"] && !files["/App.jsx"]);
 
       for (const a of allAnalysis) {
         if (a.stateHooks.some((s) => /tab|active|open|expanded|accordion|faq/i.test(s.name))) {
@@ -1158,18 +1231,24 @@ export function verifyFunctionalEvidence(contract, files, analysisMap) {
         }
 
         if (
-          a.eventHandlers.some((h) => /settab|setactive|toggle|setopen/i.test(String(h.val || ""))) ||
-          /setActiveTab|setOpenIndex|toggleItem|setActive\s*\(/i.test(a.rawCode)
+          a.eventHandlers.some((h) => /settab|setactive|toggle|setopen|click/i.test(String(h.val || h || ""))) ||
+          /setActiveTab|setOpenIndex|toggleItem|setActive\s*\(|toggleTab|classList\.toggle/i.test(a.rawCode)
         ) {
           hasToggleHandler = true;
         }
 
         if (
           /activeTab\s*===|openIndex\s*===|isOpen\s*\?|isExpanded\s*\?/i.test(a.rawCode) ||
-          /expandedIndex\s*===/i.test(a.rawCode)
+          /expandedIndex\s*===/i.test(a.rawCode) ||
+          /classList\.toggle|style\.display|\.active\b/i.test(a.rawCode)
         ) {
           hasConditionalDisplay = true;
         }
+      }
+
+      if (isVanilla && hasToggleHandler && (hasConditionalDisplay || /tab|accordion/i.test(combinedCode))) {
+        hasTabState = true;
+        hasConditionalDisplay = true;
       }
 
       if (hasTabState && hasToggleHandler && hasConditionalDisplay) {
@@ -1260,6 +1339,7 @@ export function verifyDesignAndResponsiveEvidence(contract, files, analysisMap) 
   const stylesCode = files["/styles.css"] || "";
   const combinedCode = Object.values(files || {}).join("\n");
   const allAnalysis = Object.values(analysisMap || {});
+  const rootEntry = files["/index.html"] ? "/index.html" : (files["/App.jsx"] ? "/App.jsx" : (files["/App.js"] ? "/App.js" : null));
 
   // Check 1: Color / Theme Treatment
   const requestedTheme = contract?.design?.colorPreferences?.theme || "light";
@@ -1309,11 +1389,11 @@ export function verifyDesignAndResponsiveEvidence(contract, files, analysisMap) 
     evidence: themeEvidence,
     missingEvidence: themeMissing,
     explanation: themeExplanation,
-    affectedFiles: ["/styles.css", "/App.js"].filter((p) => files[p]),
+    affectedFiles: ["/styles.css", rootEntry].filter(Boolean),
     recommendedAction:
       themeStatus === "PASS"
         ? "None"
-        : `Apply ${requestedTheme} background and text classes to /App.js and /styles.css.`,
+        : `Apply ${requestedTheme} background and text classes to ${rootEntry || "/App.js"} and /styles.css.`,
     source: "deterministic_static",
   });
 
@@ -1401,6 +1481,8 @@ export function verifyContractFilePlanConsistency(contract, files, plan, analysi
   const items = [];
   const allPaths = Object.keys(files || {});
   const plannedFiles = plan?.files || [];
+  const isVanilla = Boolean(files["/index.html"] && !files["/App.js"] && !files["/App.jsx"]) || contract?.framework === "vanilla";
+  const defaultEntry = isVanilla ? "/index.html" : (files["/App.jsx"] ? "/App.jsx" : "/App.js");
 
   // Check 1: Missing Referenced FilePlan Files
   for (const pf of plannedFiles) {
@@ -1425,7 +1507,10 @@ export function verifyContractFilePlanConsistency(contract, files, plan, analysi
   // Check 2: Requirements mapped to unrelated or missing files
   for (const fn of contract?.functionalRequirements || []) {
     if (fn.implementationTarget) {
-      const target = fn.implementationTarget;
+      let target = fn.implementationTarget;
+      if (isVanilla && !files[target] && (files["/script.js"] || files["/index.html"])) {
+        target = files["/script.js"] ? "/script.js" : "/index.html";
+      }
       if (!files[target]) {
         items.push({
           requirementId: `consistency_target_missing_${fn.id}`,
@@ -1498,7 +1583,7 @@ export function verifyContractFilePlanConsistency(contract, files, plan, analysi
         evidence: [],
         missingEvidence: [`No code or component evidence for mandatory requirement "${mandText}"`],
         explanation: `Mandatory requirement "${mandText}" is not satisfied in generated project.`,
-        affectedFiles: candidateByPath ? [candidateByPath] : ["/App.js"],
+        affectedFiles: candidateByPath ? [candidateByPath] : [defaultEntry],
         recommendedAction: `Implement the missing mandatory requirement: ${mandText}.`,
         source: "deterministic_static",
       });

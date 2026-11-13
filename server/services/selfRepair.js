@@ -21,7 +21,7 @@ import {
   FileCodeSchema,
 } from "./aiSchemas.js";
 import { generateStructuredObject } from "./ai.js";
-import { validateProject, validateAndFixCode, verifyProjectRuntime } from "./codeValidator.js";
+import { validateProject, validateAndFixCode, verifyProjectRuntime, inferFramework } from "./codeValidator.js";
 import { verifyProjectRequirements } from "./requirementVerification.js";
 import { buildFileCodeSystem } from "./prompts.js";
 import { normalizeContent } from "./contentNormalizer.js";
@@ -202,16 +202,34 @@ export function createRepairPlan(
     return 0;
   });
 
+  const framework = inferFramework(files, requirementContract?.framework);
+  const isVanilla = framework === "vanilla";
+
   // 3. Group by target file to prevent duplicate repairs and conflicting edits on the same component
   const fileGroups = new Map();
 
   for (const failure of sortedFailures) {
-    // Determine the most specific existing JS/JSX target file (avoid non-code files like package.json)
-    let target = failure.affectedFiles.find(
-      (p) => files[p] && (p.endsWith(".js") || p.endsWith(".jsx"))
-    );
-    if (!target) {
-      target = failure.affectedFiles.find((p) => p.endsWith(".js") || p.endsWith(".jsx")) || "/App.js";
+    let target = null;
+    if (isVanilla) {
+      target = failure.affectedFiles.find(
+        (p) => files[p] && (p.endsWith(".js") || p.endsWith(".html") || p.endsWith(".css"))
+      );
+      if (!target) {
+        target = failure.affectedFiles.find((p) => p.endsWith(".js") || p.endsWith(".html") || p.endsWith(".css"));
+      }
+      if (!target) {
+        target = files["/script.js"] ? "/script.js" : (files["/index.html"] ? "/index.html" : "/script.js");
+      }
+    } else {
+      target = failure.affectedFiles.find(
+        (p) => files[p] && (p.endsWith(".js") || p.endsWith(".jsx"))
+      );
+      if (!target) {
+        target = failure.affectedFiles.find((p) => p.endsWith(".js") || p.endsWith(".jsx"));
+      }
+      if (!target) {
+        target = files["/App.jsx"] ? "/App.jsx" : "/App.js";
+      }
     }
 
     if (!fileGroups.has(target)) {
@@ -240,10 +258,12 @@ export function createRepairPlan(
       specificMissingImplementation:
         missingItems.length > 0 ? missingItems.join("; ") : primaryFailure.diagnosticExplanation,
       constraints: [
-        "Preserve all existing working components, exports, and state hooks",
+        "Preserve all existing working features, exports, and logic",
         "Preserve Craftwork design tokens, color palette, and styling in styles.css",
         "Do not modify or import non-existent external dependencies",
-        "Return complete, working React/JSX code with proper default export",
+        isVanilla
+          ? "Return complete, working vanilla JavaScript/HTML without React imports or JSX syntax"
+          : "Return complete, working React/JSX code with proper default export",
       ],
       verificationCriteria: expectedBehaviors.map((b) => `Must satisfy: ${b}`),
     });
@@ -283,7 +303,8 @@ export async function generateTargetedRepairForTask({
   designSpec = null,
   filePlan = null,
 }) {
-  const targetFile = task.targetFile || (task.affectedFiles && task.affectedFiles[0]) || "/App.js";
+  const framework = inferFramework(currentFiles, requirementContract?.framework);
+  const targetFile = task.targetFile || (task.affectedFiles && task.affectedFiles[0]) || (framework === "vanilla" ? "/script.js" : "/App.jsx");
   const currentCode = currentFiles[targetFile] || "";
   const allPlanned = filePlan?.files || Object.keys(currentFiles).map((p) => ({ path: p, description: p }));
 
@@ -323,6 +344,7 @@ INSTRUCTIONS:
   const validated = validateAndFixCode(rawCode, targetFile, {
     allPlannedFiles: allPlanned,
     existingFiles: Object.keys(currentFiles),
+    framework,
   });
 
   return {
@@ -339,7 +361,7 @@ INSTRUCTIONS:
  * Evaluates a candidate repaired project against rigorous acceptance gates.
  *
  * Acceptance Gates:
- * 1. File existence & basic structure (/App.js must exist).
+ * 1. File existence & basic structure (/index.html for vanilla, /App.jsx or /App.js for React).
  * 2. Code syntax/import/export validation must succeed without critical errors.
  * 3. Runtime execution smoke check must pass without exception.
  * 4. Phase 3 Requirement Verification is re-evaluated.
@@ -362,18 +384,30 @@ export async function evaluateRepairCandidate({
   requirementContract = null,
   filePlan = null,
 }) {
+  const framework = inferFramework(candidateFiles, requirementContract?.framework);
+
   // Gate 1: Structure check
-  if (!candidateFiles["/App.js"]) {
-    return {
-      accepted: false,
-      candidateVerification: originalVerification,
-      reason: "Missing /App.js entry point in repaired candidate",
-    };
+  if (framework === "vanilla") {
+    if (!candidateFiles["/index.html"]) {
+      return {
+        accepted: false,
+        candidateVerification: originalVerification,
+        reason: "Missing /index.html entry point in repaired candidate",
+      };
+    }
+  } else {
+    if (!candidateFiles["/App.jsx"] && !candidateFiles["/App.js"]) {
+      return {
+        accepted: false,
+        candidateVerification: originalVerification,
+        reason: "Missing /App.jsx or /App.js entry point in repaired candidate",
+      };
+    }
   }
 
   // Gate 2: Code syntax and import validation
   const plannedItems = filePlan?.files || Object.keys(candidateFiles).map((p) => ({ path: p, description: p }));
-  const valResult = validateProject(candidateFiles, plannedItems);
+  const valResult = validateProject(candidateFiles, plannedItems, framework);
   if (!valResult.valid && valResult.errors.length > 0) {
     const errorDetails = valResult.errors.map((e) => `[${e.file}] ${e.message}`).join("; ");
     return {
@@ -384,7 +418,7 @@ export async function evaluateRepairCandidate({
   }
 
   // Gate 3: Runtime execution smoke test
-  const runtResult = await verifyProjectRuntime(candidateFiles);
+  const runtResult = await verifyProjectRuntime(candidateFiles, framework);
   if (!runtResult.valid && runtResult.errors.length > 0) {
     const errorDetails = runtResult.errors.map((e) => `[${e.file}] ${e.message}`).join("; ");
     return {
@@ -397,7 +431,7 @@ export async function evaluateRepairCandidate({
   // Gate 4: Phase 3 Requirement Verification re-evaluation
   let candidateVerification;
   try {
-    candidateVerification = await verifyProjectRequirements(candidateFiles, requirementContract, filePlan);
+    candidateVerification = await verifyProjectRequirements(candidateFiles, requirementContract, filePlan, { framework });
   } catch (verifErr) {
     return {
       accepted: false,
@@ -486,8 +520,10 @@ export async function runEvidenceDrivenSelfRepairLoop({
   filePlan = null,
   callbacks = {},
   maxAttempts = 2,
+  framework = null,
 }) {
   let workingFiles = { ...files };
+  const targetFramework = framework || inferFramework(files, requirementContract?.framework);
   const filesChanged = [];
   const attemptLogs = [];
   let rollbackCount = 0;
@@ -495,12 +531,12 @@ export async function runEvidenceDrivenSelfRepairLoop({
   const seenFailureSignatures = new Set();
 
   // 1. Initial baseline verification
-  let currentVerification = await verifyProjectRequirements(workingFiles, requirementContract, filePlan);
+  let currentVerification = await verifyProjectRequirements(workingFiles, requirementContract, filePlan, { framework: targetFramework });
   const initialVerification = currentVerification;
 
   // 2. Initial failure classification
-  const initialValidation = validateProject(workingFiles, filePlan?.files || []);
-  const initialRuntime = await verifyProjectRuntime(workingFiles);
+  const initialValidation = validateProject(workingFiles, filePlan?.files || [], targetFramework);
+  const initialRuntime = await verifyProjectRuntime(workingFiles, targetFramework);
 
   const initialFailures = classifyFailures({
     verificationSummary: initialVerification,
@@ -547,7 +583,7 @@ export async function runEvidenceDrivenSelfRepairLoop({
   }
 
   // 3. Notify start of self-repair
-  console.log(`[SelfRepair] Starting evidence-driven self-repair loop (${actionableFailures.length} actionable failure(s), maxAttempts=${maxAttempts})`);
+  console.log(`[SelfRepair] Starting evidence-driven self-repair loop (${actionableFailures.length} actionable failure(s), maxAttempts=${maxAttempts}, framework=${targetFramework})`);
   if (callbacks?.onRepairStarted) {
     await callbacks.onRepairStarted({
       status: "repairing",
@@ -564,8 +600,8 @@ export async function runEvidenceDrivenSelfRepairLoop({
     attempt++;
 
     // Re-classify current working files
-    const curVal = validateProject(workingFiles, filePlan?.files || []);
-    const curRunt = await verifyProjectRuntime(workingFiles);
+    const curVal = validateProject(workingFiles, filePlan?.files || [], targetFramework);
+    const curRunt = await verifyProjectRuntime(workingFiles, targetFramework);
     const curFailures = classifyFailures({
       verificationSummary: currentVerification,
       validationErrors: curVal.errors,

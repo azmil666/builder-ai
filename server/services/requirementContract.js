@@ -6,7 +6,19 @@ import { REQUIREMENT_CONTRACT_SYSTEM } from "./prompts.js";
  * Creates an intelligent, comprehensive fallback Requirement Contract directly
  * from user prompt heuristics if structured AI generation fails or is bypassed.
  */
-export function createDefaultRequirementContract(prompt = "") {
+export function createDefaultRequirementContract(prompt = "", frameworkOrOptions = null) {
+  let framework = "react";
+  if (typeof frameworkOrOptions === "string" && (frameworkOrOptions === "vanilla" || frameworkOrOptions === "react")) {
+    framework = frameworkOrOptions;
+  } else if (frameworkOrOptions && typeof frameworkOrOptions === "object" && (frameworkOrOptions.framework === "vanilla" || frameworkOrOptions.framework === "react")) {
+    framework = frameworkOrOptions.framework;
+  } else if (/\b(vanilla|html5?|pure js|no react)\b/i.test(prompt)) {
+    framework = "vanilla";
+  }
+
+  const isVanilla = framework === "vanilla";
+  const defaultTarget = (reactPath) => (isVanilla ? "/script.js" : reactPath);
+
   const p = prompt.toLowerCase();
 
   // Extract quoted copy from prompt (e.g. slogans, quotes, explicit phrases)
@@ -120,7 +132,7 @@ export function createDefaultRequirementContract(prompt = "") {
       category: "game_logic",
       expectedBehavior: "React state updates instantly upon interaction with clear visual transitions",
       priority: "mandatory",
-      implementationTarget: "/App.js",
+      implementationTarget: defaultTarget("/App.js"),
     });
   } else if (isEcommerce) {
     mandatory.push("Product catalog listing and product cards");
@@ -191,7 +203,7 @@ export function createDefaultRequirementContract(prompt = "") {
         category: "ecommerce_cart",
         expectedBehavior: "Adding items opens or updates bag; totals update reactively",
         priority: "mandatory",
-        implementationTarget: "/components/CartDrawer.js",
+        implementationTarget: defaultTarget("/components/CartDrawer.js"),
       });
     }
 
@@ -203,7 +215,7 @@ export function createDefaultRequirementContract(prompt = "") {
         category: "search_filtering",
         expectedBehavior: "Clicking filter pills immediately updates rendered product items",
         priority: "mandatory",
-        implementationTarget: "/components/ProductGrid.js",
+        implementationTarget: defaultTarget("/components/ProductGrid.js"),
       });
     }
   } else if (isRestaurant) {
@@ -261,7 +273,7 @@ export function createDefaultRequirementContract(prompt = "") {
         category: "forms_validation",
         expectedBehavior: "Validates required fields and provides immediate confirmation message",
         priority: "mandatory",
-        implementationTarget: "/components/Reservation.js",
+        implementationTarget: defaultTarget("/components/Reservation.js"),
       },
       {
         id: "menu_filter",
@@ -270,7 +282,7 @@ export function createDefaultRequirementContract(prompt = "") {
         category: "tabs_accordions",
         expectedBehavior: "Switching tabs displays corresponding course dishes smoothly",
         priority: "mandatory",
-        implementationTarget: "/components/Menu.js",
+        implementationTarget: defaultTarget("/components/Menu.js"),
       }
     );
   } else {
@@ -328,7 +340,7 @@ export function createDefaultRequirementContract(prompt = "") {
       category: "tabs_accordions",
       expectedBehavior: "Clicking items smoothly switches the active demonstration view",
       priority: "mandatory",
-      implementationTarget: "/components/Features.js",
+      implementationTarget: defaultTarget("/components/Features.js"),
     });
   }
 
@@ -357,7 +369,7 @@ export function createDefaultRequirementContract(prompt = "") {
         category: "forms_validation",
         expectedBehavior: "Validates required inputs and displays feedback toast on submit",
         priority: "mandatory",
-        implementationTarget: "/components/Contact.js",
+        implementationTarget: defaultTarget("/components/Contact.js"),
       });
       mandatory.push("Contact inquiry form");
     }
@@ -380,7 +392,7 @@ export function createDefaultRequirementContract(prompt = "") {
         category: "tabs_accordions",
         expectedBehavior: "Clicking a question toggles its answer visibility",
         priority: "mandatory",
-        implementationTarget: "/components/Faq.js",
+        implementationTarget: defaultTarget("/components/Faq.js"),
       });
       mandatory.push("FAQ Accordion section");
     }
@@ -502,13 +514,14 @@ export function createDefaultRequirementContract(prompt = "") {
       requiredCopy: [...quotedMatches],
       toneOfVoice: isRestaurant ? "Atmospheric, welcoming, artisanal" : isPortfolio ? "Refined, visionary, articulate" : "Direct, confident, inspiring",
       imageryRequirements: isEcommerce ? ["Curated product photography, editorial showcase"] : isRestaurant ? ["Culinary dishes, dining room interior"] : ["Digital tools, modern interface"],
-      iconRequirements: ["lucide-react inline icons"],
+      iconRequirements: framework === "react" ? ["lucide-react inline icons"] : ["Inline SVG icons or Lucide SVG icons"],
       placeholderRestrictions: "Use realistic domain-specific copy and pricing; avoid generic lorem ipsum",
       userProvidedAssets,
     },
     mandatoryRequirements: mandatory,
     optionalEnhancements: optional,
     inferredRequirements: inferred,
+    framework,
   };
 
   return RequirementContractSchema.parse(raw);
@@ -519,23 +532,28 @@ export function createDefaultRequirementContract(prompt = "") {
  * Falls back to createDefaultRequirementContract if AI generation fails or is malformed.
  */
 export async function generateRequirementContract(prompt, options = {}) {
-  const maxRetries = options.maxRetries ?? 2;
+  const resolvedOptions = typeof options === "string" ? { framework: options } : (options || {});
+  const maxRetries = resolvedOptions.maxRetries ?? 2;
+  const targetFramework = resolvedOptions.framework || (/\b(react|jsx|tsx|component-based|single[- ]page app|spa)\b/i.test(prompt) ? "react" : "vanilla");
 
   try {
     const { object: contract } = await generateStructuredObject({
       schema: RequirementContractSchema,
       system: REQUIREMENT_CONTRACT_SYSTEM,
-      prompt: `Analyze the user's website request and synthesize a complete, production-grade Requirement Contract for: "${prompt}"`,
+      prompt: `Analyze the user's website request and synthesize a complete, production-grade Requirement Contract for: "${prompt}" (Target Framework: ${targetFramework})`,
       maxRetries,
     });
 
     // Validate using Zod schema to ensure full structural compliance
-    const validated = RequirementContractSchema.parse(contract);
-    console.log(`[RequirementContract] Synthesized contract: category="${validated.identity.category}", mandatory=${validated.mandatoryRequirements.length}, functional=${validated.functionalRequirements.length}`);
+    const validated = RequirementContractSchema.parse({
+      ...contract,
+      framework: contract.framework || targetFramework,
+    });
+    console.log(`[RequirementContract] Synthesized contract: category="${validated.identity.category}", framework="${validated.framework}", mandatory=${validated.mandatoryRequirements.length}, functional=${validated.functionalRequirements.length}`);
     return validated;
   } catch (err) {
     console.warn(`[RequirementContract] Structured AI synthesis failed (${err.message}). Using intelligent default contract.`);
-    return createDefaultRequirementContract(prompt);
+    return createDefaultRequirementContract(prompt, targetFramework);
   }
 }
 
@@ -625,8 +643,8 @@ export function formatContractForFileCode(contract, filePath) {
 
   const lines = [];
 
-  if (filePath === "/App.js") {
-    lines.push("### File Responsibility: Main Application Entry (/App.js)");
+  if (filePath === "/App.js" || filePath === "/App.jsx") {
+    lines.push(`### File Responsibility: Main Application Entry (${filePath})`);
     lines.push("- Must assemble all primary page sections and layout structure.");
     lines.push(`- Theme: ${contract.design?.colorPreferences?.theme || "light"} mode.`);
     if (contract.navigation) {
@@ -634,11 +652,27 @@ export function formatContractForFileCode(contract, filePath) {
     }
     // List mandatory functional requirements that often live at App level (cart state, routing, active tabs)
     const appLevelFns = (contract.functionalRequirements || []).filter(
-      (f) => !f.implementationTarget || f.implementationTarget === "/App.js" || f.category === "ecommerce_cart" || f.category === "game_logic"
+      (f) => !f.implementationTarget || f.implementationTarget === "/App.js" || f.implementationTarget === "/App.jsx" || f.category === "ecommerce_cart" || f.category === "game_logic"
     );
     if (appLevelFns.length > 0) {
-      lines.push("- Core Functional States to manage in /App.js:");
+      lines.push(`- Core Functional States to manage in ${filePath}:`);
       for (const fn of appLevelFns) {
+        lines.push(`  * ${fn.name}: ${fn.expectedBehavior}`);
+      }
+    }
+  } else if (filePath === "/index.html") {
+    lines.push("### File Responsibility: Main Semantic HTML5 Entry (/index.html)");
+    lines.push("- Must assemble all primary page sections and semantic HTML5 structure.");
+    lines.push(`- Theme: ${contract.design?.colorPreferences?.theme || "light"} mode.`);
+    if (contract.navigation) {
+      lines.push(`- Navigation: Type="${contract.navigation.type}", Primary Items: ${contract.navigation.primaryItems?.join(", ")}`);
+    }
+  } else if (filePath === "/script.js") {
+    lines.push("### File Responsibility: Main Vanilla JavaScript (/script.js)");
+    lines.push("- Interactive DOM logic, event listeners, and dynamic UI states.");
+    if (contract.functionalRequirements?.length > 0) {
+      lines.push("- Core Functional States to manage in /script.js:");
+      for (const fn of contract.functionalRequirements) {
         lines.push(`  * ${fn.name}: ${fn.expectedBehavior}`);
       }
     }
@@ -777,9 +811,9 @@ export function verifyFilePlanAlignment(plan, contract) {
         const secId = (sec.id || "").toLowerCase();
         const secKey = secName.split(" ")[0];
 
-        // Dedicated component check (excluding /App.js and /styles.css unless single-file app)
+        // Dedicated component check (excluding main entry files, styles, and scripts unless single-file app)
         const matchingFile = plan.files.find((f) => {
-          if (f.path === "/App.js" || f.path === "/styles.css") return false;
+          if (f.path === "/App.js" || f.path === "/App.jsx" || f.path === "/index.html" || f.path === "/styles.css" || f.path === "/script.js") return false;
           const text = `${f.path} ${f.description || ""} ${(f.responsibilities || []).join(" ")}`.toLowerCase();
           return text.includes(secKey) || text.includes(secId) || text.includes(secName);
         });
@@ -789,27 +823,27 @@ export function verifyFilePlanAlignment(plan, contract) {
           sec.name + " " + sec.id
         );
 
+        const mainEntry = plan.files.find((f) => f.path === "/App.jsx" || f.path === "/App.js" || f.path === "/index.html");
+
         if (hasDedicatedMatch) {
           explicitlyMapped.push(`Section "${sec.name}" (mapped to ${matchingFile.path})`);
         } else if (isInteractiveApp) {
-          const appEntry = plan.files.find((f) => f.path === "/App.js");
-          if (appEntry) {
-            explicitlyMapped.push(`Section "${sec.name}" (mapped to /App.js)`);
+          if (mainEntry) {
+            explicitlyMapped.push(`Section "${sec.name}" (mapped to ${mainEntry.path})`);
           } else {
             missingRequirements.push(`Section "${sec.name}"`);
           }
         } else if (isComplexSection) {
-          // Complex sections require a dedicated component and CANNOT be silently assigned to /App.js
+          // Complex sections require a dedicated component and CANNOT be silently assigned to /App.js or /index.html
           missingRequirements.push(`Complex section "${sec.name}" requires dedicated component`);
           warnings.push(`Mandatory complex section "${sec.name}" is not mapped to a dedicated component`);
         } else {
-          // Simple sections (hero, footer, cta) can be auto-assigned to /App.js if it exists
-          const appEntry = plan.files.find((f) => f.path === "/App.js");
-          if (appEntry) {
-            appEntry.responsibilities = appEntry.responsibilities || [];
-            appEntry.responsibilities.push(`Implement ${sec.name}: ${sec.purpose}`);
+          // Simple sections (hero, footer, cta) or vanilla sections can be auto-assigned to main entry if it exists
+          if (mainEntry) {
+            mainEntry.responsibilities = mainEntry.responsibilities || [];
+            mainEntry.responsibilities.push(`Implement ${sec.name}: ${sec.purpose}`);
             autoAssignedToApp.push(`Section "${sec.name}"`);
-            warnings.push(`Auto-assigned mandatory section "${sec.name}" to /App.js responsibilities`);
+            warnings.push(`Auto-assigned mandatory section "${sec.name}" to ${mainEntry.path} responsibilities`);
           } else {
             missingRequirements.push(`Section "${sec.name}"`);
           }
