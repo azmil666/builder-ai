@@ -16,4 +16,24 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (
+              /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom)[\\/]/.test(id)
+            ) {
+              return 'react-vendor'
+            }
+            if (
+              /[\\/]node_modules[\\/](framer-motion|lucide-react)[\\/]/.test(id)
+            ) {
+              return 'ui-vendor'
+            }
+          }
+        },
+      },
+    },
+  },
 })
