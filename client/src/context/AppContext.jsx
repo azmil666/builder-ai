@@ -550,6 +550,36 @@ export function AppContextProvider({children}){
     [loadProject],
   );
 
+  const debouncedSave = React.useMemo(
+    () =>
+      debounce(async (files, id) => {
+        setSyncStatus("saving");
+        try {
+          await api.put(`/api/projects/${id}/files`, { files });
+          setSyncStatus("saved");
+          setDirtyFiles(new Set());
+        } catch (err) {
+          console.error("Failed to auto-save files:", err);
+          setSyncStatus("error");
+          toast.error("Failed to save code modifications");
+        }
+      }, 1000),
+    [],
+  );
+
+  useEffect(() => {
+    return () => {
+      debouncedSave.flush();
+    };
+  }, [debouncedSave]);
+
+  const saveNow = useCallback(async () => {
+    debouncedSave.flush();
+    setSyncStatus("saved");
+    setDirtyFiles(new Set());
+    toast.success("Saved project files");
+  }, [debouncedSave]);
+
   const fetchProjectVersions = useCallback(
     async (projectId) => {
       if (!projectId || !user) return [];
@@ -614,36 +644,6 @@ export function AppContextProvider({children}){
     },
     [user, debouncedSave],
   );
-
-  const debouncedSave = React.useMemo(
-    () =>
-      debounce(async (files, id) => {
-        setSyncStatus("saving");
-        try {
-          await api.put(`/api/projects/${id}/files`, { files });
-          setSyncStatus("saved");
-          setDirtyFiles(new Set());
-        } catch (err) {
-          console.error("Failed to auto-save files:", err);
-          setSyncStatus("error");
-          toast.error("Failed to save code modifications");
-        }
-      }, 1000),
-    [],
-  );
-
-  useEffect(() => {
-    return () => {
-      debouncedSave.flush();
-    };
-  }, [debouncedSave]);
-
-  const saveNow = useCallback(async () => {
-    debouncedSave.flush();
-    setSyncStatus("saved");
-    setDirtyFiles(new Set());
-    toast.success("Saved project files");
-  }, [debouncedSave]);
 
   const markFileDirty = useCallback((path, isDirty = true) => {
     setDirtyFiles((prev) => {
