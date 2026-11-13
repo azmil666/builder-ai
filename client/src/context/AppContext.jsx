@@ -727,16 +727,17 @@ export function AppContextProvider({children}){
   const closeTab = useCallback(
     (path) => {
       setOpenTabs((prev) => {
+        const fallback = getDefaultActiveFile(activeProject);
         const filtered = prev.filter((p) => p !== path);
-        const nextTabs = filtered.length > 0 ? filtered : ["/App.js"];
+        const nextTabs = filtered.length > 0 ? filtered : [fallback];
         if (activeFile === path) {
-          const nextActive = nextTabs[nextTabs.length - 1] || "/App.js";
+          const nextActive = nextTabs[nextTabs.length - 1] || fallback;
           setActiveFile(nextActive);
         }
         return nextTabs;
       });
     },
-    [activeFile],
+    [activeFile, activeProject],
   );
 
   const updateProjectFiles = useCallback(

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CodeIcon,
@@ -8,7 +8,80 @@ import {
   XIcon,
 } from 'lucide-react';
 
-const FILE_TEMPLATES = [
+const VANILLA_FILE_TEMPLATES = [
+  {
+    id: 'html',
+    label: 'HTML Page',
+    ext: '.html',
+    icon: FileCodeIcon,
+    defaultPath: '/about.html',
+    content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Page</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen p-8">
+  <main class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">New Page</h1>
+    <p class="text-zinc-400">Content goes here.</p>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
+`,
+  },
+  {
+    id: 'css',
+    label: 'CSS Stylesheet',
+    ext: '.css',
+    icon: FileTextIcon,
+    defaultPath: '/custom.css',
+    content: `/* Custom Project Styles */
+.custom-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.custom-card:hover {
+  transform: translateY(-2px);
+}
+`,
+  },
+  {
+    id: 'script',
+    label: 'JavaScript File',
+    ext: '.js',
+    icon: CodeIcon,
+    defaultPath: '/scripts/main.js',
+    content: `// Client Script
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('Script loaded successfully');
+});
+`,
+  },
+  {
+    id: 'json',
+    label: 'JSON Data',
+    ext: '.json',
+    icon: FileTextIcon,
+    defaultPath: '/data.json',
+    content: `{
+  "items": [
+    {
+      "id": 1,
+      "title": "Item 1",
+      "description": "Sample data"
+    }
+  ]
+}
+`,
+  },
+];
+
+const REACT_FILE_TEMPLATES = [
   {
     id: 'component',
     label: 'React Component',
@@ -81,11 +154,23 @@ export default function FileCreateModal({
   isOpen,
   onClose,
   existingFiles = {},
+  framework = 'react',
   onCreate,
 }) {
-  const [selectedTemplate, setSelectedTemplate] = useState(FILE_TEMPLATES[0]);
-  const [filePath, setFilePath] = useState(FILE_TEMPLATES[0].defaultPath);
+  const isVanilla = framework === 'vanilla';
+  const templates = isVanilla ? VANILLA_FILE_TEMPLATES : REACT_FILE_TEMPLATES;
+
+  const [selectedTemplate, setSelectedTemplate] = useState(templates[0]);
+  const [filePath, setFilePath] = useState(templates[0].defaultPath);
   const [error, setError] = useState('');
+
+  // Update template selection when framework changes
+  useEffect(() => {
+    const nextTemplates = isVanilla ? VANILLA_FILE_TEMPLATES : REACT_FILE_TEMPLATES;
+    setSelectedTemplate(nextTemplates[0]);
+    setFilePath(nextTemplates[0].defaultPath);
+    setError('');
+  }, [isVanilla]);
 
   const handleTemplateSelect = (template) => {
     setSelectedTemplate(template);
@@ -104,7 +189,7 @@ export default function FileCreateModal({
     const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 
     if (!/\.(js|jsx|css|json|html)$/.test(cleanPath)) {
-      setError('Path must end with a valid extension (.jsx, .js, .css, .json)');
+      setError('Path must end with a valid extension (.html, .jsx, .js, .css, .json)');
       return;
     }
 
@@ -154,13 +239,17 @@ export default function FileCreateModal({
               </div>
               <div>
                 <h3 className="font-display text-base font-medium text-ink">Create New File</h3>
-                <p className="text-xs text-ink-muted">Choose a starter template or custom path</p>
+                <p className="text-xs text-ink-muted">
+                  {isVanilla
+                    ? 'HTML, CSS, JavaScript, and JSON templates'
+                    : 'React components, styles, utilities, and data'}
+                </p>
               </div>
             </div>
 
             {/* Template Picker */}
             <div className="grid grid-cols-2 gap-2 mb-5">
-              {FILE_TEMPLATES.map((tmpl) => {
+              {templates.map((tmpl) => {
                 const isSelected = selectedTemplate.id === tmpl.id;
                 const Icon = tmpl.icon;
                 return (
@@ -194,7 +283,7 @@ export default function FileCreateModal({
                     setFilePath(e.target.value);
                     setError('');
                   }}
-                  placeholder="/components/Header.jsx"
+                  placeholder={isVanilla ? '/about.html or /scripts/main.js' : '/components/Header.jsx'}
                   autoFocus
                   className="w-full bg-canvas border border-white/10 focus:border-white/30 rounded-xl px-3.5 py-2 text-xs text-ink font-mono outline-none transition-colors"
                 />

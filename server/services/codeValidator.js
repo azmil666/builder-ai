@@ -115,9 +115,47 @@ export const LUCIDE_ICON_ALIASES = {
 let _parseAst = null;
 let _parserLoaded = false;
 
-// Dynamically locate Vite transformWithOxc compiler for real JSX compilation checks
+// Dynamic locate Vite transformWithOxc compiler for real JSX compilation checks
 let _transformWithOxc = null;
 let _compilerLoaded = false;
+
+/**
+ * Deterministically infers the target framework ("vanilla" or "react")
+ * from the project files collection unless explicitly specified.
+ */
+export function inferFramework(files, explicitFramework) {
+  if (files && typeof files === "object") {
+    const hasHtml = Boolean(files["/index.html"] || files["index.html"]);
+    const hasApp = Boolean(
+      files["/App.js"] || files["App.js"] ||
+      files["/App.jsx"] || files["App.jsx"]
+    );
+    if (hasApp && !hasHtml) return "react";
+    if (hasHtml && !hasApp) return "vanilla";
+  }
+  if (explicitFramework === "vanilla" || explicitFramework === "react") {
+    return explicitFramework;
+  }
+  return "react";
+}
+
+/**
+ * Resolves an import source string against available project file paths,
+ * supporting exact paths, extensions (.jsx, .js, .css), and directory index files.
+ */
+export function resolveModuleCandidate(currentDir, source, availablePaths = []) {
+  if (!source || !source.startsWith(".")) return null;
+  const resolved = resolvePath(currentDir, source);
+  const resolvedClean = cleanExtension(resolved);
+
+  return availablePaths.find((p) => {
+    if (p === resolved) return true;
+    const pClean = cleanExtension(p);
+    if (pClean === resolvedClean) return true;
+    if (pClean === `${resolvedClean}/index`) return true;
+    return false;
+  }) || null;
+}
 
 // Dynamically locate installed Lucide React icon names
 let _lucideIconsSet = null;
@@ -620,6 +658,20 @@ export function injectDefensivePropDefaultsAST(code, filePath, warnings = []) {
   return updatedCode;
 }
 
+function walkAst(node, visitor) {
+  if (!node || typeof node !== "object") return;
+  visitor(node);
+  for (const key of Object.keys(node)) {
+    if (key === "loc" || key === "start" || key === "end") continue;
+    const child = node[key];
+    if (Array.isArray(child)) {
+      for (const c of child) walkAst(c, visitor);
+    } else if (child && typeof child === "object") {
+      walkAst(child, visitor);
+    }
+  }
+}
+
 /**
  * Validates and repairs common AI-generated code issues.
  * Returns structured validation result: { code, valid, errors, warnings, ast }
@@ -628,7 +680,10 @@ export function validateAndFixCode(code, filePath, context = {}) {
   const warnings = [];
   const errors = [];
   const isCSS = filePath.endsWith(".css");
+  const isHTML = filePath.endsWith(".html");
   const isJS = filePath.endsWith(".js") || filePath.endsWith(".jsx");
+  const framework = context?.framework || (isHTML ? "vanilla" : (isJS && !filePath.endsWith(".jsx") && context?.framework === "vanilla" ? "vanilla" : "react"));
+  const isVanilla = framework === "vanilla";
 
   // 1. Strip markdown code fences that some models wrap around code
   const fencePattern = /^```(?:jsx?|javascript|css|html|tsx?|react)?\s*\n([\s\S]*?)\n```\s*$/;
@@ -642,10 +697,121 @@ export function validateAndFixCode(code, filePath, context = {}) {
   code = code.replace(/\n```\s*$/, "");
 
   if (isCSS) {
+    // Check balanced CSS braces
+    const strippedCss = code
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "");
+    const openBraces = (strippedCss.match(/\{/g) || []).length;
+    const closeBraces = (strippedCss.match(/\}/g) || []).length;
+    if (openBraces !== closeBraces) {
+      errors.push({
+        type: "syntax",
+        file: filePath,
+        message: `Unbalanced CSS braces in '${filePath}': found ${openBraces} '{' and ${closeBraces} '}'.`,
+      });
+    }
+
     return {
       code: code.trim() + "\n",
-      valid: true,
-      errors: [],
+      valid: errors.length === 0,
+      errors,
+      warnings,
+      ast: null,
+    };
+  }
+
+  if (isHTML) {
+    // 1. Basic structural validity
+    const hasDocTypeOrHtml = /<!DOCTYPE\s+html|<html[\s>]/i.test(code);
+    if (!hasDocTypeOrHtml) {
+      errors.push({
+        type: "structure",
+        file: filePath,
+        message: `HTML file '${filePath}' is missing '<!DOCTYPE html>' or '<html>' root structure.`,
+      });
+    }
+
+    // 2. Accidental React/JSX syntax inside HTML
+    if (/\bclassName\s*=/i.test(code)) {
+      errors.push({
+        type: "syntax",
+        file: filePath,
+        message: `Accidental React/JSX 'className=' found in '${filePath}'. Use standard 'class=' attribute.`,
+      });
+    }
+
+    if (/\bimport\s+React\b|\bfrom\s+['"]react['"]/i.test(code)) {
+      errors.push({
+        type: "syntax",
+        file: filePath,
+        message: `Accidental React import found in vanilla HTML file '${filePath}'.`,
+      });
+    }
+
+    // 3. Balanced critical HTML tags
+    const criticalTags = ["html", "head", "body", "div", "script", "style", "table", "form"];
+    const strippedComments = code.replace(/<!--[\s\S]*?-->/g, "");
+    for (const tag of criticalTags) {
+      const openMatches = strippedComments.match(new RegExp(`<${tag}(?:\\s[^>]*?)?(?<!/)>`, "gi")) || [];
+      const closeMatches = strippedComments.match(new RegExp(`</${tag}>`, "gi")) || [];
+      if (openMatches.length !== closeMatches.length) {
+        errors.push({
+          type: "syntax",
+          file: filePath,
+          message: `Unbalanced '<${tag}>' tags in '${filePath}': found ${openMatches.length} opening and ${closeMatches.length} closing tags.`,
+        });
+      }
+    }
+
+    // 4. Validate local asset references in <link href="..."> and <script src="...">
+    if (context?.existingFiles || context?.allPlannedFiles) {
+      const availablePaths = [
+        ...(context.allPlannedFiles || []).map((f) => (typeof f === 'string' ? f : f?.path || '')).map((p) => (p.startsWith('/') ? p : '/' + p)),
+        ...(context.existingFiles || []).map((p) => (p.startsWith('/') ? p : '/' + p)),
+      ];
+      const currentDir = getDir(filePath);
+
+      // Check <link href="...">
+      const linkRegex = /<link\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi;
+      let lMatch;
+      while ((lMatch = linkRegex.exec(strippedComments)) !== null) {
+        const href = lMatch[1].trim();
+        if (href && !href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('//') && !href.startsWith('#') && !href.startsWith('data:')) {
+          const resolved = resolvePath(currentDir, href);
+          const exists = availablePaths.includes(resolved) || availablePaths.includes(resolved.slice(1));
+          if (!exists) {
+            errors.push({
+              type: "missing_file",
+              file: filePath,
+              message: `HTML links to stylesheet/asset '${href}', but '${resolved}' does not exist in project.`,
+            });
+          }
+        }
+      }
+
+      // Check <script src="...">
+      const scriptRegex = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+      let sMatch;
+      while ((sMatch = scriptRegex.exec(strippedComments)) !== null) {
+        const src = sMatch[1].trim();
+        if (src && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('//') && !src.startsWith('data:')) {
+          const resolved = resolvePath(currentDir, src);
+          const exists = availablePaths.includes(resolved) || availablePaths.includes(resolved.slice(1));
+          if (!exists) {
+            errors.push({
+              type: "missing_file",
+              file: filePath,
+              message: `HTML references script '${src}', but '${resolved}' does not exist in project.`,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      code,
+      valid: errors.length === 0,
+      errors,
       warnings,
       ast: null,
     };
@@ -661,82 +827,81 @@ export function validateAndFixCode(code, filePath, context = {}) {
     };
   }
 
-  // --- Safe Pre-Normalization Repairs ---
-
-  // 2. Fix class= -> className= in JSX tags
-  const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
-  if (classFixRegex.test(code)) {
-    code = code.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
-    warnings.push(`${filePath}: Fixed 'class=' -> 'className='`);
-  }
-
-  // 3. Fix for= -> htmlFor= in JSX labels
-  const forFixRegex = /(<label[^>]*?)\bfor=/gi;
-  if (forFixRegex.test(code)) {
-    code = code.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
-    warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor='`);
-  }
-
-  // 4. Self-close void elements that aren't self-closed
-  for (const tag of VOID_ELEMENTS) {
-    const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
-    if (voidRegex.test(code)) {
-      code = code.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
-      warnings.push(`${filePath}: Self-closed <${tag}> elements`);
+  // --- Safe Pre-Normalization Repairs (React mode only) ---
+  if (!isVanilla) {
+    // 2. Fix class= -> className= in JSX tags
+    const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
+    if (classFixRegex.test(code)) {
+      code = code.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
+      warnings.push(`${filePath}: Fixed 'class=' -> 'className='`);
     }
-  }
 
-  // 5. Remove stray HTML comments inside JSX return blocks
-  const htmlCommentRegex = /<!--[\s\S]*?-->/g;
-  if (htmlCommentRegex.test(code)) {
-    code = code.replace(htmlCommentRegex, "");
-    warnings.push(`${filePath}: Removed HTML comments (invalid in JSX)`);
-  }
+    // 3. Fix for= -> htmlFor= in JSX labels
+    const forFixRegex = /(<label[^>]*?)\bfor=/gi;
+    if (forFixRegex.test(code)) {
+      code = code.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
+      warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor='`);
+    }
 
-  // 6. Fix common TypeScript annotations
-  code = code.replace(/:\s*React\.FC(?:<[^>]*>)?\s*=/g, () => {
-    warnings.push(`${filePath}: Removed TypeScript React.FC annotation`);
-    return " =";
-  });
+    // 4. Self-close void elements that aren't self-closed
+    for (const tag of VOID_ELEMENTS) {
+      const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
+      if (voidRegex.test(code)) {
+        code = code.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
+        warnings.push(`${filePath}: Self-closed <${tag}> elements`);
+      }
+    }
 
-  code = code.replace(/(\([^)]*?)\s*:\s*(?:string|number|boolean|any|object|void)\s*([,)])/g, (match, before, after) => {
-    warnings.push(`${filePath}: Removed TypeScript type annotation`);
-    return `${before}${after}`;
-  });
+    // 5. Remove stray HTML comments inside JSX return blocks
+    const htmlCommentRegex = /<!--[\s\S]*?-->/g;
+    if (htmlCommentRegex.test(code)) {
+      code = code.replace(htmlCommentRegex, "");
+      warnings.push(`${filePath}: Removed HTML comments (invalid in JSX)`);
+    }
 
-  // 6b. Fix accidental LLM syntax typo: mixing self-closing tags with arrow functions, e.g. (e) = /> fn(e)
-  const brokenArrowRegex = /([a-zA-Z0-9_\)\]])\s*=\s*\/>/g;
-  if (brokenArrowRegex.test(code)) {
-    code = code.replace(brokenArrowRegex, "$1 =>");
-    warnings.push(`${filePath}: Auto-corrected '= />' arrow function typo to '=>'`);
-  }
+    // 6. Fix common TypeScript annotations
+    code = code.replace(/:\s*React\.FC(?:<[^>]*>)?\s*=/g, () => {
+      warnings.push(`${filePath}: Removed TypeScript React.FC annotation`);
+      return " =";
+    });
 
-  // 7. Ensure React import exists if JSX is used
-  const hasJSX = /<[A-Za-z]/.test(code);
-  const hasReactImport = /import\s+React\b/.test(code);
-  if (hasJSX && !hasReactImport) {
-    code = `import React from 'react';\n${code}`;
-    warnings.push(`${filePath}: Added missing React import`);
-  }
+    code = code.replace(/(\([^)]*?)\s*:\s*(?:string|number|boolean|any|object|void)\s*([,)])/g, (match, before, after) => {
+      warnings.push(`${filePath}: Removed TypeScript type annotation`);
+      return `${before}${after}`;
+    });
 
-  // 8. Fix and validate relative import paths against planned/existing files
-  if (context?.allPlannedFiles || context?.existingFiles) {
-    const plannedList = context.allPlannedFiles || (context.existingFiles || []).map((p) => ({ path: p }));
-    const fixResult = fixImportPaths(code, filePath, plannedList);
-    code = fixResult.code;
-    warnings.push(...fixResult.warnings);
-  }
+    // 6b. Fix accidental LLM syntax typo: mixing self-closing tags with arrow functions, e.g. (e) = /> fn(e)
+    const brokenArrowRegex = /([a-zA-Z0-9_\)\]])\s*=\s*\/>/g;
+    if (brokenArrowRegex.test(code)) {
+      code = code.replace(brokenArrowRegex, "$1 =>");
+      warnings.push(`${filePath}: Auto-corrected '= />' arrow function typo to '=>'`);
+    }
 
-  // 8b. Validate and repair Lucide icon imports
-  const iconResult = validateAndFixLucideIcons(code, filePath, {
-    autoFallback: context?.autoFallbackIcons ?? false,
-  });
-  code = iconResult.code;
-  warnings.push(...iconResult.warnings);
-  errors.push(...iconResult.errors);
+    // 7. Ensure React import exists if JSX is used
+    const hasJSX = /<[A-Za-z]/.test(code);
+    const hasReactImport = /import\s+React\b/.test(code);
+    if (hasJSX && !hasReactImport) {
+      code = `import React from 'react';\n${code}`;
+      warnings.push(`${filePath}: Added missing React import`);
+    }
 
-  // 8c. Defensive Prop & Configuration Hardening
-  if (isJS) {
+    // 8. Fix and validate relative import paths against planned/existing files
+    if (context?.allPlannedFiles || context?.existingFiles) {
+      const plannedList = context.allPlannedFiles || (context.existingFiles || []).map((p) => ({ path: p }));
+      const fixResult = fixImportPaths(code, filePath, plannedList);
+      code = fixResult.code;
+      warnings.push(...fixResult.warnings);
+    }
+
+    // 8b. Validate and repair Lucide icon imports
+    const iconResult = validateAndFixLucideIcons(code, filePath, {
+      autoFallback: context?.autoFallbackIcons ?? false,
+    });
+    code = iconResult.code;
+    warnings.push(...iconResult.warnings);
+    errors.push(...iconResult.errors);
+
+    // 8c. Defensive Prop & Configuration Hardening
     // Provide safe defaults for common props in function parameters using AST-aware transformation
     code = injectDefensivePropDefaultsAST(code, filePath, warnings);
 
@@ -760,6 +925,29 @@ export function validateAndFixCode(code, filePath, context = {}) {
       code = `const STORE_CONFIG = { freeShippingThreshold: 100, currency: "$", taxRate: 0.08 };\n${code}`;
       warnings.push(`${filePath}: Injected default fallback STORE_CONFIG declaration`);
     }
+  } else {
+    // --- Vanilla Mode Specific JS Checks ---
+    if (/\bimport\s+React\b|\bfrom\s+['"]react['"]/.test(code)) {
+      errors.push({
+        type: "syntax",
+        file: filePath,
+        message: `Accidental React import found in vanilla JavaScript file '${filePath}'.`,
+      });
+    }
+
+    // Check for raw JSX tags in vanilla code (excluding string literals and comments)
+    const strippedJs = code
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*/g, "")
+      .replace(/`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
+    const rawJsxMatch = strippedJs.match(/(?:=|\breturn\b|\(|,)\s*<[A-Za-z][^>]*>/);
+    if (rawJsxMatch) {
+      errors.push({
+        type: "syntax",
+        file: filePath,
+        message: `Raw JSX syntax found in vanilla JavaScript file '${filePath}'. Vanilla JavaScript cannot execute JSX tags.`,
+      });
+    }
   }
 
   // 9. AST-based Syntax & Semantic Validation
@@ -770,91 +958,106 @@ export function validateAndFixCode(code, filePath, context = {}) {
     errors.push({
       type: "syntax",
       file: filePath,
-      message: parseErr.message || "Syntax error parsing JSX",
+      message: parseErr.message || (isVanilla ? "Syntax error parsing JavaScript" : "Syntax error parsing JSX"),
       pos: parseErr.pos,
       codeframe: parseErr.message,
     });
   }
 
-  if (ast && ast.body) {
-    // A. Verify and count default exports
-    const defaultExports = ast.body.filter((n) => n.type === "ExportDefaultDeclaration");
-    const namedExports = ast.body.filter((n) => n.type === "ExportNamedDeclaration");
-
-    if (defaultExports.length > 1) {
-      errors.push({
-        type: "export",
-        file: filePath,
-        message: `Multiple default exports (${defaultExports.length}) found in '${filePath}'. React components must have exactly one default export.`,
-      });
-    } else if (defaultExports.length === 0) {
-      // Attempt safe auto-repair: find top-level component function/const and export it
-      const funcMatch = code.match(/^\s*function\s+([A-Z]\w*)\s*\(/m);
-      const constMatch = code.match(/^\s*const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
-      const componentName = funcMatch?.[1] || constMatch?.[1];
-
-      if (componentName) {
-        const namedExportRegex = new RegExp(`export\\s+(function|const)\\s+${componentName}`);
-        if (namedExportRegex.test(code)) {
-          code = code.replace(new RegExp(`export\\s+(function|const)\\s+${componentName}`), `export default $1 ${componentName}`);
-        } else {
-          code = code.trimEnd() + `\n\nexport default ${componentName};\n`;
+  if (ast) {
+    if (isVanilla) {
+      // Check for AST JSXElement or JSXFragment in vanilla scripts
+      let hasJsxNode = false;
+      walkAst(ast, (n) => {
+        if (n.type === "JSXElement" || n.type === "JSXFragment") {
+          hasJsxNode = true;
         }
-        warnings.push(`${filePath}: Added missing default export for '${componentName}'`);
-      } else {
+      });
+      if (hasJsxNode && !errors.some((e) => e.message?.includes("Raw JSX"))) {
+        errors.push({
+          type: "syntax",
+          file: filePath,
+          message: `Raw JSX syntax found in vanilla JavaScript file '${filePath}'.`,
+        });
+      }
+    } else if (ast.body) {
+      // React mode exports and imports check
+      // A. Verify and count default exports
+      const defaultExports = ast.body.filter((n) => n.type === "ExportDefaultDeclaration");
+      const namedExports = ast.body.filter((n) => n.type === "ExportNamedDeclaration");
+
+      if (defaultExports.length > 1) {
         errors.push({
           type: "export",
           file: filePath,
-          message: `Component file '${filePath}' does not contain a default export.`,
+          message: `Multiple default exports (${defaultExports.length}) found in '${filePath}'. React components must have exactly one default export.`,
         });
-      }
-    }
+      } else if (defaultExports.length === 0) {
+        // Attempt safe auto-repair: find top-level component function/const and export it
+        const funcMatch = code.match(/^\s*function\s+([A-Z]\w*)\s*\(/m);
+        const constMatch = code.match(/^\s*const\s+([A-Z]\w*)\s*=\s*(?:\(|function)/m);
+        const componentName = funcMatch?.[1] || constMatch?.[1];
 
-    // B. Verify imports (detect forbidden node builtins and unresolvable targets)
-    const importNodes = ast.body.filter((n) => n.type === "ImportDeclaration");
-    for (const imp of importNodes) {
-      const source = imp.source?.value;
-      if (!source) continue;
-
-      if (!source.startsWith(".")) {
-        // Package import: check forbidden Node.js or server-only packages
-        const pkgName = source.startsWith("@") ? source.split("/").slice(0, 2).join("/") : source.split("/")[0];
-        if (FORBIDDEN_CLIENT_MODULES.has(pkgName) || FORBIDDEN_CLIENT_MODULES.has(source)) {
+        if (componentName) {
+          const namedExportRegex = new RegExp(`export\\s+(function|const)\\s+${componentName}`);
+          if (namedExportRegex.test(code)) {
+            code = code.replace(new RegExp(`export\\s+(function|const)\\s+${componentName}`), `export default $1 ${componentName}`);
+          } else {
+            code = code.trimEnd() + `\n\nexport default ${componentName};\n`;
+          }
+          warnings.push(`${filePath}: Added missing default export for '${componentName}'`);
+        } else {
           errors.push({
-            type: "dependency",
+            type: "export",
             file: filePath,
-            message: `Unsupported server/Node.js module '${source}' imported in client component.`,
-          });
-        } else if (!SUPPORTED_PACKAGES.has(pkgName) && (!context?.declaredDependencies || !context.declaredDependencies[pkgName])) {
-          errors.push({
-            type: "dependency",
-            file: filePath,
-            message: `Unsupported package '${source}' imported in client component.`,
-          });
-        }
-      } else if (context?.allPlannedFiles || context?.existingFiles) {
-        // Relative import: verify target exists in planned/existing files
-        const currentDir = getDir(filePath);
-        const resolvedTarget = resolvePath(currentDir, source);
-        const resolvedClean = cleanExtension(resolvedTarget);
-
-        const availablePaths = [
-          ...(context.allPlannedFiles || []).map((f) => (f.path.startsWith("/") ? f.path : "/" + f.path)),
-          ...(context.existingFiles || []).map((p) => (p.startsWith("/") ? p : "/" + p)),
-        ];
-
-        const targetExists = availablePaths.some((p) => cleanExtension(p) === resolvedClean);
-        if (!targetExists && availablePaths.length > 0) {
-          errors.push({
-            type: "import",
-            file: filePath,
-            message: `Unresolvable relative import '${source}' in '${filePath}'. Target file does not exist in planned files.`,
+            message: `Component file '${filePath}' does not contain a default export.`,
           });
         }
       }
+
+      // B. Verify imports (detect forbidden node builtins and unresolvable targets)
+      const importNodes = ast.body.filter((n) => n.type === "ImportDeclaration");
+      for (const imp of importNodes) {
+        const source = imp.source?.value;
+        if (!source) continue;
+
+        if (!source.startsWith(".")) {
+          // Package import: check forbidden Node.js or server-only packages
+          const pkgName = source.startsWith("@") ? source.split("/").slice(0, 2).join("/") : source.split("/")[0];
+          if (FORBIDDEN_CLIENT_MODULES.has(pkgName) || FORBIDDEN_CLIENT_MODULES.has(source)) {
+            errors.push({
+              type: "dependency",
+              file: filePath,
+              message: `Unsupported server/Node.js module '${source}' imported in client component.`,
+            });
+          } else if (!SUPPORTED_PACKAGES.has(pkgName) && (!context?.declaredDependencies || !context.declaredDependencies[pkgName])) {
+            errors.push({
+              type: "dependency",
+              file: filePath,
+              message: `Unsupported package '${source}' imported in client component.`,
+            });
+          }
+        } else if (context?.allPlannedFiles || context?.existingFiles) {
+          // Relative import: verify target exists in planned/existing files using candidate resolution
+          const currentDir = getDir(filePath);
+          const availablePaths = [
+            ...(context.allPlannedFiles || []).map((f) => (typeof f === 'string' ? f : f?.path || '')).map((p) => (p.startsWith("/") ? p : "/" + p)),
+            ...(context.existingFiles || []).map((p) => (p.startsWith("/") ? p : "/" + p)),
+          ];
+
+          const targetMatch = resolveModuleCandidate(currentDir, source, availablePaths);
+          if (!targetMatch && availablePaths.length > 0) {
+            errors.push({
+              type: "import",
+              file: filePath,
+              message: `Unresolvable relative import '${source}' in '${filePath}'. Target file does not exist in planned files.`,
+            });
+          }
+        }
+      }
     }
-  } else if (!ast) {
-    // Fallback export check if AST parser is inactive
+  } else if (!ast && !isVanilla) {
+    // Fallback export check if AST parser is inactive (React mode only)
     const defaultExportCount = (code.match(/export\s+default\s+/g) || []).length;
     if (defaultExportCount === 0) {
       const funcMatch = code.match(/^\s*function\s+([A-Z]\w*)\s*\(/m);
@@ -892,11 +1095,13 @@ export function validateAndFixCode(code, filePath, context = {}) {
 /**
  * Validates and fixes code for conversational revision operations.
  */
-export function validateRevisionContent(content, filePath, op) {
+export function validateRevisionContent(content, filePath, op, framework = null) {
   if (op === "delete") return { content, warnings: [], valid: true, errors: [] };
 
+  const isVanilla = framework === "vanilla" || filePath.endsWith(".html") || (filePath.endsWith(".js") && framework === "vanilla");
+
   if (op === "create") {
-    const result = validateAndFixCode(content, filePath);
+    const result = validateAndFixCode(content, filePath, { framework });
     return {
       content: result.code,
       warnings: result.warnings,
@@ -909,23 +1114,26 @@ export function validateRevisionContent(content, filePath, op) {
   const warnings = [];
   const errors = [];
 
-  const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
-  if (classFixRegex.test(content)) {
-    content = content.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
-    warnings.push(`${filePath}: Fixed 'class=' -> 'className=' in replacement`);
-  }
+  // In HTML files or vanilla projects, NEVER convert class= to className= or for= to htmlFor=
+  if (!isVanilla && !filePath.endsWith(".html")) {
+    const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
+    if (classFixRegex.test(content)) {
+      content = content.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
+      warnings.push(`${filePath}: Fixed 'class=' -> 'className=' in replacement`);
+    }
 
-  const forFixRegex = /(<label[^>]*?)\bfor=/gi;
-  if (forFixRegex.test(content)) {
-    content = content.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
-    warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor=' in replacement`);
-  }
+    const forFixRegex = /(<label[^>]*?)\bfor=/gi;
+    if (forFixRegex.test(content)) {
+      content = content.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
+      warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor=' in replacement`);
+    }
 
-  for (const tag of VOID_ELEMENTS) {
-    const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
-    if (voidRegex.test(content)) {
-      content = content.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
-      warnings.push(`${filePath}: Self-closed <${tag}> in replacement`);
+    for (const tag of VOID_ELEMENTS) {
+      const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
+      if (voidRegex.test(content)) {
+        content = content.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
+        warnings.push(`${filePath}: Self-closed <${tag}> in replacement`);
+      }
     }
   }
 
@@ -935,8 +1143,9 @@ export function validateRevisionContent(content, filePath, op) {
 /**
  * Validates an entire multi-file project for cross-file integrity,
  * missing components, import contracts, and entry point completeness.
+ * Supports both "vanilla" (HTML5+CSS+JS) and "react" (React/JSX) project stacks.
  */
-export function validateProject(files, plannedFiles = []) {
+export function validateProject(files, plannedFiles = [], explicitFramework = null) {
   const errors = [];
   const warnings = [];
 
@@ -948,19 +1157,81 @@ export function validateProject(files, plannedFiles = []) {
     };
   }
 
+  const framework = inferFramework(files, explicitFramework);
   const filePaths = Object.keys(files);
 
-  // 1. Mandatory Entry Point /App.js
-  if (!files["/App.js"]) {
+  if (framework === "vanilla") {
+    // 1. Mandatory Entry Point /index.html
+    const hasIndexHtml = Boolean(files["/index.html"] || files["index.html"]);
+    if (!hasIndexHtml) {
+      errors.push({
+        type: "missing_file",
+        file: "/index.html",
+        message: "Project is missing required entry point '/index.html'",
+      });
+    }
+
+    // 2. Recommended Global CSS /styles.css
+    if (!files["/styles.css"] && !files["styles.css"]) {
+      warnings.push("Project is missing '/styles.css' stylesheet");
+    }
+
+    // 3. Verify planned files exist
+    if (Array.isArray(plannedFiles)) {
+      for (const planned of plannedFiles) {
+        const rawPath = typeof planned === 'string' ? planned : planned?.path || '';
+        if (!rawPath) continue;
+        const pPath = rawPath.startsWith("/") ? rawPath : "/" + rawPath;
+        if (!files[pPath] && !files[pPath.slice(1)]) {
+          errors.push({
+            type: "missing_file",
+            file: pPath,
+            message: `Planned file '${pPath}' was not generated.`,
+          });
+        }
+      }
+    }
+
+    // 4. Validate each file individually with framework: "vanilla"
+    for (const [filePath, fileData] of Object.entries(files)) {
+      const content = typeof fileData === "string" ? fileData : fileData?.content || "";
+      const result = validateAndFixCode(content, filePath, {
+        allPlannedFiles: plannedFiles,
+        existingFiles: filePaths,
+        framework: "vanilla",
+      });
+
+      if (!result.valid) {
+        errors.push(...result.errors);
+      }
+      warnings.push(...result.warnings);
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+    };
+  }
+
+  // --- React Mode ---
+  // 1. Mandatory Entry Point /App.jsx or /App.js
+  const hasAppEntry = Boolean(files["/App.jsx"] || files["/App.js"]);
+  if (!hasAppEntry) {
+    const plannedHasJsx = Array.isArray(plannedFiles) && plannedFiles.some(p => {
+      const raw = typeof p === 'string' ? p : p?.path || '';
+      return raw.endsWith('/App.jsx') || raw === 'App.jsx';
+    });
+    const missingEntryPath = plannedHasJsx ? "/App.jsx" : "/App.js";
     errors.push({
       type: "missing_file",
-      file: "/App.js",
-      message: "Project is missing required entry point '/App.js'",
+      file: missingEntryPath,
+      message: `Project is missing required entry point '${missingEntryPath}'`,
     });
   }
 
   // 2. Recommended Global CSS /styles.css
-  if (!files["/styles.css"]) {
+  if (!files["/styles.css"] && !files["styles.css"]) {
     warnings.push("Project is missing '/styles.css' stylesheet");
   }
 
@@ -970,7 +1241,13 @@ export function validateProject(files, plannedFiles = []) {
       const rawPath = typeof planned === 'string' ? planned : planned?.path || '';
       if (!rawPath) continue;
       const pPath = rawPath.startsWith("/") ? rawPath : "/" + rawPath;
-      if (!files[pPath]) {
+      const targetFound = filePaths.some((p) => {
+        if (p === pPath) return true;
+        const pClean = cleanExtension(p);
+        const plannedClean = cleanExtension(pPath);
+        return pClean === plannedClean || pClean === `${plannedClean}/index`;
+      });
+      if (!targetFound) {
         errors.push({
           type: "missing_file",
           file: pPath,
@@ -1002,6 +1279,7 @@ export function validateProject(files, plannedFiles = []) {
       allPlannedFiles: plannedFiles,
       existingFiles: filePaths,
       declaredDependencies,
+      framework: "react",
     });
 
     if (!result.valid) {
@@ -1043,11 +1321,15 @@ export function validateProject(files, plannedFiles = []) {
         const source = imp.source?.value;
         if (!source || !source.startsWith(".")) continue;
 
-        const resolved = resolvePath(currentDir, source);
-        const resolvedPath = filePaths.find((p) => cleanExtension(p) === cleanExtension(resolved));
+        const resolvedPath = resolveModuleCandidate(currentDir, source, filePaths);
 
         if (!resolvedPath) {
-          const wasPlanned = plannedFiles.some((p) => cleanExtension(p.path) === cleanExtension(resolved));
+          const wasPlanned = plannedFiles.some((p) => {
+            const raw = typeof p === 'string' ? p : p?.path || '';
+            const norm = raw.startsWith('/') ? raw : '/' + raw;
+            const res = resolvePath(currentDir, source);
+            return norm === res || cleanExtension(norm) === cleanExtension(res) || cleanExtension(norm) === `${cleanExtension(res)}/index`;
+          });
           if (wasPlanned) {
             errors.push({
               type: "import",
@@ -1549,10 +1831,100 @@ export function validatePropContracts(files) {
  * rendering modal/drawer components with active state { isOpen: true }.
  * Catches runtime TypeErrors before project generation is marked as completed.
  */
-export async function verifyProjectRuntime(files) {
+export async function verifyProjectRuntime(files, explicitFramework = null) {
   const errors = [];
 
-  if (!files || typeof files !== "object" || !files["/App.js"]) {
+  if (!files || typeof files !== "object") {
+    return { valid: true, errors };
+  }
+
+  const framework = inferFramework(files, explicitFramework);
+
+  // --- Vanilla Runtime Verification ---
+  if (framework === "vanilla") {
+    const htmlKey = files["/index.html"] ? "/index.html" : (files["index.html"] ? "index.html" : null);
+    if (!htmlKey) {
+      errors.push({
+        type: "runtime_exception",
+        file: "/index.html",
+        message: "Vanilla project missing '/index.html' entry point.",
+      });
+      return { valid: false, errors };
+    }
+
+    const htmlContent = typeof files[htmlKey] === "string" ? files[htmlKey] : files[htmlKey]?.content || "";
+    // Verify basic HTML structure
+    if (!/<!DOCTYPE\s+html|<html[\s>]/i.test(htmlContent)) {
+      errors.push({
+        type: "runtime_exception",
+        file: "/index.html",
+        message: "HTML document is missing basic '<!DOCTYPE html>' or '<html>' structure.",
+      });
+    }
+
+    // Verify local assets referenced in HTML resolve cleanly
+    const availablePaths = Object.keys(files).map((p) => (p.startsWith("/") ? p : "/" + p));
+    const currentDir = "/";
+    const strippedHtml = htmlContent.replace(/<!--[\s\S]*?-->/g, "");
+
+    const linkRegex = /<link\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi;
+    let lMatch;
+    while ((lMatch = linkRegex.exec(strippedHtml)) !== null) {
+      const href = lMatch[1].trim();
+      if (href && !href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("//") && !href.startsWith("#") && !href.startsWith("data:")) {
+        const resolved = resolvePath(currentDir, href);
+        if (!availablePaths.includes(resolved) && !availablePaths.includes(resolved.slice(1))) {
+          errors.push({
+            type: "runtime_exception",
+            file: "/index.html",
+            message: `HTML links to missing local asset '${href}' (resolved to '${resolved}').`,
+          });
+        }
+      }
+    }
+
+    const scriptRegex = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+    let sMatch;
+    while ((sMatch = scriptRegex.exec(strippedHtml)) !== null) {
+      const src = sMatch[1].trim();
+      if (src && !src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("//") && !src.startsWith("data:")) {
+        const resolved = resolvePath(currentDir, src);
+        if (!availablePaths.includes(resolved) && !availablePaths.includes(resolved.slice(1))) {
+          errors.push({
+            type: "runtime_exception",
+            file: "/index.html",
+            message: `HTML references missing local script '${src}' (resolved to '${resolved}').`,
+          });
+        }
+      }
+    }
+
+    // Check CSS files for balanced braces
+    for (const [p, c] of Object.entries(files)) {
+      if (p.endsWith(".css")) {
+        const cssContent = typeof c === "string" ? c : c?.content || "";
+        const strippedCss = cssContent.replace(/\/\*[\s\S]*?\*\//g, "").replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "");
+        const openB = (strippedCss.match(/\{/g) || []).length;
+        const closeB = (strippedCss.match(/\}/g) || []).length;
+        if (openB !== closeB) {
+          errors.push({
+            type: "runtime_exception",
+            file: p,
+            message: `Unbalanced CSS braces in '${p}': found ${openB} '{' and ${closeB} '}'.`,
+          });
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  // --- React Runtime Verification ---
+  const hasAppEntry = Boolean(files["/App.jsx"] || files["/App.js"]);
+  if (!hasAppEntry) {
     return { valid: true, errors };
   }
 
@@ -1566,7 +1938,8 @@ export async function verifyProjectRuntime(files) {
   // Normalize files with .jsx extension for Rolldown OXC JSX parsing
   const normalized = {};
   for (const [p, c] of Object.entries(files)) {
-    const key = (p.startsWith("/") ? p : "/" + p).replace(/\.js$/, ".jsx");
+    const norm = p.startsWith("/") ? p : "/" + p;
+    const key = norm.endsWith(".js") ? norm.replace(/\.js$/, ".jsx") : norm;
     normalized[key] = typeof c === "string" ? c : c.content || "";
   }
 
@@ -1575,11 +1948,12 @@ export async function verifyProjectRuntime(files) {
     (k) => k.includes("/components/") && k.endsWith(".jsx")
   );
 
+  const appEntryName = files["/App.jsx"] ? "/App.jsx" : "/App.js";
   let entryImports = `import React from "react";\nimport App from "/App.jsx";\n`;
   let entryMounts = `
 export function runSmoke() {
   const results = [];
-  results.push({ name: "/App.js", element: React.createElement(App) });
+  results.push({ name: "${appEntryName}", element: React.createElement(App) });
 `;
 
   componentPaths.forEach((cp, idx) => {
@@ -1606,9 +1980,15 @@ export function runSmoke() {
               return { id, external: true };
             }
             if (id.startsWith(".") || id.startsWith("/")) {
-              const resolved = resolveVirtualPath(importer, id).replace(/\.js$/, ".jsx");
+              const resolved = resolveVirtualPath(importer, id);
+              const resolvedJsx = resolved.endsWith(".js") ? resolved.replace(/\.js$/, ".jsx") : resolved;
+              const resolvedClean = cleanExtension(resolved);
+
               if (normalized[resolved]) return resolved;
+              if (normalized[resolvedJsx]) return resolvedJsx;
               if (normalized[resolved + ".jsx"]) return resolved + ".jsx";
+              if (normalized[resolvedClean + ".jsx"]) return resolvedClean + ".jsx";
+              if (normalized[resolvedClean + "/index.jsx"]) return resolvedClean + "/index.jsx";
               return resolved;
             }
             return { id, external: true };
@@ -1677,9 +2057,10 @@ export function runSmoke() {
       }
     }
   } catch (bundlerErr) {
+    const entryName = files["/App.jsx"] ? "/App.jsx" : "/App.js";
     errors.push({
       type: "runtime_exception",
-      file: "/App.js",
+      file: entryName,
       message: `Active-state runtime bundler error: ${bundlerErr.message}`,
     });
   }
@@ -1761,7 +2142,10 @@ function fixImportPaths(code, filePath, allPlannedFiles) {
   }
 
   const currentDir = getDir(filePath);
-  const plannedPaths = allPlannedFiles.map((f) => (f.path.startsWith("/") ? f.path : "/" + f.path));
+  const plannedPaths = allPlannedFiles
+    .map((f) => (typeof f === "string" ? f : f?.path || ""))
+    .filter(Boolean)
+    .map((p) => (p.startsWith("/") ? p : "/" + p));
 
   const importRegex = /(from\s+['"]|import\s+['"])([^'"]+)(['"])/g;
 

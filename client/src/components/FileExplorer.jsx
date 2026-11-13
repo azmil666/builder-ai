@@ -285,6 +285,7 @@ const FileExplorer = ({
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         existingFiles={files}
+        framework={resolvedFramework}
         onCreate={onCreateFile}
       />
 

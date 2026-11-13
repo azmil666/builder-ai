@@ -99,7 +99,9 @@ export async function chat(req, res) {
         `(${manifest.length} files, manifest ~${JSON.stringify(manifest).length} chars)`,
     );
 
-    // Call AI with manifest + relevant files + designSpec + candidateContract
+    const projectFramework = project.framework || (project.files?.["/index.html"] ? "vanilla" : "react");
+
+    // Call AI with manifest + relevant files + designSpec + candidateContract + framework
     const result = await reviseProject(
       prompt,
       manifest,
@@ -107,6 +109,7 @@ export async function chat(req, res) {
       recentMessages,
       project.designSpec,
       candidateContract,
+      projectFramework,
     );
 
     console.log(
@@ -136,7 +139,8 @@ export async function chat(req, res) {
                 relevantFiles[failedPath],
                 prompt,
                 relevantFiles,
-                project.designSpec
+                project.designSpec,
+                projectFramework,
               );
               if (newContent && typeof newContent === "string" && newContent.trim().length > 0) {
                 updatedFiles[failedPath] = {
@@ -165,8 +169,8 @@ export async function chat(req, res) {
       description: p,
     }));
 
-    let projectValidation = validateProject(candidateFilesMap, plannedItems);
-    let runtimeValidation = await verifyProjectRuntime(candidateFilesMap);
+    let projectValidation = validateProject(candidateFilesMap, plannedItems, projectFramework);
+    let runtimeValidation = await verifyProjectRuntime(candidateFilesMap, projectFramework);
     let combinedErrors = [...projectValidation.errors, ...runtimeValidation.errors];
 
     // If validation or runtime issues occur, initiate targeted AI self-repair
@@ -180,7 +184,9 @@ export async function chat(req, res) {
           prompt,
           project.designSpec,
           {},
-          2
+          2,
+          candidateContract,
+          projectFramework
         );
         if (repairResult.success) {
           for (const [p, code] of Object.entries(repairResult.files)) {
@@ -249,7 +255,8 @@ export async function chat(req, res) {
         let revVerification = await verifyProjectRequirements(
           candidateFilesMap,
           candidateContract,
-          null
+          null,
+          { framework: projectFramework }
         );
 
         if (revVerification.mandatoryFailed > 0) {
@@ -261,6 +268,7 @@ export async function chat(req, res) {
             designSpec: project.designSpec,
             filePlan: null,
             maxAttempts: 2,
+            framework: projectFramework,
           });
 
           if (repairLoopResult.success) {
