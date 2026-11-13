@@ -146,6 +146,13 @@ export function buildProjectZip(project, JSZip) {
   // ----------------------------------------------------
   const detectedDeps = detectDependencies(fileMap, { framework: "react" });
   const hasStylesCss = Boolean(fileMap["/styles.css"] || fileMap["styles.css"]);
+  const hasAppJsx = Boolean(
+    fileMap["/App.jsx"] ||
+    fileMap["App.jsx"] ||
+    fileMap["/src/App.jsx"] ||
+    fileMap["src/App.jsx"],
+  );
+  const appEntryImport = hasAppJsx ? "./App.jsx" : "./App.js";
 
   // Add package.json
   zip.file(
@@ -222,12 +229,12 @@ export default defineConfig({
 `,
   );
 
-  // Add src/main.jsx mounting App extensionlessly
+  // Add src/main.jsx mounting App
   zip.file(
     "src/main.jsx",
     `import React from 'react';
 import { createRoot } from 'react-dom/client';
-${hasStylesCss ? "import './styles.css';\n" : ""}import App from './App';
+${hasStylesCss ? "import './styles.css';\n" : ""}import App from '${appEntryImport}';
 
 const container = document.getElementById('root');
 const root = createRoot(container);

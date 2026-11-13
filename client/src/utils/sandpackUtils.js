@@ -205,7 +205,10 @@ export function validateDependenciesMap(dependencies) {
  *     - Direct file mapping without injecting React boilerplate or npm dependencies.
  *     - Prefers /index.html as active file.
  * - For "react" projects:
- *     - Ensures /index.js imports `./App` extensionlessly so Sandpack resolves either /App.jsx or /App.js.
+ *     - When /App.jsx is present, explicitly imports `./App.jsx` in /index.js and provides
+ *       a hidden re-export at /App.js to override Sandpack's built-in "Hello world" /App.js template.
+ *     - When only /App.js is present (legacy), imports `./App.js` normally.
+ *     - Imports /styles.css in /index.js if /styles.css exists.
  *     - Prefers /App.jsx (falling back to /App.js) as active file.
  *
  * @param {object} projectOrFiles - Project object or files map.
@@ -250,26 +253,40 @@ export function buildSandpackFiles(projectOrFiles, options = {}) {
   }
 
   // React project: support both modern /App.jsx and legacy /App.js entry points
+  const hasAppJsx = Boolean(spFiles["/App.jsx"]);
+  const hasAppJs = Boolean(spFiles["/App.js"]);
   const hasIndexJs = Boolean(spFiles["/index.js"]);
   const hasIndexJsx = Boolean(spFiles["/index.jsx"]);
   const hasStylesCss = Boolean(spFiles["/styles.css"]);
 
+  // Override Sandpack's built-in "react" template /App.js ("Hello world") if /App.jsx is present
+  if (hasAppJsx && !hasAppJs) {
+    spFiles["/App.js"] = {
+      code: 'export { default } from "./App.jsx";\n',
+      hidden: true,
+    };
+  }
+
+  const appImport = hasAppJsx ? "./App.jsx" : "./App.js";
+
   if (hasIndexJs || hasIndexJsx) {
-    // If project already contains index.js / index.jsx, normalize ./App.jsx or ./App.js import to ./App
+    // If project already contains index.js / index.jsx, normalize ./App import to explicit target file
     const targetKey = hasIndexJs ? "/index.js" : "/index.jsx";
     if (typeof spFiles[targetKey].code === "string") {
       spFiles[targetKey].code = spFiles[targetKey].code.replace(
-        /(['"])\.\/App\.(jsx?|tsx?)(['"])/g,
-        '$1./App$3',
+        /(['"])\.\/App(?:\.(?:jsx?|tsx?))?(['"])/g,
+        `$1${appImport}$2`,
       );
+      if (hasStylesCss && !spFiles[targetKey].code.includes("./styles.css")) {
+        spFiles[targetKey].code = `import './styles.css';\n` + spFiles[targetKey].code;
+      }
     }
   } else {
-    // Auto-inject standard React 18 createRoot index.js that imports `./App` extensionlessly
+    // Auto-inject standard React 18 createRoot index.js that explicitly imports target App entry
     spFiles["/index.js"] = {
       code: `import React from 'react';
 import { createRoot } from 'react-dom/client';
-${hasStylesCss ? "import './styles.css';" : ""}
-import App from './App';
+${hasStylesCss ? "import './styles.css';\n" : ""}import App from '${appImport}';
 
 const container = document.getElementById('root');
 const root = createRoot(container);

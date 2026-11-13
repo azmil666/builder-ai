@@ -121,8 +121,9 @@ export default function VisualVerificationRunner({
   const sandpackFiles = useMemo(() => {
     const spFiles = {};
     for (const [path, content] of Object.entries(activeFiles || {})) {
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
       const code = typeof content === 'string' ? content : content?.content || '';
-      spFiles[path] = { code, active: path === (framework === 'vanilla' ? '/index.html' : '/App.jsx') || path === '/App.js' };
+      spFiles[cleanPath] = { code };
     }
 
     if (framework === 'vanilla') {
@@ -189,13 +190,26 @@ export default function VisualVerificationRunner({
         hidden: true,
       };
 
-      // Ensure /index.js imports `./App` extensionlessly so either /App.jsx or /App.js works
+      const hasAppJsx = Boolean(spFiles['/App.jsx']);
+      const hasAppJs = Boolean(spFiles['/App.js']);
+
+      // Override Sandpack's built-in "react" template /App.js ("Hello world") if /App.jsx is present
+      if (hasAppJsx && !hasAppJs) {
+        spFiles['/App.js'] = {
+          code: 'export { default } from "./App.jsx";\n',
+          hidden: true,
+        };
+      }
+
+      const appImport = hasAppJsx ? './App.jsx' : './App.js';
+      const hasStyles = Boolean(spFiles['/styles.css']);
+
+      // Ensure /index.js explicitly imports `./App.jsx` (or `./App.js` for legacy)
       if (!spFiles['/index.js'] && !spFiles['/index.jsx']) {
-        const hasStyles = Boolean(spFiles['/styles.css']);
         spFiles['/index.js'] = {
           code: `import React from 'react';
 import { createRoot } from 'react-dom/client';
-${hasStyles ? "import './styles.css';\n" : ""}import App from './App';
+${hasStyles ? "import './styles.css';\n" : ""}import App from '${appImport}';
 
 const container = document.getElementById('root');
 const root = createRoot(container);
@@ -203,6 +217,22 @@ root.render(<App />);
 `,
           hidden: true,
         };
+      } else {
+        const targetKey = spFiles['/index.js'] ? '/index.js' : '/index.jsx';
+        if (typeof spFiles[targetKey]?.code === 'string') {
+          spFiles[targetKey].code = spFiles[targetKey].code.replace(
+            /(['"])\.\/App(?:\.(?:jsx?|tsx?))?(['"])/g,
+            `$1${appImport}$2`,
+          );
+          if (hasStyles && !spFiles[targetKey].code.includes('./styles.css')) {
+            spFiles[targetKey].code = `import './styles.css';\n` + spFiles[targetKey].code;
+          }
+        }
+      }
+
+      const activeKey = hasAppJsx ? '/App.jsx' : '/App.js';
+      for (const [path, fileObj] of Object.entries(spFiles)) {
+        fileObj.active = path === activeKey;
       }
     }
     return spFiles;
