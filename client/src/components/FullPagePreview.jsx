@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { detectDependencies } from "../utils/sandpackUtils";
+import { buildSandpackConfig } from "../utils/sandpackUtils";
+import { resolveProjectFramework } from "../utils/frameworkUtils";
 import SandpackErrorMonitor from "./SandpackErrorMonitor";
 import {
   SandpackLayout,
@@ -8,30 +9,25 @@ import {
 } from "@codesandbox/sandpack-react";
 import { AlertTriangle, RotateCw } from "lucide-react";
 
-const FullPagePreview = ({ files }) => {
+const FullPagePreview = ({ files, project, framework: explicitFramework }) => {
   const [showErrorOverlay, setShowErrorOverlay] = useState(true);
   const [detailedError, setDetailedError] = useState(null);
   const [ignoredPackages, setIgnoredPackages] = useState(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Convert liveFiles to Sandpack Format
-  const sandpackFiles = useMemo(() => {
-    if (!files) return {};
-    const spFiles = {};
-    for (const [path, content] of Object.entries(files)) {
-      spFiles[path] = { code: typeof content === "string" ? content : content?.content || "" };
-    }
-    return spFiles;
-  }, [files]);
+  const resolvedFramework = useMemo(() => {
+    if (explicitFramework && explicitFramework !== "auto") return explicitFramework;
+    if (project?.framework && project.framework !== "auto") return project.framework;
+    return resolveProjectFramework(project || files);
+  }, [explicitFramework, project, files]);
 
-  const dependencies = useMemo(() => {
-    if (!files) return {};
-    const deps = detectDependencies(files);
-    for (const p of ignoredPackages) {
-      delete deps[p];
-    }
-    return deps;
-  }, [files, ignoredPackages]);
+  const sandpackConfig = useMemo(() => {
+    const targetSource = project ? { ...project, files: files || project.files } : files;
+    return buildSandpackConfig(targetSource, {
+      framework: resolvedFramework,
+      ignoredPackages,
+    });
+  }, [project, files, resolvedFramework, ignoredPackages]);
 
   const handleRetry = () => {
     setDetailedError(null);
@@ -45,20 +41,16 @@ const FullPagePreview = ({ files }) => {
     setRefreshKey((k) => k + 1);
   };
 
+  const providerKey = `${project?._id || "fullpage"}-${resolvedFramework}-${refreshKey}`;
+
   return (
     <div className="h-screen w-screen bg-white overflow-hidden relative">
       <SandpackProvider
-        key={`fullpage-${refreshKey}`}
-        template="react"
-        files={sandpackFiles}
-        customSetup={{ dependencies }}
-        options={{
-          externalResources: [
-            "https://cdn.tailwindcss.com",
-            "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
-          ],
-          logLevel: 0,
-        }}
+        key={providerKey}
+        template={sandpackConfig.template}
+        files={sandpackConfig.files}
+        customSetup={sandpackConfig.customSetup}
+        options={sandpackConfig.options}
         className="h-full w-full"
       >
         <SandpackErrorMonitor

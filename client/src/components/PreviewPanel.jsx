@@ -19,7 +19,8 @@ import {
   XIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { detectDependencies } from '../utils/sandpackUtils';
+import { buildSandpackConfig } from '../utils/sandpackUtils';
+import { resolveProjectFramework } from '../utils/frameworkUtils';
 import { useAppContext } from '../context/useAppContext';
 import SandpackErrorMonitor from './SandpackErrorMonitor';
 import QuickOpenModal from './QuickOpenModal';
@@ -171,28 +172,22 @@ const PreviewPanel = ({
     });
   };
 
-  // Convert liveFiles to Sandpack format
-  const sandpackFiles = useMemo(() => {
-    const spFiles = {};
-    for (const [path, content] of Object.entries(liveFiles)) {
-      const fileCode =
-        typeof content === 'string' ? content : content?.content || '';
-      spFiles[path] = {
-        code: fileCode,
-        active: path === activeFile,
-      };
-    }
-    return spFiles;
-  }, [liveFiles, activeFile]);
+  const framework = useMemo(
+    () => resolveProjectFramework(project),
+    [project],
+  );
 
-  // Detect dependencies from import statements using liveFiles, filtering out ignored packages
-  const dependencies = useMemo(() => {
-    const deps = detectDependencies(liveFiles);
-    for (const p of ignoredPackages) {
-      delete deps[p];
-    }
-    return deps;
-  }, [liveFiles, ignoredPackages]);
+  // Build dual-stack Sandpack configuration (handles both static vanilla & dynamic React)
+  const sandpackConfig = useMemo(() => {
+    return buildSandpackConfig(
+      { ...project, files: liveFiles },
+      {
+        framework,
+        activeFile,
+        ignoredPackages,
+      },
+    );
+  }, [project, liveFiles, framework, activeFile, ignoredPackages]);
 
   const handleRetryDependencies = () => {
     setDetailedError(null);
@@ -279,22 +274,11 @@ const PreviewPanel = ({
   return (
     <div className="h-full w-full flex flex-col min-w-0 min-h-0 bg-zinc-950 overflow-hidden">
       <SandpackProvider
-        key={`${project._id}-${refreshKey}`}
-        template="react"
-        files={sandpackFiles}
-        customSetup={{ dependencies }}
-        options={{
-          externalResources: [
-            'https://cdn.tailwindcss.com',
-            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-          ],
-          classes: {
-            'sp-wrapper': 'sp-wrapper h-full w-full',
-            'sp-layout': 'sp-layout h-full w-full',
-            'sp-preview': 'sp-preview h-full w-full',
-          },
-          logLevel: 0,
-        }}
+        key={`${project._id}-${framework}-${refreshKey}`}
+        template={sandpackConfig.template}
+        files={sandpackConfig.files}
+        customSetup={sandpackConfig.customSetup}
+        options={sandpackConfig.options}
         theme={{
           colors: {
             surface1: '#09090b',
