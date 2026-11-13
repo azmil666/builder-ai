@@ -1,4 +1,5 @@
 import 'dotenv/config';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_123';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';

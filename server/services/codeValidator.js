@@ -1095,11 +1095,13 @@ export function validateAndFixCode(code, filePath, context = {}) {
 /**
  * Validates and fixes code for conversational revision operations.
  */
-export function validateRevisionContent(content, filePath, op) {
+export function validateRevisionContent(content, filePath, op, framework = null) {
   if (op === "delete") return { content, warnings: [], valid: true, errors: [] };
 
+  const isVanilla = framework === "vanilla" || filePath.endsWith(".html") || (filePath.endsWith(".js") && framework === "vanilla");
+
   if (op === "create") {
-    const result = validateAndFixCode(content, filePath);
+    const result = validateAndFixCode(content, filePath, { framework });
     return {
       content: result.code,
       warnings: result.warnings,
@@ -1112,23 +1114,26 @@ export function validateRevisionContent(content, filePath, op) {
   const warnings = [];
   const errors = [];
 
-  const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
-  if (classFixRegex.test(content)) {
-    content = content.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
-    warnings.push(`${filePath}: Fixed 'class=' -> 'className=' in replacement`);
-  }
+  // In HTML files or vanilla projects, NEVER convert class= to className= or for= to htmlFor=
+  if (!isVanilla && !filePath.endsWith(".html")) {
+    const classFixRegex = /(<[a-zA-Z][^>]*?)\bclass=/g;
+    if (classFixRegex.test(content)) {
+      content = content.replace(/(<[a-zA-Z][^>]*?)\bclass=/g, "$1className=");
+      warnings.push(`${filePath}: Fixed 'class=' -> 'className=' in replacement`);
+    }
 
-  const forFixRegex = /(<label[^>]*?)\bfor=/gi;
-  if (forFixRegex.test(content)) {
-    content = content.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
-    warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor=' in replacement`);
-  }
+    const forFixRegex = /(<label[^>]*?)\bfor=/gi;
+    if (forFixRegex.test(content)) {
+      content = content.replace(/(<label[^>]*?)\bfor=/gi, "$1htmlFor=");
+      warnings.push(`${filePath}: Fixed 'for=' -> 'htmlFor=' in replacement`);
+    }
 
-  for (const tag of VOID_ELEMENTS) {
-    const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
-    if (voidRegex.test(content)) {
-      content = content.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
-      warnings.push(`${filePath}: Self-closed <${tag}> in replacement`);
+    for (const tag of VOID_ELEMENTS) {
+      const voidRegex = new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi");
+      if (voidRegex.test(content)) {
+        content = content.replace(new RegExp(`<${tag}(\\s[^>]*?)?(?<!/)>`, "gi"), (match, attrs) => `<${tag}${attrs || ""} />`);
+        warnings.push(`${filePath}: Self-closed <${tag}> in replacement`);
+      }
     }
   }
 

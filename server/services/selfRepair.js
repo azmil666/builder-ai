@@ -202,7 +202,7 @@ export function createRepairPlan(
     return 0;
   });
 
-  const framework = requirementContract?.framework || inferFramework(files);
+  const framework = inferFramework(files, requirementContract?.framework);
   const isVanilla = framework === "vanilla";
 
   // 3. Group by target file to prevent duplicate repairs and conflicting edits on the same component
@@ -303,7 +303,7 @@ export async function generateTargetedRepairForTask({
   designSpec = null,
   filePlan = null,
 }) {
-  const framework = requirementContract?.framework || inferFramework(currentFiles);
+  const framework = inferFramework(currentFiles, requirementContract?.framework);
   const targetFile = task.targetFile || (task.affectedFiles && task.affectedFiles[0]) || (framework === "vanilla" ? "/script.js" : "/App.jsx");
   const currentCode = currentFiles[targetFile] || "";
   const allPlanned = filePlan?.files || Object.keys(currentFiles).map((p) => ({ path: p, description: p }));
@@ -384,7 +384,7 @@ export async function evaluateRepairCandidate({
   requirementContract = null,
   filePlan = null,
 }) {
-  const framework = requirementContract?.framework || inferFramework(candidateFiles);
+  const framework = inferFramework(candidateFiles, requirementContract?.framework);
 
   // Gate 1: Structure check
   if (framework === "vanilla") {
@@ -523,7 +523,7 @@ export async function runEvidenceDrivenSelfRepairLoop({
   framework = null,
 }) {
   let workingFiles = { ...files };
-  const targetFramework = framework || requirementContract?.framework || inferFramework(files);
+  const targetFramework = framework || inferFramework(files, requirementContract?.framework);
   const filesChanged = [];
   const attemptLogs = [];
   let rollbackCount = 0;
