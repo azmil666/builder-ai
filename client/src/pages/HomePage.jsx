@@ -16,6 +16,7 @@ import { curatedPrompts } from '../assets/assets';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import ProjectCard from '../components/dashboard/ProjectCard';
 import ProjectDeleteModal from '../components/dashboard/ProjectDeleteModal';
+import { FRAMEWORK_OPTIONS } from '../utils/frameworkUtils';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -25,12 +26,14 @@ const HomePage = () => {
     loadingProjects,
     generatingProject,
     loadProjects,
+    createProject,
     handleGenerate,
     handleDelete,
     logout,
   } = useAppContext();
 
   const [promptValue, setPromptValue] = useState('');
+  const [selectedFramework, setSelectedFramework] = useState('auto'); // 'auto' | 'vanilla' | 'react'
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'published' | 'drafts'
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -72,6 +75,45 @@ const HomePage = () => {
     setPromptValue(promptText);
     toast('Prompt loaded into composer', { icon: '✨' });
   };
+
+  // Build website submit handler passing selected framework
+  const handleBuildWebsite = (prompt) => {
+    const creator = createProject || handleGenerate;
+    creator(prompt, { framework: selectedFramework });
+  };
+
+  const frameworkSelector = (
+    <div
+      role="group"
+      aria-label="Target Framework Stack"
+      className="inline-flex items-center rounded-full border border-hairline bg-surface/80 p-0.5 text-[11px] backdrop-blur-md"
+    >
+      {FRAMEWORK_OPTIONS.map((opt) => {
+        const isSelected = selectedFramework === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => setSelectedFramework(opt.id)}
+            disabled={generatingProject}
+            title={opt.tooltip}
+            className={`relative rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer select-none ${
+              isSelected ? 'text-canvas' : 'text-ink-secondary hover:text-ink'
+            }`}
+          >
+            {isSelected && (
+              <motion.span
+                layoutId="framework-selector-pill"
+                transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                className="absolute inset-0 rounded-full bg-ink"
+              />
+            )}
+            <span className="relative z-10">{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   // Filter & search logic
   const filteredProjects = useMemo(() => {
@@ -145,12 +187,13 @@ const HomePage = () => {
           {/* Command Console */}
           <div className="mt-8 w-full text-left">
             <Promptinput
-              onSubmit={handleGenerate}
+              onSubmit={handleBuildWebsite}
               loading={generatingProject}
               placeholder="E.g., Minimalist AI developer observability platform with live metric charts and pricing..."
               variant="dashboard"
               value={promptValue}
               onChange={setPromptValue}
+              footerAction={frameworkSelector}
               autoFocus
             />
           </div>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import FileCreateModal from './FileCreateModal';
 import FileDeleteModal from './FileDeleteModal';
+import { isLockedEntryFile, resolveProjectFramework } from '../utils/frameworkUtils';
 
 function buildTree(paths) {
   const root = [];
@@ -55,6 +56,7 @@ function getFileIcon(name) {
 function TreeItem({
   node,
   activeFile,
+  framework = 'react',
   onFileSelect,
   onRename,
   onDeleteRequest,
@@ -64,6 +66,7 @@ function TreeItem({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(node.name);
   const isActive = node.path === activeFile;
+  const isLocked = isLockedEntryFile(node.path, framework);
 
   const handleRenameSubmit = (e) => {
     e.preventDefault();
@@ -106,6 +109,7 @@ function TreeItem({
                 key={child.path}
                 node={child}
                 activeFile={activeFile}
+                framework={framework}
                 onFileSelect={onFileSelect}
                 onRename={onRename}
                 onDeleteRequest={onDeleteRequest}
@@ -156,7 +160,7 @@ function TreeItem({
           className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
           onClick={(e) => e.stopPropagation()}
         >
-          {node.path !== '/App.js' && onRename && (
+          {!isLocked && onRename && (
             <button
               type="button"
               onClick={() => setIsRenaming(true)}
@@ -167,7 +171,7 @@ function TreeItem({
             </button>
           )}
 
-          {node.path !== '/App.js' && node.path !== '/styles.css' && onDeleteRequest && (
+          {!isLocked && onDeleteRequest && (
             <button
               type="button"
               onClick={() => onDeleteRequest(node.path)}
@@ -186,6 +190,7 @@ function TreeItem({
 const FileExplorer = ({
   files = {},
   activeFile,
+  framework = 'react',
   onFileSelect,
   onCreateFile,
   onRenameFile,
@@ -195,6 +200,7 @@ const FileExplorer = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const resolvedFramework = framework || resolveProjectFramework(files);
   const allFileKeys = useMemo(() => Object.keys(files || {}), [files]);
 
   const filteredKeys = useMemo(() => {
@@ -266,6 +272,7 @@ const FileExplorer = ({
             key={node.path}
             node={node}
             activeFile={activeFile}
+            framework={resolvedFramework}
             onFileSelect={onFileSelect}
             onRename={onRenameFile}
             onDeleteRequest={setDeleteTarget}

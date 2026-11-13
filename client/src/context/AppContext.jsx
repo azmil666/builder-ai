@@ -5,6 +5,11 @@ import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
 import { AppContext } from "./useAppContext.js";
 import { reconcileProjectState } from "../utils/projectReconciliation.js";
+import {
+  resolveProjectFramework,
+  getDefaultActiveFile,
+  isLockedEntryFile,
+} from "../utils/frameworkUtils.js";
 
 export function AppContextProvider({children}){
     
@@ -104,10 +109,10 @@ export function AppContextProvider({children}){
        const { data } = await api.get(`/api/projects/${id}`);
        setActiveProject((prev) => reconcileProjectState(prev, data));
        
-       //default file selection 
+       // default file selection based on target framework
        const files = Object.keys(data.files || {});
        if(files.length > 0){
-        const target = files.includes("/App.js") ? "/App.js" : files[0];
+        const target = getDefaultActiveFile(data);
         setActiveFile(target);
         setOpenTabs((prev) => {
           const valid = prev.filter((p) => files.includes(p));
@@ -125,6 +130,27 @@ export function AppContextProvider({children}){
         if(!silent) setLoadingActiveProject(false);
     }
     }, [user, navigate]);
+
+    const openProject = useCallback(
+      async (target, silent = false) => {
+        if (!target) return null;
+        if (typeof target === "string") {
+          return loadProject(target, silent);
+        }
+        setActiveProject((prev) => reconcileProjectState(prev, target));
+        const files = Object.keys(target.files || {});
+        if (files.length > 0) {
+          const defaultFile = getDefaultActiveFile(target);
+          setActiveFile(defaultFile);
+          setOpenTabs((prev) => {
+            const valid = prev.filter((p) => files.includes(p));
+            return valid.length > 0 ? valid : [defaultFile];
+          });
+        }
+        return target;
+      },
+      [loadProject]
+    );
   // Track whether active project is currently in an ongoing generation/revision state
   const isOngoing = Boolean(
     activeProject?._id &&
@@ -480,14 +506,22 @@ export function AppContextProvider({children}){
     };
   }, [activeProject?._id, activeProject?.status, isOngoing, loadProject, user]);
 
-    const handleGenerate = useCallback(
-        async (prompt) => {
+    const createProject = useCallback(
+        async (prompt, options = {}) => {
            if(!user) return;
            setGeneratingProject(true);
            try {
-              const { data } = await api.post("/api/projects", { prompt });
+              const payload = { prompt };
+              const framework = options?.framework;
+              if (framework && framework !== "auto") {
+                payload.framework = framework;
+              } else if (framework === "auto") {
+                payload.framework = "auto";
+              }
+              const { data } = await api.post("/api/projects", payload);
               toast.success("AI Agent is planning structure...")
               navigate(`/builder/${data._id}`)
+              return data;
            } catch (err) {
             console.error("Failed to generate project:", err);
             toast.error(err?.response?.data?.error || "Failed to generate project");
@@ -495,7 +529,9 @@ export function AppContextProvider({children}){
             setGeneratingProject(false);
            }
         },[navigate, user]
-    )
+    );
+
+    const handleGenerate = createProject;
 
     const handleDelete = useCallback(
         async (id) => {
@@ -644,7 +680,7 @@ export function AppContextProvider({children}){
         // Verify and update active file and open tabs if current file was removed in that snapshot
         const files = Object.keys(data.files || {});
         if (files.length > 0) {
-          const fallbackTarget = files.includes("/App.js") ? "/App.js" : files[0];
+          const fallbackTarget = getDefaultActiveFile(data);
           setActiveFile((prev) => (files.includes(prev) ? prev : fallbackTarget));
           setOpenTabs((prev) => {
             const valid = prev.filter((p) => files.includes(p));
@@ -739,8 +775,9 @@ export function AppContextProvider({children}){
   const renameFile = useCallback(
     async (oldPath, newPath) => {
       if (!activeProject || !user) return;
-      if (oldPath === "/App.js") {
-        toast.error("Cannot rename primary entry point /App.js");
+      const framework = resolveProjectFramework(activeProject);
+      if (isLockedEntryFile(oldPath, framework)) {
+        toast.error(`Cannot rename core file ${oldPath}`);
         return;
       }
       const normalizedNew = newPath.startsWith("/") ? newPath : `/${newPath}`;
@@ -768,7 +805,8 @@ export function AppContextProvider({children}){
   const deleteFile = useCallback(
     async (path) => {
       if (!activeProject || !user) return;
-      if (path === "/App.js" || path === "/styles.css") {
+      const framework = resolveProjectFramework(activeProject);
+      if (isLockedEntryFile(path, framework)) {
         toast.error(`Cannot delete core file ${path}`);
         return;
       }
@@ -778,11 +816,12 @@ export function AppContextProvider({children}){
       const updated = { ...currentFiles };
       delete updated[path];
 
+      const fallback = getDefaultActiveFile({ ...activeProject, files: updated });
       setActiveProject((prev) => (prev ? { ...prev, files: updated } : prev));
-      setActiveFile((prev) => (prev === path ? "/App.js" : prev));
+      setActiveFile((prev) => (prev === path ? fallback : prev));
       setOpenTabs((prev) => {
         const next = prev.filter((p) => p !== path);
-        return next.length > 0 ? next : ["/App.js"];
+        return next.length > 0 ? next : [fallback];
       });
       updateProjectFiles(updated);
       toast.success(`Deleted ${path}`);
@@ -821,6 +860,8 @@ export function AppContextProvider({children}){
         setShowCode,
         loadProjects,
         loadProject,
+        openProject,
+        createProject,
         handleGenerate,
         handleDelete,
         logout,

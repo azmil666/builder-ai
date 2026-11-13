@@ -26,6 +26,7 @@ import PublishModal from '../components/PublishModal';
 import ProjectDeleteModal from '../components/dashboard/ProjectDeleteModal';
 import api from '../api/api';
 import { exportProjectZip } from '../utils/exportProject';
+import { resolveProjectFramework } from '../utils/frameworkUtils';
 
 const BuilderPage = () => {
   const { id } = useParams();
@@ -136,6 +137,7 @@ const BuilderPage = () => {
         projectId={activeProject._id}
         projectName={activeProject.name}
         version={activeProject.version}
+        framework={activeProject.framework || resolveProjectFramework(activeProject)}
         isOngoing={isOngoingBuild || chatLoading}
         showCode={showCode}
         deviceViewport={deviceViewport}
@@ -226,6 +228,7 @@ const BuilderPage = () => {
                   <FileExplorer
                     files={activeProject.files}
                     activeFile={activeFile}
+                    framework={activeProject.framework || resolveProjectFramework(activeProject)}
                     onFileSelect={(path) => openFile(path)}
                     onCreateFile={createFile}
                     onRenameFile={renameFile}

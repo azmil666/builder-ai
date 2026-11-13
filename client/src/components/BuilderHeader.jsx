@@ -20,6 +20,7 @@ const BuilderHeader = ({
   projectId,
   projectName,
   version = 1,
+  framework = 'react',
   isOngoing = false,
   showCode = false,
   deviceViewport = 'desktop', // 'desktop' | 'tablet' | 'mobile'
@@ -34,6 +35,9 @@ const BuilderHeader = ({
   onBack,
 }) => {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const isVanilla = framework === 'vanilla';
+  const frameworkLabel = isVanilla ? 'HTML · CSS · JS' : 'React';
+
   return (
     <header className="h-12 shrink-0 flex items-center justify-between px-3 sm:px-4 border-b border-white/10 bg-canvas/90 backdrop-blur-xl text-ink z-30 select-none">
       {/* Left Area: Back, Logo, Project Name, Version, Sync */}
@@ -63,6 +67,12 @@ const BuilderHeader = ({
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated border border-white/10 text-ink-muted shrink-0">
             v{version}
+          </span>
+          <span
+            className="inline-flex items-center text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated border border-white/10 text-ink-secondary shrink-0 select-none"
+            title={`Target Stack: ${frameworkLabel}`}
+          >
+            {frameworkLabel}
           </span>
         </div>
 

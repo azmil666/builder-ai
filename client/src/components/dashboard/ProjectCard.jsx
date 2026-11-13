@@ -10,11 +10,24 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 import ProjectPreviewPlaceholder from './ProjectPreviewPlaceholder';
+import { resolveProjectFramework } from '../../utils/frameworkUtils';
 
 const cardTransition = {
   type: 'spring',
   stiffness: 320,
   damping: 28,
+};
+
+const FrameworkBadge = ({ framework }) => {
+  const isVanilla = framework === 'vanilla';
+  return (
+    <span
+      className="inline-flex items-center rounded border border-hairline bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-secondary"
+      title={`Target Stack: ${isVanilla ? 'HTML5 · CSS3 · Modern JavaScript' : 'React JSX'}`}
+    >
+      {isVanilla ? 'HTML/JS' : 'React'}
+    </span>
+  );
 };
 
 const StatusBadge = ({ isPublished, isGenerating, isRevising }) => {
@@ -58,6 +71,7 @@ const ProjectCard = ({
   viewMode = 'grid',
 }) => {
   const isPublished = Boolean(project?.published);
+  const framework = resolveProjectFramework(project);
   const status =
     project?.status ||
     (project?.files && Object.keys(project.files).length > 0 ? 'completed' : 'pending');
@@ -87,12 +101,14 @@ const ProjectCard = ({
             <h4 className="truncate font-display text-sm font-medium text-ink">
               {project.name || 'Untitled Project'}
             </h4>
-            <div className="mt-0.5 flex items-center gap-2.5 text-xs text-ink-muted">
+            <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-muted">
               <StatusBadge
                 isPublished={isPublished}
                 isGenerating={isGenerating}
                 isRevising={isRevising}
               />
+              <span className="text-ink-subtle">·</span>
+              <FrameworkBadge framework={framework} />
               <span className="text-ink-subtle">·</span>
               <span className="font-mono text-[11px]">{timeAgo}</span>
             </div>
@@ -185,7 +201,7 @@ const ProjectCard = ({
         </div>
       </div>
 
-      {/* Minimalist Card Footer: Essential Metadata Only (Title, Status, Time) */}
+      {/* Minimalist Card Footer: Essential Metadata Only (Title, Status, Time, Framework) */}
       <div className="flex flex-col gap-2 px-4 py-3.5">
         <div className="flex items-center justify-between gap-3">
           <h4 className="truncate font-display text-sm font-medium text-ink">
@@ -198,9 +214,12 @@ const ProjectCard = ({
           />
         </div>
 
-        <span className="font-mono text-[11px] text-ink-muted">
-          Updated {timeAgo}
-        </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-[11px] text-ink-muted">
+            Updated {timeAgo}
+          </span>
+          <FrameworkBadge framework={framework} />
+        </div>
       </div>
     </motion.div>
   );
