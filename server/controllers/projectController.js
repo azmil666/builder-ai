@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { Project } from "../models/Project.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
-import { emitProjectEvent, formatSSE, subscribeProjectEvents, getMissedProjectEvents } from "../services/projectEvents.js";
+import { emitProjectEvent, formatSSE, subscribeProjectEvents, getMissedProjectEvents, getMissedProjectEventsAsync } from "../services/projectEvents.js";
 import {
   analyzeProjectVisualQuality,
   buildVisualQAFixPrompt,
@@ -750,7 +750,7 @@ export async function streamProjectProgress(req, res) {
 
   // 2. Replay missed events from ring buffer if Last-Event-ID was provided
   if (lastEventId) {
-    const missedEvents = getMissedProjectEvents(project._id, lastEventId);
+    const missedEvents = await getMissedProjectEventsAsync(project._id, lastEventId);
     if (Array.isArray(missedEvents)) {
       for (const item of missedEvents) {
         if (res.writableEnded === true) break;

@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { connectToDatabase } from "./config/db.js";
 import { Project } from "./models/Project.js";
 import { recoverOrphanedProjects } from "./services/recoveryService.js";
+import { closeRedisClients } from "./config/redis.js";
 import authRouter from "./routes/authRoutes.js";
 import projectRouter from "./routes/projectRoutes.js";
 
@@ -52,6 +53,22 @@ app.use((err, _req, res, _next) => {
 
 const port = process.env.PORT || 3000;
 
-app.listen(port, ()=> {
-    console.log(`Server is running at http://localhost:${port}`)
-})
+const server = app.listen(port, () => {
+  console.log(`Server is running at http://localhost:${port}`);
+});
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal) => {
+  console.log(`[Shutdown] Received ${signal}, closing server and connections...`);
+  server.close(async () => {
+    try {
+      await closeRedisClients();
+    } catch (err) {
+      console.warn(`[Shutdown] Redis cleanup notice: ${err.message}`);
+    }
+    process.exit(0);
+  });
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
