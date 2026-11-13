@@ -101,7 +101,7 @@ const ProjectCard = ({
 
         {/* Hover-revealed Quick Actions */}
         <div
-          className="flex shrink-0 items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
+          className="flex shrink-0 items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 relative z-20 pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -153,7 +153,7 @@ const ProjectCard = ({
 
         {/* Quick Actions Overlay on Hover */}
         <div
-          className="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-full glass-overlay px-1.5 py-1 opacity-100 sm:opacity-0 sm:translate-y-1 sm:group-hover:opacity-100 sm:group-hover:translate-y-0 focus-within:opacity-100 transition-all duration-200"
+          className="absolute top-3 right-3 z-20 flex items-center gap-1 rounded-full glass-overlay px-1.5 py-1 opacity-100 sm:opacity-0 sm:translate-y-1 sm:group-hover:opacity-100 sm:group-hover:translate-y-0 focus-within:opacity-100 transition-all duration-200 pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <button

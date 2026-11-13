@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeftIcon,
   CheckCircle2Icon,
@@ -8,15 +8,19 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   GlobeIcon,
+  HistoryIcon,
   Loader2Icon,
   MonitorIcon,
   SmartphoneIcon,
   TabletIcon,
 } from 'lucide-react';
+import VersionHistoryPopover from './VersionHistoryPopover';
 
 const BuilderHeader = ({
+  projectId,
   projectName,
   version = 1,
+  isOngoing = false,
   showCode = false,
   deviceViewport = 'desktop', // 'desktop' | 'tablet' | 'mobile'
   syncStatus = 'saved', // 'saved' | 'saving' | 'error'
@@ -29,6 +33,7 @@ const BuilderHeader = ({
   onDownload,
   onBack,
 }) => {
+  const [historyOpen, setHistoryOpen] = useState(false);
   return (
     <header className="h-12 shrink-0 flex items-center justify-between px-3 sm:px-4 border-b border-white/10 bg-canvas/90 backdrop-blur-xl text-ink z-30 select-none">
       {/* Left Area: Back, Logo, Project Name, Version, Sync */}
@@ -214,6 +219,39 @@ const BuilderHeader = ({
           <ExternalLinkIcon size={13} />
           <span className="hidden md:inline">Preview</span>
         </button>
+
+        {/* Version History Popover */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((prev) => !prev)}
+            disabled={isOngoing}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+              historyOpen
+                ? 'border-white/20 bg-surface-active text-ink'
+                : 'border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink'
+            }`}
+            title={
+              isOngoing
+                ? 'Version history is unavailable while project is generating or revising'
+                : 'Version History & Rollback'
+            }
+          >
+            <HistoryIcon size={13} />
+            <span className="hidden lg:inline">History</span>
+          </button>
+
+          <AnimatePresence>
+            {historyOpen && (
+              <VersionHistoryPopover
+                projectId={projectId}
+                currentVersion={version}
+                isOpen={historyOpen}
+                onClose={() => setHistoryOpen(false)}
+              />
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Export ZIP */}
         <button

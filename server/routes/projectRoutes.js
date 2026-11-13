@@ -3,11 +3,13 @@ import {
   createProject,
   deleteProject,
   getProject,
+  getProjectVersions,
   getProjectVisualQA,
   getPublicProject,
   handleVisualVerification,
   listProjects,
   publishProject,
+  restoreProjectVersion,
   streamProjectProgress,
   updateProjectFiles,
 } from "../controllers/projectController.js";
@@ -30,6 +32,8 @@ projectRouter.post("/", aiGenerationRateLimiter, createProject);
 projectRouter.get("/", listProjects);
 projectRouter.get("/:id/stream", streamProjectProgress);
 projectRouter.get("/:id/qa", getProjectVisualQA);
+projectRouter.get("/:id/versions", getProjectVersions);
+projectRouter.post("/:id/versions/:version/restore", restoreProjectVersion);
 projectRouter.post("/:id/visual-verification", aiRevisionRateLimiter, handleVisualVerification);
 projectRouter.get("/:id", getProject);
 projectRouter.delete("/:id", deleteProject);

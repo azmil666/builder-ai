@@ -204,7 +204,7 @@ const ProjectPreviewPlaceholder = ({ project }) => {
         </div>
 
         {/* Hover overlay hint */}
-        <div className="absolute inset-0 bg-zinc-950/70 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2 text-white font-medium text-xs z-20">
+        <div className="absolute inset-0 bg-zinc-950/70 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2 text-white font-medium text-xs z-10 pointer-events-none">
           <span className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 shadow-xl flex items-center gap-1.5">
             <ExternalLinkIcon size={12} className="text-indigo-400" />
             Open Builder
