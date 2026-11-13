@@ -7,6 +7,7 @@ import { updateRequirementContractOnRevision } from "../services/requirementCont
 import { verifyProjectRequirements } from "../services/requirementVerification.js";
 import { runEvidenceDrivenSelfRepairLoop } from "../services/selfRepair.js";
 import { emitProjectEvent } from "../services/projectEvents.js";
+import { recordSnapshot } from "./projectController.js";
 
 export function buildManifest(files) {
   const manifest = [];
@@ -283,6 +284,13 @@ export async function chat(req, res) {
         console.warn(`[AI Revision Verification] Could not reverify requirements: ${revVerifErr.message}`);
       }
     }
+
+    // Ensure finalized files are committed
+    project.files = updatedFiles;
+    project.markModified("files");
+
+    // Capture point-in-time snapshot for this revision
+    recordSnapshot(project, prompt.slice(0, 100));
 
     project.messages.push({
       role: "assistant",

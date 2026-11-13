@@ -28,6 +28,31 @@ export function sanitizeError(error) {
     .replace(/mongodb(\+srv)?:\/\/[^@]+@/gi, "mongodb$1://[REDACTED_AUTH]@");
 }
 
+/**
+ * Appends an immutable snapshot of project files to project.history,
+ * capping stored snapshots at the most recent 15 versions.
+ */
+export function recordSnapshot(project, label = "Initial generation") {
+  if (!project) return null;
+  if (!project.history) {
+    project.history = [];
+  }
+  const snapshot = {
+    version: project.version,
+    label: (label || "").slice(0, 100),
+    files: JSON.parse(JSON.stringify(project.files || {})),
+    createdAt: new Date(),
+  };
+  project.history.push(snapshot);
+  if (project.history.length > 15) {
+    project.history = project.history.slice(-15);
+  }
+  if (typeof project.markModified === "function") {
+    project.markModified("history");
+  }
+  return snapshot;
+}
+
 // POST /api/projects
 // Create a new project from an AI prompt .
 export async function createProject(req, res) {
@@ -96,7 +121,7 @@ export async function createProject(req, res) {
 }
 
 // Background worker to progressive generate files and update database in real-time.
-async function runBackgroundGeneration(projectId, prompt) {
+export async function runBackgroundGeneration(projectId, prompt) {
   try {
     console.log(`[Background AI] Starting generation for project ${projectId}`);
     const result = await generateProject(prompt, {
@@ -326,6 +351,18 @@ async function runBackgroundGeneration(projectId, prompt) {
 
       // Wait for visual verification reporting from client preview runtime
       await waitForClientVisualVerification(projectId, project);
+
+      // Ensure initial immutable snapshot is recorded when generation reaches completed
+      const finalProject = await Project.findById(projectId);
+      if (finalProject && finalProject.status === "completed") {
+        const alreadyHasSnapshot = (finalProject.history || []).some(
+          (h) => h.version === finalProject.version
+        );
+        if (!alreadyHasSnapshot) {
+          recordSnapshot(finalProject, "Initial generation");
+          await finalProject.save();
+        }
+      }
     }
   } catch (err) {
     const safeError = sanitizeError(err);
@@ -398,6 +435,7 @@ export async function waitForClientVisualVerification(projectId, project) {
         content: "Website generation complete. (Visual preview verification skipped: preview runtime was not available).",
         timestamp: new Date(),
       });
+      recordSnapshot(updated, "Initial generation");
       await updated.save();
 
       emitProjectEvent(projectId, "completed", {
@@ -843,6 +881,7 @@ export async function handleVisualVerification(req, res) {
       repairedFiles: project.visualVerification?.repairedFiles || [],
     };
     project.status = "completed";
+    recordSnapshot(project, "Initial generation");
     await project.save();
 
     emitProjectEvent(project._id, "completed", {
@@ -883,6 +922,7 @@ export async function handleVisualVerification(req, res) {
         : `✅ Visual verification passed. Both desktop (1440×900) and mobile (375×812) viewports render cleanly with 0 overflow.`,
       timestamp: new Date(),
     });
+    recordSnapshot(project, "Initial generation");
     await project.save();
 
     emitProjectEvent(project._id, "completed", {
@@ -923,6 +963,7 @@ export async function handleVisualVerification(req, res) {
       content: `⚠️ Visual verification unresolved: ${aggregated.issues.length} issue(s) remaining after 1 targeted repair attempt. Retaining best available project.`,
       timestamp: new Date(),
     });
+    recordSnapshot(project, "Initial generation");
     await project.save();
 
     emitProjectEvent(project._id, "completed", {
@@ -1006,4 +1047,111 @@ export async function handleVisualVerification(req, res) {
     repairedFiles: repairResult.repairedFiles,
     files: plainFiles,
   });
+}
+
+// GET /api/projects/:id/versions
+// Returns lightweight revision history metadata sorted newest-first
+export async function getProjectVersions(req, res) {
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = (req.user._id || req.user.userID || req.user.userId)?.toString();
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.owner.toString() !== userId) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  const versions = (project.history || []).map((entry) => ({
+    version: entry.version,
+    label: entry.label,
+    createdAt: entry.createdAt,
+    fileCount: Object.keys(entry.files || {}).length,
+  }));
+
+  versions.sort((a, b) => b.version - a.version);
+
+  res.json(versions);
+}
+
+// POST /api/projects/:id/versions/:version/restore
+// Restores project files from an older snapshot, increments version, and logs snapshot
+export async function restoreProjectVersion(req, res) {
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = (req.user._id || req.user.userID || req.user.userId)?.toString();
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.owner.toString() !== userId) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  const targetVersion = Number(req.params.version);
+  if (isNaN(targetVersion)) {
+    res.status(400).json({ error: "Invalid version parameter" });
+    return;
+  }
+
+  const snapshot = (project.history || []).find(
+    (h) => Number(h.version) === targetVersion
+  );
+
+  if (!snapshot) {
+    res.status(404).json({ error: `Version ${targetVersion} not found in project history` });
+    return;
+  }
+
+  // Increment project.version
+  project.version += 1;
+
+  // Overwrite project.files with a deep clone of snapshot's files
+  project.files = JSON.parse(JSON.stringify(snapshot.files || {}));
+  project.markModified("files");
+
+  // Push new snapshot labeled "Restored from v<version>" (capped to last 15)
+  recordSnapshot(project, `Restored from v${targetVersion}`);
+
+  project.status = "completed";
+  project.messages.push({
+    role: "assistant",
+    content: `Restored project files from version ${targetVersion}. (New version: v${project.version})`,
+    timestamp: new Date(),
+  });
+
+  await project.save();
+
+  emitProjectEvent(project._id, "version_restored", {
+    status: "completed",
+    version: project.version,
+    restoredFrom: targetVersion,
+  });
+
+  res.json(project);
 }
