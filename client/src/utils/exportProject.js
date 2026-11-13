@@ -3,8 +3,10 @@ import { detectDependencies } from "./sandpackUtils";
 export async function exportProjectZip(project) {
     if (!project) return;
     try {
-        const JSZip = (await import("jszip")).default;
-        const { saveAs } = await import("file-saver");
+        const jszipModule = await import("jszip");
+        const JSZip = jszipModule.default || jszipModule;
+        const fileSaverModule = await import("file-saver");
+        const saveAs = fileSaverModule.saveAs || fileSaverModule.default;
 
         const zip = new JSZip();
 
