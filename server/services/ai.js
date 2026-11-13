@@ -5,7 +5,7 @@ import pMap from "p-map";
 import { DesignSpecSchema, FileCodeSchema, FilePlanSchema, RevisionResultSchema, RequirementContractSchema } from './aiSchemas.js';
 import { buildFileCodeSystem, buildFilePlanSystem, buildReviseSystem, createDefaultDesignSpec, DESIGN_SPEC_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
-import { validateAndFixCode, validateRevisionContent, validateProject, verifyProjectRuntime } from './codeValidator.js';
+import { validateAndFixCode, validateRevisionContent, validateProject, verifyProjectRuntime, inferFramework } from './codeValidator.js';
 import { deriveFeatureChecklist, validateFeatureChecklist } from './featureValidator.js';
 import { generateGeminiObject } from './gemini.js';
 import { loadCraftworkSkill } from './craftworkSkill.js';
@@ -159,8 +159,10 @@ export async function repairProjectFiles(
     designSpec,
     callbacks = {},
     maxAttempts = 2,
-    requirementContract = null
+    requirementContract = null,
+    framework = null
 ) {
+    const targetFramework = framework || requirementContract?.framework || inferFramework(files);
     let currentFiles = { ...files };
     let currentErrors = [...errors];
     const repairLogs = [];
@@ -211,6 +213,7 @@ export async function repairProjectFiles(
                 const reval = validateAndFixCode(repairedCode, filePath, {
                     allPlannedFiles,
                     existingFiles: Object.keys(currentFiles),
+                    framework: targetFramework,
                 });
 
                 currentFiles[filePath] = reval.code;
@@ -234,13 +237,13 @@ export async function repairProjectFiles(
             }
         }
 
-        const recheck = validateProject(currentFiles, allPlannedFiles);
-        const rerunt = await verifyProjectRuntime(currentFiles);
+        const recheck = validateProject(currentFiles, allPlannedFiles, targetFramework);
+        const rerunt = await verifyProjectRuntime(currentFiles, targetFramework);
         currentErrors = [...recheck.errors, ...rerunt.errors];
     }
 
-    const finalCheck = validateProject(currentFiles, allPlannedFiles);
-    const finalRunt = await verifyProjectRuntime(currentFiles);
+    const finalCheck = validateProject(currentFiles, allPlannedFiles, targetFramework);
+    const finalRunt = await verifyProjectRuntime(currentFiles, targetFramework);
     const combinedFinalErrors = [...finalCheck.errors, ...finalRunt.errors];
 
     return {
@@ -308,7 +311,13 @@ export async function generateProject(prompt, callbacks = {}, options = {}){
         maxRetries: 2,
     });
 
-    if (framework === "vanilla") {
+    // Fallback guarantees: ensure essential entry points exist in FilePlan
+    let resolvedFramework = framework;
+    if (plan.files?.some((f) => f.path === "/App.js" || f.path === "/App.jsx") && !plan.files?.some((f) => f.path === "/index.html")) {
+        resolvedFramework = "react";
+    }
+
+    if (resolvedFramework === "vanilla") {
         if (!plan.files.find((f) => f.path === "/index.html")) {
             plan.files.unshift({
                 path: "/index.html",
@@ -445,7 +454,7 @@ export async function generateProject(prompt, callbacks = {}, options = {}){
         throw new Error(`Failed to generate mandatory planned file(s): ${failedPaths}${errorDetail}`);
     }
 
-    if (framework === "vanilla") {
+    if (resolvedFramework === "vanilla") {
         if (!files["/index.html"]) {
             throw new Error("AI did not generate /index.html entry point");
         }
@@ -459,8 +468,8 @@ export async function generateProject(prompt, callbacks = {}, options = {}){
     if (callbacks?.onValidationStart) {
         await callbacks.onValidationStart();
     }
-    let projectValidation = validateProject(files, plan.files);
-    let runtimeValidation = await verifyProjectRuntime(files);
+    let projectValidation = validateProject(files, plan.files, resolvedFramework);
+    let runtimeValidation = await verifyProjectRuntime(files, resolvedFramework);
     let combinedErrors = [...projectValidation.errors, ...runtimeValidation.errors];
 
     // If validation fails, initiate targeted AI self-repair loop
@@ -479,7 +488,8 @@ export async function generateProject(prompt, callbacks = {}, options = {}){
             designSpec,
             callbacks,
             2,
-            requirementContract
+            requirementContract,
+            resolvedFramework
         );
 
         files = repairResult.files;
@@ -492,7 +502,7 @@ export async function generateProject(prompt, callbacks = {}, options = {}){
     // Phase 4.5: Evidence-Based Requirement Verification (Phase 3 Quality Engine V2)
     let requirementVerification = null;
     try {
-        requirementVerification = await verifyProjectRequirements(files, requirementContract, plan);
+        requirementVerification = await verifyProjectRequirements(files, requirementContract, plan, { framework: resolvedFramework });
         console.log(`[RequirementVerification] Completed: status=${requirementVerification.overallStatus}, passed=${requirementVerification.passed}/${requirementVerification.totalRequirements}, mandatoryPassed=${requirementVerification.mandatoryPassed}`);
         if (callbacks?.onRequirementVerification) {
             await callbacks.onRequirementVerification(requirementVerification);
@@ -514,6 +524,7 @@ export async function generateProject(prompt, callbacks = {}, options = {}){
                 filePlan: plan,
                 callbacks,
                 maxAttempts: 2,
+                framework: resolvedFramework,
             });
             files = repairLoopResult.files;
             requirementVerification = repairLoopResult.verification;
@@ -541,7 +552,7 @@ export async function generateProject(prompt, callbacks = {}, options = {}){
         selfRepair: selfRepairReport,
         manifest: plan.manifest,
         featureReport,
-        framework,
+        framework: resolvedFramework,
     };
 }
 

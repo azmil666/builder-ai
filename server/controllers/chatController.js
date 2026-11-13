@@ -169,8 +169,8 @@ export async function chat(req, res) {
       description: p,
     }));
 
-    let projectValidation = validateProject(candidateFilesMap, plannedItems);
-    let runtimeValidation = await verifyProjectRuntime(candidateFilesMap);
+    let projectValidation = validateProject(candidateFilesMap, plannedItems, projectFramework);
+    let runtimeValidation = await verifyProjectRuntime(candidateFilesMap, projectFramework);
     let combinedErrors = [...projectValidation.errors, ...runtimeValidation.errors];
 
     // If validation or runtime issues occur, initiate targeted AI self-repair
@@ -184,7 +184,9 @@ export async function chat(req, res) {
           prompt,
           project.designSpec,
           {},
-          2
+          2,
+          candidateContract,
+          projectFramework
         );
         if (repairResult.success) {
           for (const [p, code] of Object.entries(repairResult.files)) {
@@ -253,7 +255,8 @@ export async function chat(req, res) {
         let revVerification = await verifyProjectRequirements(
           candidateFilesMap,
           candidateContract,
-          null
+          null,
+          { framework: projectFramework }
         );
 
         if (revVerification.mandatoryFailed > 0) {
@@ -265,6 +268,7 @@ export async function chat(req, res) {
             designSpec: project.designSpec,
             filePlan: null,
             maxAttempts: 2,
+            framework: projectFramework,
           });
 
           if (repairLoopResult.success) {

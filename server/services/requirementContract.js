@@ -7,14 +7,17 @@ import { REQUIREMENT_CONTRACT_SYSTEM } from "./prompts.js";
  * from user prompt heuristics if structured AI generation fails or is bypassed.
  */
 export function createDefaultRequirementContract(prompt = "", frameworkOrOptions = null) {
-  let framework = "vanilla";
+  let framework = "react";
   if (typeof frameworkOrOptions === "string" && (frameworkOrOptions === "vanilla" || frameworkOrOptions === "react")) {
     framework = frameworkOrOptions;
   } else if (frameworkOrOptions && typeof frameworkOrOptions === "object" && (frameworkOrOptions.framework === "vanilla" || frameworkOrOptions.framework === "react")) {
     framework = frameworkOrOptions.framework;
-  } else if (/\b(react|jsx|tsx|component-based|single[- ]page app|spa)\b/i.test(prompt)) {
-    framework = "react";
+  } else if (/\b(vanilla|html5?|pure js|no react)\b/i.test(prompt)) {
+    framework = "vanilla";
   }
+
+  const isVanilla = framework === "vanilla";
+  const defaultTarget = (reactPath) => (isVanilla ? "/script.js" : reactPath);
 
   const p = prompt.toLowerCase();
 
@@ -129,7 +132,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
       category: "game_logic",
       expectedBehavior: "React state updates instantly upon interaction with clear visual transitions",
       priority: "mandatory",
-      implementationTarget: "/App.js",
+      implementationTarget: defaultTarget("/App.js"),
     });
   } else if (isEcommerce) {
     mandatory.push("Product catalog listing and product cards");
@@ -200,7 +203,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
         category: "ecommerce_cart",
         expectedBehavior: "Adding items opens or updates bag; totals update reactively",
         priority: "mandatory",
-        implementationTarget: "/components/CartDrawer.js",
+        implementationTarget: defaultTarget("/components/CartDrawer.js"),
       });
     }
 
@@ -212,7 +215,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
         category: "search_filtering",
         expectedBehavior: "Clicking filter pills immediately updates rendered product items",
         priority: "mandatory",
-        implementationTarget: "/components/ProductGrid.js",
+        implementationTarget: defaultTarget("/components/ProductGrid.js"),
       });
     }
   } else if (isRestaurant) {
@@ -270,7 +273,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
         category: "forms_validation",
         expectedBehavior: "Validates required fields and provides immediate confirmation message",
         priority: "mandatory",
-        implementationTarget: "/components/Reservation.js",
+        implementationTarget: defaultTarget("/components/Reservation.js"),
       },
       {
         id: "menu_filter",
@@ -279,7 +282,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
         category: "tabs_accordions",
         expectedBehavior: "Switching tabs displays corresponding course dishes smoothly",
         priority: "mandatory",
-        implementationTarget: "/components/Menu.js",
+        implementationTarget: defaultTarget("/components/Menu.js"),
       }
     );
   } else {
@@ -337,7 +340,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
       category: "tabs_accordions",
       expectedBehavior: "Clicking items smoothly switches the active demonstration view",
       priority: "mandatory",
-      implementationTarget: "/components/Features.js",
+      implementationTarget: defaultTarget("/components/Features.js"),
     });
   }
 
@@ -366,7 +369,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
         category: "forms_validation",
         expectedBehavior: "Validates required inputs and displays feedback toast on submit",
         priority: "mandatory",
-        implementationTarget: "/components/Contact.js",
+        implementationTarget: defaultTarget("/components/Contact.js"),
       });
       mandatory.push("Contact inquiry form");
     }
@@ -389,7 +392,7 @@ export function createDefaultRequirementContract(prompt = "", frameworkOrOptions
         category: "tabs_accordions",
         expectedBehavior: "Clicking a question toggles its answer visibility",
         priority: "mandatory",
-        implementationTarget: "/components/Faq.js",
+        implementationTarget: defaultTarget("/components/Faq.js"),
       });
       mandatory.push("FAQ Accordion section");
     }

@@ -7,7 +7,7 @@ import { generateStructuredObject } from './ai.js';
 import { FileCodeSchema } from './aiSchemas.js';
 import { buildFileCodeSystem } from './prompts.js';
 import { normalizeContent } from './contentNormalizer.js';
-import { validateAndFixCode, validateProject } from './codeValidator.js';
+import { validateAndFixCode, validateProject, inferFramework } from './codeValidator.js';
 
 // Heuristics for responsive and layout issues
 const RESPONSIVE_DEFECT_PATTERNS = [
@@ -79,10 +79,18 @@ const ACCESSIBILITY_DEFECT_PATTERNS = [
 
 /**
  * Analyzes a collection of project files against Visual QA rules and DesignSpec.
+ * Supports both "vanilla" (HTML5+CSS+JS) and "react" (React/JSX+CSS) stacks.
  */
-export function analyzeProjectVisualQuality(files = {}, designSpec = null) {
+export function analyzeProjectVisualQuality(files = {}, designSpec = null, framework = null) {
   const issues = [];
-  const filesList = Object.entries(files);
+  const targetFramework = framework || inferFramework(files);
+
+  const filesList = Object.entries(files).filter(([filePath]) => {
+    if (targetFramework === "vanilla") {
+      return filePath.endsWith(".html") || filePath.endsWith(".css") || filePath.endsWith(".js");
+    }
+    return filePath.endsWith(".jsx") || filePath.endsWith(".js") || filePath.endsWith(".css");
+  });
 
   for (const [filePath, fileObj] of filesList) {
     const content = typeof fileObj === 'string' ? fileObj : fileObj?.content || '';
@@ -191,6 +199,14 @@ export function analyzeProjectVisualQuality(files = {}, designSpec = null) {
       compliant: summary.critical === 0,
     },
   };
+}
+
+/**
+ * Static Visual QA inspection entry point.
+ * Alias for analyzeProjectVisualQuality with explicit framework support.
+ */
+export function runStaticVisualQa(files = {}, designSpec = null, framework = null) {
+  return analyzeProjectVisualQuality(files, designSpec, framework);
 }
 
 /**
