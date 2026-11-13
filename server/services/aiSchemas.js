@@ -27,6 +27,7 @@ export const TypographyPairingSchema = z.object({
 });
 
 export const DesignSpecSchema = z.object({
+  framework: z.enum(["vanilla", "react"]).optional(),
   // Core Identity & Category
   purpose: z.string().default("Web application"),
   targetAudience: z.string().default("General audience"),
@@ -333,6 +334,7 @@ export const RequirementContentSchema = z.object({
 });
 
 export const RequirementContractSchema = z.object({
+  framework: z.enum(["vanilla", "react"]).optional(),
   identity: RequirementIdentitySchema.default(() => ({
     name: "Generated Project",
     category: "saas_landing",

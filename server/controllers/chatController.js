@@ -99,7 +99,9 @@ export async function chat(req, res) {
         `(${manifest.length} files, manifest ~${JSON.stringify(manifest).length} chars)`,
     );
 
-    // Call AI with manifest + relevant files + designSpec + candidateContract
+    const projectFramework = project.framework || (project.files?.["/index.html"] ? "vanilla" : "react");
+
+    // Call AI with manifest + relevant files + designSpec + candidateContract + framework
     const result = await reviseProject(
       prompt,
       manifest,
@@ -107,6 +109,7 @@ export async function chat(req, res) {
       recentMessages,
       project.designSpec,
       candidateContract,
+      projectFramework,
     );
 
     console.log(
@@ -136,7 +139,8 @@ export async function chat(req, res) {
                 relevantFiles[failedPath],
                 prompt,
                 relevantFiles,
-                project.designSpec
+                project.designSpec,
+                projectFramework,
               );
               if (newContent && typeof newContent === "string" && newContent.trim().length > 0) {
                 updatedFiles[failedPath] = {

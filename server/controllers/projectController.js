@@ -53,10 +53,26 @@ export function recordSnapshot(project, label = "Initial generation") {
   return snapshot;
 }
 
+/**
+ * Deterministically resolves the target framework ("vanilla" or "react")
+ * based on user request or heuristic prompt inspection.
+ */
+export function resolveTargetFramework(prompt = "", requestedFramework = null) {
+  const normalized = typeof requestedFramework === "string" ? requestedFramework.trim().toLowerCase() : "";
+  if (normalized === "react" || normalized === "vanilla") {
+    return normalized;
+  }
+  const p = typeof prompt === "string" ? prompt : "";
+  if (/\b(react|jsx|tsx|component-based|single[- ]page\s*(?:app|application)?|spa)\b/i.test(p)) {
+    return "react";
+  }
+  return "vanilla";
+}
+
 // POST /api/projects
 // Create a new project from an AI prompt .
 export async function createProject(req, res) {
-  const { prompt } = req.body;
+  const { prompt, framework } = req.body;
   if (!prompt || typeof prompt !== "string") {
     res.status(400).json({ error: "prompt is required" });
     return;
@@ -68,11 +84,13 @@ export async function createProject(req, res) {
   }
 
   const userId = req.user.userID || req.user.userId;
+  const targetFramework = resolveTargetFramework(prompt, framework);
 
   // Create project in DB immediately with "pending" status
   const project = await Project.create({
     name: "Planning project...",
     description: prompt,
+    framework: targetFramework,
     files: {},
     messages: [
       { role: "user", content: prompt },
@@ -92,7 +110,7 @@ export async function createProject(req, res) {
   });
 
   // Start background generation
-  runBackgroundGeneration(project._id.toString(), prompt).catch((err) => {
+  runBackgroundGeneration(project._id.toString(), prompt, targetFramework).catch((err) => {
     const safeError = sanitizeError(err);
     console.error(
       `[Background AI] Fatal generation error for project ${project._id}: ${safeError}`,
@@ -103,6 +121,7 @@ export async function createProject(req, res) {
     _id: project._id,
     name: project.name,
     description: project.description,
+    framework: project.framework,
     files: {},
     messages: project.messages,
     version: project.version,
@@ -121,9 +140,14 @@ export async function createProject(req, res) {
 }
 
 // Background worker to progressive generate files and update database in real-time.
-export async function runBackgroundGeneration(projectId, prompt) {
+export async function runBackgroundGeneration(projectId, prompt, framework = null) {
   try {
-    console.log(`[Background AI] Starting generation for project ${projectId}`);
+    let targetFramework = framework;
+    if (!targetFramework) {
+      const p = await Project.findById(projectId).select("framework files");
+      targetFramework = p?.framework || (p?.files && (p.files["/App.js"] || p.files["/App.jsx"]) ? "react" : "vanilla");
+    }
+    console.log(`[Background AI] Starting generation for project ${projectId} (framework=${targetFramework})`);
     const result = await generateProject(prompt, {
       onRequirementContract: async (contract) => {
         console.log(
@@ -296,7 +320,7 @@ export async function runBackgroundGeneration(projectId, prompt) {
       onRepairExhausted: async (data) => {
         emitProjectEvent(projectId, "repair_exhausted", data);
       },
-    });
+    }, { framework: targetFramework });
 
     console.log(`[Background AI] Successfully generated project ${projectId}`);
 
@@ -465,6 +489,7 @@ export async function listProjects(req, res) {
     {
       name: 1,
       description: 1,
+      framework: 1,
       version: 1,
       status: 1,
       published: 1,
@@ -511,6 +536,7 @@ export async function getProject(req, res) {
     _id: project._id,
     name: project.name,
     description: project.description,
+    framework: project.framework || (project.files?.["/index.html"] ? "vanilla" : (project.files?.["/App.js"] || project.files?.["/App.jsx"] ? "react" : "vanilla")),
     files: fileObj,
     messages: project.messages,
     version: project.version,

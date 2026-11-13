@@ -23,6 +23,7 @@ const ProjectSchema = new Schema({
     name: {type: String, required: true, default: "Untitled Project" },
     description : {type: String, default: "" },
     files: { type: Schema.Types.Mixed, default: {}}, 
+    framework: { type: String, enum: ["vanilla", "react"], default: "vanilla" },
     messages: { type: [MessageSchema], default: []},
     version: { type: Number, default: 0 },
     history: { type: [HistoryEntrySchema], default: [] },
@@ -41,10 +42,16 @@ const ProjectSchema = new Schema({
     error: {type: String, default: null},
 },{timestamps: true})
 
-// Backward compatibility: keep currentFile and legacy CurrentFile in sync
+// Backward compatibility: keep currentFile and legacy CurrentFile in sync, and detect framework for legacy projects
 ProjectSchema.post('init', function(doc) {
     if (!doc.currentFile && doc.CurrentFile) {
         doc.currentFile = doc.CurrentFile;
+    }
+    // Backward compatibility: treat legacy projects with /App.js or /App.jsx as "react" when needed
+    if (!doc.framework || doc.framework === "vanilla") {
+        if (doc.files && (doc.files["/App.js"] || doc.files["/App.jsx"])) {
+            doc.framework = "react";
+        }
     }
 });
 
