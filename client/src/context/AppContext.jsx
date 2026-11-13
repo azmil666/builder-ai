@@ -144,7 +144,9 @@ export function AppContextProvider({children}){
       return;
     }
 
-    setChatLoading(true);
+    if (activeProject.status === "revising") {
+      setChatLoading(true);
+    }
 
     let eventSource = null;
     let fallbackInterval = null;
@@ -212,6 +214,9 @@ export function AppContextProvider({children}){
         stopFallbackPolling();
         try {
           const data = JSON.parse(e.data);
+          if (Array.isArray(data.filesGenerated)) {
+            data.filesGenerated = Array.from(new Set(data.filesGenerated.filter(Boolean)));
+          }
           setActiveProject((prev) => (prev ? { ...prev, ...data } : prev));
         } catch (err) {
           console.error("Failed to parse initial_state SSE event:", err);
@@ -289,10 +294,23 @@ export function AppContextProvider({children}){
             if (data.path && data.file) {
               updatedFiles[data.path] = data.file;
             }
+
+            const prevGenerated = Array.isArray(prev.filesGenerated)
+              ? prev.filesGenerated
+              : [];
+            const incomingGenerated = Array.isArray(data.filesGenerated)
+              ? data.filesGenerated
+              : [];
+            const combined = [...prevGenerated, ...incomingGenerated];
+            if (data.path) {
+              combined.push(data.path);
+            }
+            const uniqueGenerated = Array.from(new Set(combined.filter(Boolean)));
+
             return {
               ...prev,
               files: updatedFiles,
-              filesGenerated: data.filesGenerated || prev.filesGenerated,
+              filesGenerated: uniqueGenerated,
               currentFile: null,
             };
           });
@@ -382,19 +400,29 @@ export function AppContextProvider({children}){
       eventSource.addEventListener("completed", (e) => {
         try {
           const data = JSON.parse(e.data);
-          setActiveProject((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: "completed",
-                  version: data.version || prev.version || 1,
-                  name: data.name || prev.name,
-                  designSpec: data.designSpec || prev.designSpec,
-                  requirementContract: data.requirementContract || prev.requirementContract,
-                  visualVerification: data.visualVerification || prev.visualVerification,
-                }
-              : prev,
-          );
+          setActiveProject((prev) => {
+            if (!prev) return prev;
+            const prevGenerated = Array.isArray(prev.filesGenerated)
+              ? prev.filesGenerated
+              : [];
+            const incomingGenerated = Array.isArray(data.filesGenerated)
+              ? data.filesGenerated
+              : [];
+            const uniqueGenerated = Array.from(
+              new Set([...prevGenerated, ...incomingGenerated].filter(Boolean))
+            );
+
+            return {
+              ...prev,
+              status: "completed",
+              version: data.version || prev.version || 1,
+              name: data.name || prev.name,
+              designSpec: data.designSpec || prev.designSpec,
+              requirementContract: data.requirementContract || prev.requirementContract,
+              visualVerification: data.visualVerification || prev.visualVerification,
+              filesGenerated: uniqueGenerated,
+            };
+          });
           setChatLoading(false);
           eventSource?.close();
           if (fallbackInterval) {
@@ -450,7 +478,7 @@ export function AppContextProvider({children}){
         clearInterval(fallbackInterval);
       }
     };
-  }, [activeProject?._id, isOngoing, loadProject, user]);
+  }, [activeProject?._id, activeProject?.status, isOngoing, loadProject, user]);
 
     const handleGenerate = useCallback(
         async (prompt) => {

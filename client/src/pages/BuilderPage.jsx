@@ -216,6 +216,8 @@ const BuilderPage = () => {
                     messages={activeProject.messages}
                     onSend={handleChat}
                     loading={chatLoading}
+                    status={activeProject.status}
+                    project={activeProject}
                     onFileSelect={(path) => openFile(path)}
                   />
                 )}

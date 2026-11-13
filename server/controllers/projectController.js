@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { Project } from "../models/Project.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
-import { emitProjectEvent, formatSSE, subscribeProjectEvents } from "../services/projectEvents.js";
+import { emitProjectEvent, formatSSE, subscribeProjectEvents, getMissedProjectEvents, getMissedProjectEventsAsync } from "../services/projectEvents.js";
 import {
   analyzeProjectVisualQuality,
   buildVisualQAFixPrompt,
@@ -712,6 +712,24 @@ export async function streamProjectProgress(req, res) {
     "X-Accel-Buffering": "no",
   });
 
+  // Extract Last-Event-ID from header or query param fallback
+  let lastEventId =
+    req.headers?.["last-event-id"] ||
+    req.headers?.["Last-Event-ID"] ||
+    req.query?.lastEventId ||
+    null;
+  if (Array.isArray(lastEventId)) {
+    lastEventId = lastEventId[0];
+  }
+  if (typeof lastEventId !== "string" || !lastEventId.trim()) {
+    lastEventId = null;
+  } else {
+    lastEventId = lastEventId.trim();
+  }
+
+  // Deduplication set per connection to prevent duplicate emissions
+  const sentEventIds = new Set();
+
   // 1. Immediately send ground-truth state from database
   const initialState = {
     projectId: project._id,
@@ -730,27 +748,53 @@ export async function streamProjectProgress(req, res) {
   };
   res.write(formatSSE("initial_state", initialState));
 
-  // 2. If already terminal (completed or failed), terminate stream immediately
+  // 2. Replay missed events from ring buffer if Last-Event-ID was provided
+  if (lastEventId) {
+    const missedEvents = await getMissedProjectEventsAsync(project._id, lastEventId);
+    if (Array.isArray(missedEvents)) {
+      for (const item of missedEvents) {
+        if (res.writableEnded === true) break;
+        if (item.id && sentEventIds.has(item.id)) continue;
+        if (item.id) sentEventIds.add(item.id);
+        res.write(formatSSE(item.event, item.data, item.id));
+        if (item.event === "completed" || item.event === "failed") {
+          res.end();
+          return;
+        }
+      }
+    }
+  }
+
+  // 3. If already terminal (completed or failed), terminate stream immediately
   if (project.status === "completed" || project.status === "failed") {
-    res.write(
-      formatSSE(project.status, {
-        status: project.status,
-        error: project.error,
-        version: project.version,
-        name: project.name,
-        designSpec: project.designSpec,
-        visualVerification: project.visualVerification || null,
-        filesGenerated: project.filesGenerated || [],
-      }),
-    );
-    res.end();
+    if (res.writableEnded !== true) {
+      res.write(
+        formatSSE(project.status, {
+          status: project.status,
+          error: project.error,
+          version: project.version,
+          name: project.name,
+          designSpec: project.designSpec,
+          visualVerification: project.visualVerification || null,
+          filesGenerated: project.filesGenerated || [],
+        }),
+      );
+      res.end();
+    }
     return;
   }
 
-  // 3. Subscribe to real-time events for this project
-  const unsubscribe = subscribeProjectEvents(project._id, ({ event, data }) => {
+  // 4. Subscribe to real-time events for this project
+  const unsubscribe = subscribeProjectEvents(project._id, ({ event, data, id }) => {
     try {
-      res.write(formatSSE(event, data));
+      if (res.writableEnded === true) return;
+      if (id && sentEventIds.has(id)) {
+        return;
+      }
+      if (id) {
+        sentEventIds.add(id);
+      }
+      res.write(formatSSE(event, data, id));
       if (event === "completed" || event === "failed") {
         res.end();
       }
@@ -759,9 +803,13 @@ export async function streamProjectProgress(req, res) {
     }
   });
 
-  // 4. Send keepalive heartbeat comment every 15 seconds
+  // 5. Send keepalive heartbeat comment every 15 seconds
   const heartbeatTimer = setInterval(() => {
     try {
+      if (res.writableEnded === true) {
+        clearInterval(heartbeatTimer);
+        return;
+      }
       res.write(": heartbeat\n\n");
     } catch {
       clearInterval(heartbeatTimer);
@@ -771,7 +819,7 @@ export async function streamProjectProgress(req, res) {
     heartbeatTimer.unref();
   }
 
-  // 5. Clean up on connection close or stream termination
+  // 6. Clean up on connection close or stream termination
   let isCleanedUp = false;
   const cleanup = () => {
     if (isCleanedUp) return;

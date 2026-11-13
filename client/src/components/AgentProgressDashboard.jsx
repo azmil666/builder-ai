@@ -20,7 +20,24 @@ const PHASES = [
 export default function AgentProgressDashboard({ project }) {
   const { reportVisualVerification } = useAppContext();
   const planned = project.filesPlanned || [];
-  const completed = project.filesGenerated || [];
+  const rawCompleted = project.filesGenerated || [];
+  // (a) Deduplicate completed file paths using a Set
+  const completedUnique = Array.from(new Set(rawCompleted.filter(Boolean)));
+  const completedCount = completedUnique.length;
+
+  // (b) Include any self-repair additions in effective total
+  const plannedPathSet = new Set(
+    planned.map((f) => (typeof f === "string" ? f : f?.path)).filter(Boolean)
+  );
+  const extraFiles = completedUnique
+    .filter((filePath) => !plannedPathSet.has(filePath))
+    .map((filePath) => ({
+      path: filePath,
+      description: "Self-repair component",
+    }));
+  const displayFiles = [...planned, ...extraFiles];
+  const effectiveTotal = Math.max(planned.length, completedCount);
+
   const current = project.currentFile;
   const isFailed = project.status === "failed";
   const isVisualVerifying = project.status === "visual_verifying";
@@ -48,8 +65,14 @@ export default function AgentProgressDashboard({ project }) {
         ? 1
         : 0;
 
+  // (c) Clamp progress percentage to [0, 100] and cap active in-flight progress at 99% until completed
+  const rawPercent =
+    effectiveTotal > 0 ? Math.round((completedCount / effectiveTotal) * 100) : 0;
+  const clampedPercent = Math.min(100, Math.max(0, rawPercent));
   const progressPercent =
-    planned.length > 0 ? Math.round((completed.length / planned.length) * 100) : 0;
+    project.status === "completed"
+      ? clampedPercent
+      : Math.min(99, clampedPercent);
 
   const phaseTitle = isFailed
     ? "Generation Failed"
@@ -262,17 +285,18 @@ export default function AgentProgressDashboard({ project }) {
         {planned.length > 0 ? (
           <div>
             <span className="block font-mono text-[10px] text-ink-muted uppercase tracking-widest mb-3">
-              Planned Files ({completed.length}/{planned.length})
+              Planned Files ({completedCount}/{effectiveTotal})
             </span>
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1 hide-scrollbar">
-              {planned.map((file) => {
-                const isCompleted = completed.includes(file.path);
-                const isGenerating = !isFailed && current === file.path;
+              {displayFiles.map((file) => {
+                const filePath = typeof file === "string" ? file : file.path;
+                const isCompleted = completedUnique.includes(filePath);
+                const isGenerating = !isFailed && current === filePath;
 
                 return (
                   <motion.div
                     layout
-                    key={file.path}
+                    key={filePath}
                     className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${
                       isGenerating
                         ? "bg-surface-elevated border-white/25"
@@ -294,11 +318,13 @@ export default function AgentProgressDashboard({ project }) {
                           isGenerating ? "text-ink font-medium" : "text-ink-secondary"
                         }`}
                       >
-                        {file.path}
+                        {filePath}
                       </p>
-                      <p className="text-[11px] text-ink-muted truncate mt-0.5">
-                        {file.description}
-                      </p>
+                      {file.description && (
+                        <p className="text-[11px] text-ink-muted truncate mt-0.5">
+                          {file.description}
+                        </p>
+                      )}
                     </div>
                     {isGenerating && (
                       <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-surface-active text-ink border border-white/10 animate-pulse uppercase tracking-wider">

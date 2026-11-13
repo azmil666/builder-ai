@@ -18,18 +18,38 @@ const REVISION_SUGGESTIONS = [
   'Improve typography contrast',
 ];
 
-const ChatPanel = ({ messages = [], onSend, loading = false, onFileSelect }) => {
+const INITIAL_BUILD_STATUSES = [
+  'pending',
+  'generating',
+  'validating',
+  'repairing',
+  'visual_verifying',
+];
+
+const ChatPanel = ({
+  messages = [],
+  onSend,
+  loading = false,
+  status = '',
+  project = null,
+  onFileSelect,
+}) => {
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
 
+  const currentStatus = status || project?.status || '';
+  const isInitialBuild = INITIAL_BUILD_STATUSES.includes(currentStatus);
+  const showLoadingIndicator =
+    (currentStatus === 'revising' || loading) && !isInitialBuild;
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  }, [messages, showLoadingIndicator]);
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed || showLoadingIndicator) return;
     onSend(trimmed);
     setInput('');
   };
@@ -129,7 +149,7 @@ const ChatPanel = ({ messages = [], onSend, loading = false, onFileSelect }) => 
         </AnimatePresence>
 
         {/* Loading Indicator */}
-        {loading && (
+        {showLoadingIndicator && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -150,7 +170,7 @@ const ChatPanel = ({ messages = [], onSend, loading = false, onFileSelect }) => 
       </div>
 
       {/* Revision Suggestions */}
-      {messages.length > 0 && !loading && (
+      {messages.length > 0 && !showLoadingIndicator && !isInitialBuild && (
         <div className="px-3 pt-2.5 pb-1.5 border-t border-white/10 flex items-center gap-1.5 overflow-x-auto hide-scrollbar shrink-0 bg-canvas/40">
           {REVISION_SUGGESTIONS.map((suggestion, i) => (
             <button
