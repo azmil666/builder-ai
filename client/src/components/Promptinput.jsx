@@ -10,6 +10,7 @@ const Promptinput = ({
   variant = "default",
   value: controlledValue,
   onChange: onControlledChange,
+  footerAction = null,
 }) => {
   const [internalValue, setInternalValue] = useState("");
   const textareaRef = useRef(null);
@@ -81,23 +82,26 @@ const Promptinput = ({
             <span className="text-ink-subtle">Shift + Enter for newline</span>
           </div>
 
-          <button
-            type="submit"
-            disabled={!value.trim() || loading}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-ink px-5 py-2 text-xs font-medium text-canvas transition-all duration-150 hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35 cursor-pointer"
-          >
-            {loading ? (
-              <>
-                <Loader2Icon size={14} className="animate-spin" />
-                <span>Building...</span>
-              </>
-            ) : (
-              <>
-                <span>Build Website</span>
-                <ArrowRightIcon size={13} />
-              </>
-            )}
-          </button>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            {footerAction}
+            <button
+              type="submit"
+              disabled={!value.trim() || loading}
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-ink px-5 py-2 text-xs font-medium text-canvas transition-all duration-150 hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35 cursor-pointer"
+            >
+              {loading ? (
+                <>
+                  <Loader2Icon size={14} className="animate-spin" />
+                  <span>Building...</span>
+                </>
+              ) : (
+                <>
+                  <span>Build Website</span>
+                  <ArrowRightIcon size={13} />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     );

@@ -22,7 +22,7 @@ const PreviewPage = () => {
     return <Loading />;
   }
 
-  return <FullPagePreview files={project.files} />;
+  return <FullPagePreview project={project} files={project.files} />;
 };
 
 export default PreviewPage;

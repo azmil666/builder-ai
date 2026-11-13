@@ -5,6 +5,7 @@ import {
   useSandpack,
 } from '@codesandbox/sandpack-react';
 import { detectDependencies } from '../utils/sandpackUtils';
+import { resolveProjectFramework } from '../utils/frameworkUtils';
 
 const VERIFY_VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 900 },
@@ -111,24 +112,136 @@ export default function VisualVerificationRunner({
   const activeFilesRef = useRef(activeFiles);
   activeFilesRef.current = activeFiles;
 
+  const framework = useMemo(
+    () => resolveProjectFramework(project || activeFiles),
+    [project, activeFiles],
+  );
+
   // Prepare sandpack files
   const sandpackFiles = useMemo(() => {
     const spFiles = {};
     for (const [path, content] of Object.entries(activeFiles || {})) {
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
       const code = typeof content === 'string' ? content : content?.content || '';
-      spFiles[path] = { code, active: path === '/App.js' };
+      spFiles[cleanPath] = { code };
     }
-    // Inject metric extraction script into /public/index.html
-    spFiles['/public/index.html'] = {
-      code: OBSERVER_INDEX_HTML,
-      hidden: true,
-    };
+
+    if (framework === 'vanilla') {
+      // In vanilla, inject observer metric script into /index.html
+      const existingHtml = spFiles['/index.html']?.code || OBSERVER_INDEX_HTML;
+      const observerScript = `<script>
+      function extractAndSendMetrics(viewportName) {
+        try {
+          var doc = document.documentElement;
+          var body = document.body;
+          var scrollW = Math.max(doc ? doc.scrollWidth : 0, body ? body.scrollWidth : 0);
+          var clientW = doc ? doc.clientWidth : window.innerWidth;
+          var scrollH = Math.max(doc ? doc.scrollHeight : 0, body ? body.scrollHeight : 0);
+          var clientH = doc ? doc.clientHeight : window.innerHeight;
+
+          window.parent.postMessage({
+            type: 'BUILDER_AI_METRICS_REPORT',
+            viewportName: viewportName,
+            metrics: {
+              scrollWidth: scrollW,
+              clientWidth: clientW,
+              scrollHeight: scrollH,
+              clientHeight: clientH,
+            },
+          }, '*');
+        } catch (err) {
+          window.parent.postMessage({
+            type: 'BUILDER_AI_RUNTIME_ERROR',
+            message: err.message,
+          }, '*');
+        }
+      }
+
+      window.addEventListener('message', function(ev) {
+        if (ev.data && ev.data.type === 'BUILDER_AI_REQUEST_METRICS') {
+          setTimeout(function() {
+            extractAndSendMetrics(ev.data.viewportName);
+          }, 200);
+        }
+      });
+
+      window.addEventListener('error', function(ev) {
+        window.parent.postMessage({
+          type: 'BUILDER_AI_RUNTIME_ERROR',
+          message: ev.message || 'Runtime execution error',
+          file: ev.filename,
+        }, '*');
+      });
+    </script>`;
+
+      let injectedHtml = existingHtml;
+      if (!injectedHtml.includes('BUILDER_AI_REQUEST_METRICS')) {
+        if (injectedHtml.includes('</body>')) {
+          injectedHtml = injectedHtml.replace('</body>', `${observerScript}</body>`);
+        } else {
+          injectedHtml += observerScript;
+        }
+      }
+      spFiles['/index.html'] = { code: injectedHtml, active: true };
+    } else {
+      // React project: inject observer into /public/index.html
+      spFiles['/public/index.html'] = {
+        code: OBSERVER_INDEX_HTML,
+        hidden: true,
+      };
+
+      const hasAppJsx = Boolean(spFiles['/App.jsx']);
+      const hasAppJs = Boolean(spFiles['/App.js']);
+
+      // Override Sandpack's built-in "react" template /App.js ("Hello world") if /App.jsx is present
+      if (hasAppJsx && !hasAppJs) {
+        spFiles['/App.js'] = {
+          code: 'export { default } from "./App.jsx";\n',
+          hidden: true,
+        };
+      }
+
+      const appImport = hasAppJsx ? './App.jsx' : './App.js';
+      const hasStyles = Boolean(spFiles['/styles.css']);
+
+      // Ensure /index.js explicitly imports `./App.jsx` (or `./App.js` for legacy)
+      if (!spFiles['/index.js'] && !spFiles['/index.jsx']) {
+        spFiles['/index.js'] = {
+          code: `import React from 'react';
+import { createRoot } from 'react-dom/client';
+${hasStyles ? "import './styles.css';\n" : ""}import App from '${appImport}';
+
+const container = document.getElementById('root');
+const root = createRoot(container);
+root.render(<App />);
+`,
+          hidden: true,
+        };
+      } else {
+        const targetKey = spFiles['/index.js'] ? '/index.js' : '/index.jsx';
+        if (typeof spFiles[targetKey]?.code === 'string') {
+          spFiles[targetKey].code = spFiles[targetKey].code.replace(
+            /(['"])\.\/App(?:\.(?:jsx?|tsx?))?(['"])/g,
+            `$1${appImport}$2`,
+          );
+          if (hasStyles && !spFiles[targetKey].code.includes('./styles.css')) {
+            spFiles[targetKey].code = `import './styles.css';\n` + spFiles[targetKey].code;
+          }
+        }
+      }
+
+      const activeKey = hasAppJsx ? '/App.jsx' : '/App.js';
+      for (const [path, fileObj] of Object.entries(spFiles)) {
+        fileObj.active = path === activeKey;
+      }
+    }
     return spFiles;
-  }, [activeFiles]);
+  }, [activeFiles, framework]);
 
   const dependencies = useMemo(() => {
-    return detectDependencies(activeFiles || {});
-  }, [activeFiles]);
+    if (framework === 'vanilla') return {};
+    return detectDependencies(activeFiles || {}, { framework: 'react' });
+  }, [activeFiles, framework]);
 
   const handleViewportCompleteRef = useRef(null);
 
@@ -316,8 +429,8 @@ export default function VisualVerificationRunner({
       aria-hidden="true"
     >
       <SandpackProvider
-        key={`qa-${round}-${currentVp.name}`}
-        template="react"
+        key={`qa-${round}-${framework}-${currentVp.name}`}
+        template={framework === 'vanilla' ? 'static' : 'react'}
         files={sandpackFiles}
         customSetup={{ dependencies }}
         options={{

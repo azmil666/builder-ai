@@ -55,7 +55,7 @@ const PublishPage = () => {
     );
   }
 
-  return <FullPagePreview files={project.files} />;
+  return <FullPagePreview project={project} files={project.files} />;
 };
 
 export default PublishPage;

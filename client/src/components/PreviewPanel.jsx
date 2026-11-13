@@ -19,7 +19,8 @@ import {
   XIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { detectDependencies } from '../utils/sandpackUtils';
+import { buildSandpackConfig } from '../utils/sandpackUtils';
+import { resolveProjectFramework, getDefaultActiveFile } from '../utils/frameworkUtils';
 import { useAppContext } from '../context/useAppContext';
 import SandpackErrorMonitor from './SandpackErrorMonitor';
 import QuickOpenModal from './QuickOpenModal';
@@ -102,12 +103,12 @@ function SandpackFileWatcher({ onLiveFilesChange, markFileDirty }) {
 
 const PreviewPanel = ({
   project,
-  activeFile = '/App.js',
+  activeFile,
   showCode = false,
   deviceViewport = 'desktop', // 'desktop' | 'tablet' | 'mobile'
 }) => {
   const {
-    openTabs = ['/App.js'],
+    openTabs,
     dirtyFiles = new Set(),
     openFile,
     closeTab,
@@ -134,6 +135,17 @@ const PreviewPanel = ({
     setLiveFiles(project.files || {});
   }
 
+  const fallbackActiveFile = useMemo(
+    () => getDefaultActiveFile(project),
+    [project],
+  );
+
+  const currentActiveFile = activeFile || fallbackActiveFile;
+
+  const currentOpenTabs = useMemo(() => {
+    return openTabs && openTabs.length > 0 ? openTabs : [currentActiveFile];
+  }, [openTabs, currentActiveFile]);
+
   // Global Keyboard Shortcuts (Cmd+S to save, Cmd+P for Quick Open, Cmd+W to close tab)
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -148,15 +160,15 @@ const PreviewPanel = ({
         setIsQuickOpen((prev) => !prev);
       } else if (modifier && e.key.toLowerCase() === 'w' && showCode) {
         e.preventDefault();
-        if (openTabs.length > 1) {
-          closeTab(activeFile);
+        if (currentOpenTabs.length > 1) {
+          closeTab(currentActiveFile);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveNow, showCode, openTabs, activeFile, closeTab]);
+  }, [saveNow, showCode, currentOpenTabs, currentActiveFile, closeTab]);
 
   const handleLiveFilesChange = (newFiles) => {
     setLiveFiles((prev) => {
@@ -171,28 +183,22 @@ const PreviewPanel = ({
     });
   };
 
-  // Convert liveFiles to Sandpack format
-  const sandpackFiles = useMemo(() => {
-    const spFiles = {};
-    for (const [path, content] of Object.entries(liveFiles)) {
-      const fileCode =
-        typeof content === 'string' ? content : content?.content || '';
-      spFiles[path] = {
-        code: fileCode,
-        active: path === activeFile,
-      };
-    }
-    return spFiles;
-  }, [liveFiles, activeFile]);
+  const framework = useMemo(
+    () => resolveProjectFramework(project),
+    [project],
+  );
 
-  // Detect dependencies from import statements using liveFiles, filtering out ignored packages
-  const dependencies = useMemo(() => {
-    const deps = detectDependencies(liveFiles);
-    for (const p of ignoredPackages) {
-      delete deps[p];
-    }
-    return deps;
-  }, [liveFiles, ignoredPackages]);
+  // Build dual-stack Sandpack configuration (handles both static vanilla & dynamic React)
+  const sandpackConfig = useMemo(() => {
+    return buildSandpackConfig(
+      { ...project, files: liveFiles },
+      {
+        framework,
+        activeFile: currentActiveFile,
+        ignoredPackages,
+      },
+    );
+  }, [project, liveFiles, framework, currentActiveFile, ignoredPackages]);
 
   const handleRetryDependencies = () => {
     setDetailedError(null);
@@ -210,13 +216,13 @@ const PreviewPanel = ({
 
   const handleCopyActiveCode = () => {
     const currentCode =
-      typeof liveFiles[activeFile] === 'string'
-        ? liveFiles[activeFile]
-        : liveFiles[activeFile]?.content || '';
+      typeof liveFiles[currentActiveFile] === 'string'
+        ? liveFiles[currentActiveFile]
+        : liveFiles[currentActiveFile]?.content || '';
     if (currentCode) {
       navigator.clipboard.writeText(currentCode);
       setCopiedCode(true);
-      toast.success(`Copied ${activeFile}`);
+      toast.success(`Copied ${currentActiveFile}`);
       setTimeout(() => setCopiedCode(false), 2000);
     }
   };
@@ -279,22 +285,11 @@ const PreviewPanel = ({
   return (
     <div className="h-full w-full flex flex-col min-w-0 min-h-0 bg-zinc-950 overflow-hidden">
       <SandpackProvider
-        key={`${project._id}-${refreshKey}`}
-        template="react"
-        files={sandpackFiles}
-        customSetup={{ dependencies }}
-        options={{
-          externalResources: [
-            'https://cdn.tailwindcss.com',
-            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-          ],
-          classes: {
-            'sp-wrapper': 'sp-wrapper h-full w-full',
-            'sp-layout': 'sp-layout h-full w-full',
-            'sp-preview': 'sp-preview h-full w-full',
-          },
-          logLevel: 0,
-        }}
+        key={`${project._id}-${framework}-${refreshKey}`}
+        template={sandpackConfig.template}
+        files={sandpackConfig.files}
+        customSetup={sandpackConfig.customSetup}
+        options={sandpackConfig.options}
         theme={{
           colors: {
             surface1: '#09090b',
@@ -321,7 +316,7 @@ const PreviewPanel = ({
           onLiveFilesChange={handleLiveFilesChange}
           markFileDirty={markFileDirty}
         />
-        <SandpackTabController activeFile={activeFile} />
+        <SandpackTabController activeFile={currentActiveFile} />
         <SandpackErrorMonitor
           onErrorChange={setShowErrorOverlay}
           onDetailedErrorChange={setDetailedError}
@@ -332,8 +327,8 @@ const PreviewPanel = ({
           <div className="h-9 shrink-0 bg-zinc-925 border-b border-zinc-800 flex items-center justify-between text-xs text-zinc-400 select-none overflow-x-auto hide-scrollbar">
             {/* Tabs List */}
             <div className="flex items-center h-full overflow-x-auto hide-scrollbar">
-              {openTabs.map((tabPath) => {
-                const isActive = tabPath === activeFile;
+              {currentOpenTabs.map((tabPath) => {
+                const isActive = tabPath === currentActiveFile;
                 const isDirty = dirtyFiles.has(tabPath);
                 const fileName = tabPath.split('/').pop();
 
@@ -359,7 +354,7 @@ const PreviewPanel = ({
                     )}
 
                     {/* Close Tab Button */}
-                    {openTabs.length > 1 && (
+                    {currentOpenTabs.length > 1 && (
                       <button
                         type="button"
                         onClick={(e) => {
