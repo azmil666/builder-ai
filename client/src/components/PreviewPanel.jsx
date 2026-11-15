@@ -577,17 +577,15 @@ const PreviewPanel = ({
                   />
                 </div>
               </div>
-
-              {/* In-Workspace Live Console Drawer (docked cleanly beneath preview when !showCode) */}
-              {!showCode && (
-                <ConsoleDrawer
-                  projectId={project?._id}
-                  framework={framework}
-                />
-              )}
             </div>
           </SandpackLayout>
         </div>
+
+        {/* In-Workspace Live Console Drawer (persists across Preview and Code Editor modes) */}
+        <ConsoleDrawer
+          projectId={project?._id}
+          framework={framework}
+        />
       </SandpackProvider>
 
       {/* Quick Open Modal */}

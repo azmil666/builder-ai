@@ -66,9 +66,32 @@ export default function ConsoleDrawer({ projectId, framework }) {
 
   const scrollContainerRef = useRef(null);
   const shouldAutoScrollRef = useRef(true);
+  const pendingLogsRef = useRef([]);
+  const flushTimerRef = useRef(null);
+
+  // Batch flush pending logs to state every 100ms
+  const scheduleFlush = () => {
+    if (!flushTimerRef.current) {
+      flushTimerRef.current = setTimeout(() => {
+        flushTimerRef.current = null;
+        if (pendingLogsRef.current.length === 0) return;
+        const queued = pendingLogsRef.current;
+        pendingLogsRef.current = [];
+        setLogs((prev) => {
+          const combined = [...prev, ...queued];
+          return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+        });
+      }, 100);
+    }
+  };
 
   // Clear logs automatically when active project ID or framework changes
   useEffect(() => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    pendingLogsRef.current = [];
     setLogs([]);
   }, [projectId, framework]);
 
@@ -93,6 +116,11 @@ export default function ConsoleDrawer({ projectId, framework }) {
           if (!rawLog) continue;
           const rawMethod = String(rawLog.method || 'log').toLowerCase();
           if (rawMethod === 'clear') {
+            if (flushTimerRef.current) {
+              clearTimeout(flushTimerRef.current);
+              flushTimerRef.current = null;
+            }
+            pendingLogsRef.current = [];
             setLogs([]);
             continue;
           }
@@ -118,10 +146,11 @@ export default function ConsoleDrawer({ projectId, framework }) {
         }
 
         if (newItems.length > 0) {
-          setLogs((prev) => {
-            const combined = [...prev, ...newItems];
-            return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-          });
+          pendingLogsRef.current.push(...newItems);
+          if (pendingLogsRef.current.length > 200) {
+            pendingLogsRef.current = pendingLogsRef.current.slice(-200);
+          }
+          scheduleFlush();
         }
       } else if (
         (msg.type === 'action' && msg.action === 'show-error') ||
@@ -147,10 +176,11 @@ export default function ConsoleDrawer({ projectId, framework }) {
           timestamp: getTimestamp(),
         };
 
-        setLogs((prev) => {
-          const combined = [...prev, entry];
-          return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-        });
+        pendingLogsRef.current.push(entry);
+        if (pendingLogsRef.current.length > 200) {
+          pendingLogsRef.current = pendingLogsRef.current.slice(-200);
+        }
+        scheduleFlush();
       }
     });
 
@@ -158,6 +188,11 @@ export default function ConsoleDrawer({ projectId, framework }) {
       if (typeof unsubscribe === 'function') {
         unsubscribe();
       }
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      pendingLogsRef.current = [];
     };
   }, [listen]);
 
@@ -207,6 +242,11 @@ export default function ConsoleDrawer({ projectId, framework }) {
 
   const handleClear = (e) => {
     e.stopPropagation();
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    pendingLogsRef.current = [];
     setLogs([]);
   };
 
