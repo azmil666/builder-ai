@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { z } from "zod";
 import { Project } from "../models/Project.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
@@ -1235,3 +1236,73 @@ export async function restoreProjectVersion(req, res) {
 
   res.json(project);
 }
+
+const updateProjectMetadataSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Name must be at least 1 character")
+      .max(100, "Name must not exceed 100 characters")
+      .optional(),
+    description: z
+      .string()
+      .trim()
+      .max(500, "Description must not exceed 500 characters")
+      .optional(),
+  })
+  .refine(
+    (data) => data.name !== undefined || data.description !== undefined,
+    { message: "At least one of name or description must be provided" }
+  );
+
+// PATCH /api/projects/:id
+// Update project name and metadata.
+export async function updateProjectMetadata(req, res) {
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const parsed = updateProjectMetadataSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: parsed.error.issues?.[0]?.message || "Invalid project metadata",
+    });
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const project = await Project.findById(req.params.id);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const userId = (req.user._id || req.user.userID || req.user.userId)?.toString();
+  if (!userId || project.owner.toString() !== userId) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  if (parsed.data.name !== undefined) {
+    project.name = parsed.data.name;
+  }
+  if (parsed.data.description !== undefined) {
+    project.description = parsed.data.description;
+  }
+
+  await project.save();
+
+  res.status(200).json({
+    _id: project._id,
+    name: project.name,
+    description: project.description,
+    updatedAt: project.updatedAt,
+  });
+}
+

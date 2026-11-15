@@ -12,6 +12,7 @@ import {
   restoreProjectVersion,
   streamProjectProgress,
   updateProjectFiles,
+  updateProjectMetadata,
 } from "../controllers/projectController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { chat } from "../controllers/chatController.js";
@@ -36,6 +37,7 @@ projectRouter.get("/:id/versions", getProjectVersions);
 projectRouter.post("/:id/versions/:version/restore", restoreProjectVersion);
 projectRouter.post("/:id/visual-verification", aiRevisionRateLimiter, handleVisualVerification);
 projectRouter.get("/:id", getProject);
+projectRouter.patch("/:id", authMiddleware, updateProjectMetadata);
 projectRouter.delete("/:id", deleteProject);
 projectRouter.put("/:id/files", updateProjectFiles);
 projectRouter.post("/:id/publish", publishProject);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -15,13 +15,27 @@ export default function ProjectSettingsPanel({
 }) {
   const [name, setName] = useState(project?.name || '');
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleNameSave = (e) => {
+  useEffect(() => {
+    setName(project?.name || '');
+  }, [project?.name]);
+
+  const handleNameSave = async (e) => {
     e.preventDefault();
-    if (name.trim() && name !== project.name) {
-      onUpdateName(name.trim());
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== project?.name) {
+      setIsSaving(true);
+      try {
+        await onUpdateName(trimmed);
+      } finally {
+        setIsSaving(false);
+        setIsEditing(false);
+      }
+    } else {
+      setName(project?.name || '');
+      setIsEditing(false);
     }
-    setIsEditing(false);
   };
 
   const isPublished = Boolean(project?.published);
@@ -52,12 +66,14 @@ export default function ProjectSettingsPanel({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              disabled={isSaving}
               autoFocus
-              className="flex-1 bg-zinc-900 border border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-white outline-none"
+              className="flex-1 bg-zinc-900 border border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-white outline-none disabled:opacity-50"
             />
             <button
               type="submit"
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium cursor-pointer"
+              disabled={isSaving}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium cursor-pointer"
             >
               <CheckIcon size={13} />
             </button>
@@ -66,7 +82,10 @@ export default function ProjectSettingsPanel({
           <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
             <span className="text-xs font-medium text-white truncate">{project?.name}</span>
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => {
+                setName(project?.name || '');
+                setIsEditing(true);
+              }}
               type="button"
               className="p-1 rounded text-zinc-400 hover:text-white transition cursor-pointer"
               title="Rename project"
