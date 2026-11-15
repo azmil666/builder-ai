@@ -15,6 +15,174 @@ import { CATEGORIES, COMPONENT_BLOCKS } from '../data/componentBlocks';
 import { useAppContext } from '../context/useAppContext';
 import { resolveProjectFramework } from '../utils/frameworkUtils';
 
+function injectImport(source, componentName, importLine) {
+  const importRegex = new RegExp(`\\bimport\\s+.*\\b${componentName}\\b.*from`);
+  if (importRegex.test(source)) {
+    return source;
+  }
+
+  const matches = [
+    ...source.matchAll(/(?:^|\n)[ \t]*import\b[\s\S]*?(?:from\s*)?['"][^'"]+['"];?/g),
+  ];
+
+  if (matches.length > 0) {
+    const lastMatch = matches[matches.length - 1];
+    const insertIndex = lastMatch.index + lastMatch[0].length;
+    return (
+      source.slice(0, insertIndex) + `\n${importLine}` + source.slice(insertIndex)
+    );
+  }
+
+  return `${importLine}\n\n${source}`;
+}
+
+function injectJSX(source, componentName) {
+  const mountedRegex = new RegExp(`<\\s*${componentName}\\b`);
+  if (mountedRegex.test(source)) {
+    return source;
+  }
+
+  const returnIndices = [];
+  const re = /\breturn\b/g;
+  let match;
+  while ((match = re.exec(source)) !== null) {
+    returnIndices.push(match.index);
+  }
+
+  let container = null;
+  for (let i = returnIndices.length - 1; i >= 0; i--) {
+    const idx = returnIndices[i];
+    const after = source.slice(idx + 6).trimStart();
+    if (after.startsWith('(')) {
+      let depth = 0;
+      const startParen = source.indexOf('(', idx);
+      let endParen = -1;
+      for (let j = startParen; j < source.length; j++) {
+        if (source[j] === '(') depth++;
+        else if (source[j] === ')') {
+          depth--;
+          if (depth === 0) {
+            endParen = j;
+            break;
+          }
+        }
+      }
+      if (endParen !== -1) {
+        const body = source.slice(startParen + 1, endParen);
+        if (body.includes('<') && body.includes('>')) {
+          container = {
+            bodyStartIndex: startParen + 1,
+            bodyEndIndex: endParen,
+            body,
+          };
+          break;
+        }
+      }
+    } else if (after.startsWith('<')) {
+      const semiIndex = source.indexOf(';', idx);
+      const endIndex = semiIndex !== -1 ? semiIndex : source.length;
+      const body = source.slice(idx + 6, endIndex);
+      if (body.includes('<') && body.includes('>')) {
+        container = {
+          bodyStartIndex: idx + 6,
+          bodyEndIndex: endIndex,
+          body,
+        };
+        break;
+      }
+    }
+  }
+
+  if (!container) {
+    const arrowMatch = source.match(
+      /=>\s*\(\s*([\s\S]*<\/(?:[a-zA-Z0-9_$.-]+)?>[\s\S]*?)\s*\)/,
+    );
+    if (arrowMatch) {
+      const startParen = source.indexOf('(', source.indexOf('=>'));
+      let depth = 0;
+      let endParen = -1;
+      for (let j = startParen; j < source.length; j++) {
+        if (source[j] === '(') depth++;
+        else if (source[j] === ')') {
+          depth--;
+          if (depth === 0) {
+            endParen = j;
+            break;
+          }
+        }
+      }
+      if (endParen !== -1) {
+        container = {
+          bodyStartIndex: startParen + 1,
+          bodyEndIndex: endParen,
+          body: source.slice(startParen + 1, endParen),
+        };
+      }
+    }
+  }
+
+  if (!container) return null;
+
+  const { body } = container;
+
+  // 1. Check for footer (<footer or <Footer)
+  const footerMatch = body.match(/(<footer\b|<Footer\b)/);
+  if (footerMatch) {
+    const footerIndex = footerMatch.index;
+    const lineStartIndex = body.lastIndexOf('\n', footerIndex);
+    const indent =
+      lineStartIndex !== -1
+        ? body.slice(lineStartIndex + 1, footerIndex).match(/^[ \t]*/)[0]
+        : '      ';
+    const insertion = `${indent}<${componentName} />\n`;
+    const newBody =
+      lineStartIndex !== -1
+        ? body.slice(0, lineStartIndex + 1) +
+          insertion +
+          body.slice(lineStartIndex + 1)
+        : insertion + body;
+    return (
+      source.slice(0, container.bodyStartIndex) +
+      newBody +
+      source.slice(container.bodyEndIndex)
+    );
+  }
+
+  // 2. Outermost closing tag
+  const lastClosingTagIndex = body.lastIndexOf('</');
+  if (lastClosingTagIndex === -1) return null;
+  const tagClosingMatch = body
+    .slice(lastClosingTagIndex)
+    .match(/^<\/(?:[a-zA-Z0-9_$.-]+)?>/);
+  if (!tagClosingMatch) return null;
+
+  const lineStartIndex = body.lastIndexOf('\n', lastClosingTagIndex);
+  let newBody = '';
+  if (lineStartIndex !== -1) {
+    const wrapperIndent = body
+      .slice(lineStartIndex + 1, lastClosingTagIndex)
+      .match(/^[ \t]*/)[0];
+    const indent = wrapperIndent + '  ';
+    const insertion = `${indent}<${componentName} />\n`;
+    newBody =
+      body.slice(0, lineStartIndex + 1) +
+      insertion +
+      body.slice(lineStartIndex + 1);
+  } else {
+    const insertion = `  <${componentName} />\n`;
+    newBody =
+      body.slice(0, lastClosingTagIndex) +
+      insertion +
+      body.slice(lastClosingTagIndex);
+  }
+
+  return (
+    source.slice(0, container.bodyStartIndex) +
+    newBody +
+    source.slice(container.bodyEndIndex)
+  );
+}
+
 export default function BlockCatalogModal({ isOpen, onClose }) {
   const {
     activeProject,
@@ -22,6 +190,7 @@ export default function BlockCatalogModal({ isOpen, onClose }) {
     updateProjectFiles,
     setActiveFile,
     setShowCode,
+    openFile,
   } = useAppContext();
 
   const framework = activeProject?.framework || resolveProjectFramework(activeProject);
@@ -172,22 +341,22 @@ export default function BlockCatalogModal({ isOpen, onClose }) {
         }
       } else {
         // --- REACT PROJECT INSERTION ---
-        const baseSuggestedPath =
-          selectedBlock.suggestedPath ||
-          `/components/${selectedBlock.componentName}.jsx`;
         const currentFiles = activeProject.files || {};
+        const fileKeys = Object.keys(currentFiles);
 
-        let targetPath = baseSuggestedPath;
+        // 1. Directory Convention Detection: inspect if existing files use /src/ prefix
+        const hasSrcPrefix = fileKeys.some(
+          (k) => k.startsWith('/src/') || k.startsWith('src/'),
+        );
+        const baseDir = hasSrcPrefix ? '/src/components' : '/components';
+
         let componentName = selectedBlock.componentName;
+        let targetPath = `${baseDir}/${componentName}.jsx`;
         let counter = 2;
-
-        const extMatch = baseSuggestedPath.match(/(\.[^.]+)$/);
-        const ext = extMatch ? extMatch[1] : '.jsx';
-        const basePathWithoutExt = baseSuggestedPath.replace(/(\.[^.]+)$/, '');
 
         // Resolve collision: /components/HeroSection.jsx -> /components/HeroSection2.jsx
         while (currentFiles[targetPath] || currentFiles[targetPath.replace(/^\//, '')]) {
-          targetPath = `${basePathWithoutExt}${counter}${ext}`;
+          targetPath = `${baseDir}/${selectedBlock.componentName}${counter}.jsx`;
           componentName = `${selectedBlock.componentName}${counter}`;
           counter++;
         }
@@ -202,29 +371,114 @@ export default function BlockCatalogModal({ isOpen, onClose }) {
           );
         }
 
-        // Create component file via context action
-        await createFile(targetPath, finalCode);
+        // 2. Auto-Mount into Root App File
+        const candidateAppPaths = hasSrcPrefix
+          ? [
+              '/src/App.jsx',
+              '/src/App.js',
+              'src/App.jsx',
+              'src/App.js',
+              '/App.jsx',
+              '/App.js',
+              'App.jsx',
+              'App.js',
+            ]
+          : [
+              '/App.jsx',
+              '/App.js',
+              'App.jsx',
+              'App.js',
+              '/src/App.jsx',
+              '/src/App.js',
+              'src/App.jsx',
+              'src/App.js',
+            ];
 
-        // Compute import statement for developer drop-in into App.js
-        const cleanImportPath = targetPath
-          .replace(/^\//, './')
-          .replace(/\.jsx?$/, '');
-        const importSnippet = `import ${componentName} from '${cleanImportPath}';`;
+        const appKey =
+          candidateAppPaths.find((k) => currentFiles[k] !== undefined) ||
+          fileKeys.find(
+            (k) =>
+              k === '/App.jsx' ||
+              k === '/App.js' ||
+              k.endsWith('/App.jsx') ||
+              k.endsWith('/App.js'),
+          );
 
-        try {
-          await navigator.clipboard.writeText(importSnippet);
-          toast.success(
-            `Created ${targetPath}! Import snippet copied to clipboard: ${importSnippet}`,
-            { duration: 5000 },
-          );
-        } catch {
-          toast.success(
-            `Created ${targetPath}! Usage: ${importSnippet} -> <${componentName} />`,
-            { duration: 5000 },
-          );
+        let relativeImportPath = `./components/${componentName}`;
+        if (appKey) {
+          const appInSrc = appKey.startsWith('/src/') || appKey.startsWith('src/');
+          const compInSrc = targetPath.startsWith('/src/') || targetPath.startsWith('src/');
+          if (appInSrc && !compInSrc) {
+            relativeImportPath = `../components/${componentName}`;
+          } else if (!appInSrc && compInSrc) {
+            relativeImportPath = `./src/components/${componentName}`;
+          } else {
+            relativeImportPath = `./components/${componentName}`;
+          }
         }
 
-        onClose();
+        const importSnippet = `import ${componentName} from '${relativeImportPath}';`;
+
+        let mountedSuccessfully = false;
+
+        if (appKey) {
+          const appEntry = currentFiles[appKey];
+          const appSource =
+            typeof appEntry === 'string' ? appEntry : appEntry?.content || '';
+
+          const sourceWithImport = injectImport(
+            appSource,
+            componentName,
+            importSnippet,
+          );
+          const transformedAppSource = injectJSX(
+            sourceWithImport,
+            componentName,
+          );
+
+          if (transformedAppSource) {
+            const updatedFiles = {
+              ...currentFiles,
+              [targetPath]: { content: finalCode },
+              [appKey]:
+                typeof appEntry === 'object' && appEntry !== null
+                  ? { ...appEntry, content: transformedAppSource }
+                  : { content: transformedAppSource },
+            };
+
+            await updateProjectFiles(updatedFiles);
+            if (openFile) {
+              openFile(targetPath);
+            } else if (setActiveFile) {
+              setActiveFile(targetPath);
+            }
+            if (setShowCode) setShowCode(true);
+
+            toast.success(`Inserted & mounted <${componentName} /> in App`);
+            mountedSuccessfully = true;
+            onClose();
+          }
+        }
+
+        if (!mountedSuccessfully) {
+          // Fall back gracefully to creating component file and copying import snippet
+          await createFile(targetPath, finalCode);
+
+          try {
+            await navigator.clipboard.writeText(importSnippet);
+            toast.success(
+              `Created ${targetPath}! Import snippet copied to clipboard: ${importSnippet}`,
+              { duration: 5000 },
+            );
+          } catch {
+            toast.success(
+              `Created ${targetPath}! Usage: ${importSnippet} -> <${componentName} />`,
+              { duration: 5000 },
+            );
+          }
+
+          onClose();
+        }
       }
     } catch (err) {
       console.error('Failed to insert component block:', err);
