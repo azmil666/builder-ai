@@ -40,6 +40,12 @@ const ProjectSchema = new Schema({
     selfRepair: {type: Schema.Types.Mixed, default: null},
     visualVerification: {type: Schema.Types.Mixed, default: null},
     error: {type: String, default: null},
+    seo: {
+      title: { type: String, trim: true, maxlength: 100, default: "" },
+      description: { type: String, trim: true, maxlength: 300, default: "" },
+      ogImage: { type: String, trim: true, maxlength: 500, default: "" },
+      favicon: { type: String, trim: true, maxlength: 500, default: "" },
+    },
 },{timestamps: true})
 
 // Backward compatibility: keep currentFile and legacy CurrentFile in sync, and detect framework for legacy projects

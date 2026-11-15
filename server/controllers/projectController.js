@@ -136,6 +136,7 @@ export async function createProject(req, res) {
     selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
+    seo: project.seo || {},
     createdAt: project.createdAt,
   });
 }
@@ -551,6 +552,7 @@ export async function getProject(req, res) {
     selfRepair: project.selfRepair || null,
     visualVerification: project.visualVerification || null,
     error: project.error,
+    seo: project.seo || {},
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   });
@@ -707,6 +709,7 @@ export async function getPublicProject(req, res) {
     framework: project.framework || "react",
     files: filesObj,
     version: project.version,
+    seo: project.seo || {},
   });
 }
 
@@ -1250,10 +1253,37 @@ const updateProjectMetadataSchema = z
       .trim()
       .max(500, "Description must not exceed 500 characters")
       .optional(),
+    seo: z
+      .object({
+        title: z.string().trim().max(100).optional(),
+        description: z.string().trim().max(300).optional(),
+        ogImage: z
+          .string()
+          .trim()
+          .max(500)
+          .refine(
+            (v) => !v || /^https?:\/\//i.test(v) || v.startsWith("data:image/"),
+            "Invalid image URL",
+          )
+          .optional(),
+        favicon: z
+          .string()
+          .trim()
+          .max(500)
+          .refine(
+            (v) => !v || /^https?:\/\//i.test(v) || v.startsWith("data:image/"),
+            "Invalid favicon URL",
+          )
+          .optional(),
+      })
+      .optional(),
   })
   .refine(
-    (data) => data.name !== undefined || data.description !== undefined,
-    { message: "At least one of name or description must be provided" }
+    (data) =>
+      data.name !== undefined ||
+      data.description !== undefined ||
+      data.seo !== undefined,
+    { message: "At least one of name, description, or seo must be provided" },
   );
 
 // PATCH /api/projects/:id
@@ -1295,6 +1325,15 @@ export async function updateProjectMetadata(req, res) {
   if (parsed.data.description !== undefined) {
     project.description = parsed.data.description;
   }
+  if (parsed.data.seo !== undefined) {
+    project.seo = {
+      ...(project.seo?.toObject?.() || project.seo || {}),
+      ...parsed.data.seo,
+    };
+    if (typeof project.markModified === "function") {
+      project.markModified("seo");
+    }
+  }
 
   await project.save();
 
@@ -1302,6 +1341,7 @@ export async function updateProjectMetadata(req, res) {
     _id: project._id,
     name: project.name,
     description: project.description,
+    seo: project.seo,
     updatedAt: project.updatedAt,
   });
 }
