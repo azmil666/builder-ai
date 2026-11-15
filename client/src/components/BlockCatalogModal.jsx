@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BlocksIcon,
@@ -202,20 +202,65 @@ export default function BlockCatalogModal({ isOpen, onClose }) {
   const [codeView, setCodeView] = useState(isVanilla ? 'html' : 'react');
   const [copied, setCopied] = useState(false);
   const [inserting, setInserting] = useState(false);
+  const modalRef = useRef(null);
 
   // Sync default codeView when framework changes
   useEffect(() => {
     setCodeView(isVanilla ? 'html' : 'react');
   }, [isVanilla]);
 
-  // Close on Escape key
+  // Initial focus on open
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        const searchInput = modalRef.current?.querySelector('input');
+        searchInput?.focus();
+      }, 50);
+    }
+  }, [isOpen]);
+
+  // Modal Focus Trapping & Close on Escape
   useEffect(() => {
     if (!isOpen) return;
+
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const modal = modalRef.current;
+        if (!modal) return;
+
+        const focusableElements = Array.from(
+          modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+
+        if (focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !modal.contains(document.activeElement)) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement || !modal.contains(document.activeElement)) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
@@ -501,6 +546,7 @@ export default function BlockCatalogModal({ isOpen, onClose }) {
           onClick={onClose}
         >
           <motion.div
+            ref={modalRef}
             key="block-catalog-dialog"
             initial={{ opacity: 0, scale: 0.97, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}

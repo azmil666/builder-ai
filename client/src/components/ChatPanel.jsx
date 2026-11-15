@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BotIcon,
@@ -11,12 +11,38 @@ import {
 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
-const REVISION_SUGGESTIONS = [
-  'Add dark mode toggle',
-  'Make hero responsive',
-  'Add interactive pricing calculator',
-  'Improve typography contrast',
-];
+const ARCHETYPE_SUGGESTIONS = {
+  ecommerce: [
+    { text: 'Add slide-out shopping cart', keywords: ['cart'] },
+    { text: 'Add category & price filters', keywords: ['filter', 'category'] },
+    { text: 'Add product quick-view modal', keywords: ['quickview', 'quick-view', 'productmodal'] },
+    { text: 'Add trust badges & reviews', keywords: ['trust', 'badge', 'review'] },
+  ],
+  portfolio: [
+    { text: 'Add interactive project case study modal', keywords: ['casestudy', 'case-study', 'projectmodal'] },
+    { text: 'Add downloadable resume CTA', keywords: ['resume', 'cv'] },
+    { text: 'Add client logo marquee', keywords: ['marquee', 'clientlogo', 'logo-marquee'] },
+    { text: 'Add contact form validation', keywords: ['contactform', 'contact-form'] },
+  ],
+  saas: [
+    { text: 'Add monthly/annual pricing toggle', keywords: ['pricing', 'pricingtoggle', 'price'] },
+    { text: 'Add interactive FAQ accordion', keywords: ['faq', 'accordion'] },
+    { text: 'Add customer testimonials grid', keywords: ['testimonial', 'testimonials'] },
+    { text: 'Add feature comparison table', keywords: ['comparison', 'featuretable', 'feature-table'] },
+  ],
+  dashboard: [
+    { text: 'Add search & status filtering', keywords: ['search', 'filter'] },
+    { text: 'Add summary KPI metric cards', keywords: ['kpi', 'metric', 'statscard', 'kpicard'] },
+    { text: 'Add responsive mobile navigation', keywords: ['mobilenav', 'mobile-nav'] },
+    { text: 'Add empty & loading states', keywords: ['emptystate', 'empty-state'] },
+  ],
+  fallback: [
+    { text: 'Enhance mobile responsiveness', keywords: ['responsive'] },
+    { text: 'Add smooth scroll animations', keywords: ['animation'] },
+    { text: 'Add interactive FAQ section', keywords: ['faq', 'accordion'] },
+    { text: 'Polish footer & navigation', keywords: ['navigation'] },
+  ],
+};
 
 const INITIAL_BUILD_STATUSES = [
   'pending',
@@ -41,6 +67,116 @@ const ChatPanel = ({
   const isInitialBuild = INITIAL_BUILD_STATUSES.includes(currentStatus);
   const showLoadingIndicator =
     (currentStatus === 'revising' || loading) && !isInitialBuild;
+
+  // Compute 4 contextual suggestion chips based on project archetype, prompt & file contents
+  const revisionSuggestions = useMemo(() => {
+    const archetype = (project?.designSpec?.archetype || '').toLowerCase();
+    const promptText = (
+      project?.prompt ||
+      project?.description ||
+      project?.name ||
+      ''
+    ).toLowerCase();
+    const category = (project?.designSpec?.category || '').toLowerCase();
+    const combinedContext = `${archetype} ${category} ${promptText}`;
+
+    let primaryPool = ARCHETYPE_SUGGESTIONS.fallback;
+
+    if (
+      combinedContext.includes('ecommerce') ||
+      combinedContext.includes('e-commerce') ||
+      combinedContext.includes('store') ||
+      combinedContext.includes('shop') ||
+      combinedContext.includes('retail') ||
+      combinedContext.includes('cart') ||
+      combinedContext.includes('product') ||
+      combinedContext.includes('luxury')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.ecommerce;
+    } else if (
+      combinedContext.includes('portfolio') ||
+      combinedContext.includes('agency') ||
+      combinedContext.includes('freelance') ||
+      combinedContext.includes('resume') ||
+      combinedContext.includes('cv') ||
+      combinedContext.includes('showcase') ||
+      combinedContext.includes('creative') ||
+      combinedContext.includes('editorial') ||
+      combinedContext.includes('photograph')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.portfolio;
+    } else if (
+      combinedContext.includes('dashboard') ||
+      combinedContext.includes('app') ||
+      combinedContext.includes('admin') ||
+      combinedContext.includes('crm') ||
+      combinedContext.includes('portal') ||
+      combinedContext.includes('analytics') ||
+      combinedContext.includes('metrics') ||
+      combinedContext.includes('utility')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.dashboard;
+    } else if (
+      combinedContext.includes('saas') ||
+      combinedContext.includes('landing') ||
+      combinedContext.includes('startup') ||
+      combinedContext.includes('b2b') ||
+      combinedContext.includes('software') ||
+      combinedContext.includes('platform') ||
+      combinedContext.includes('clean_modern') ||
+      combinedContext.includes('minimal-saas') ||
+      combinedContext.includes('swiss')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.saas;
+    }
+
+    // Inspect existing file names / paths in project to filter already built components
+    const fileKeys = Object.keys(project?.files || {}).map((f) => f.toLowerCase());
+
+    const isExisting = (keywords) => {
+      if (!keywords || keywords.length === 0) return false;
+      return keywords.some((kw) =>
+        fileKeys.some((f) => f.includes(kw.toLowerCase()))
+      );
+    };
+
+    // Filter candidate pool
+    const selected = [];
+    for (const item of primaryPool) {
+      if (!isExisting(item.keywords)) {
+        selected.push(item.text);
+      }
+    }
+
+    // Backfill from fallback pool to ensure 4 suggestion chips
+    if (selected.length < 4) {
+      for (const item of ARCHETYPE_SUGGESTIONS.fallback) {
+        if (!selected.includes(item.text) && !isExisting(item.keywords)) {
+          selected.push(item.text);
+        }
+        if (selected.length >= 4) break;
+      }
+    }
+
+    // Fallback if still under 4 items
+    if (selected.length < 4) {
+      for (const item of primaryPool) {
+        if (!selected.includes(item.text)) {
+          selected.push(item.text);
+        }
+        if (selected.length >= 4) break;
+      }
+    }
+
+    return selected.slice(0, 4);
+  }, [
+    project?.designSpec?.archetype,
+    project?.designSpec?.category,
+    project?.prompt,
+    project?.description,
+    project?.name,
+    project?.files,
+  ]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -172,7 +308,7 @@ const ChatPanel = ({
       {/* Revision Suggestions */}
       {messages.length > 0 && !showLoadingIndicator && !isInitialBuild && (
         <div className="px-3 pt-2.5 pb-1.5 border-t border-white/10 flex items-center gap-1.5 overflow-x-auto hide-scrollbar shrink-0 bg-canvas/40">
-          {REVISION_SUGGESTIONS.map((suggestion, i) => (
+          {revisionSuggestions.map((suggestion, i) => (
             <button
               key={i}
               type="button"

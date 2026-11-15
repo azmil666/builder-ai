@@ -38,6 +38,9 @@ const BuilderPage = () => {
   const [leftTab, setLeftTab] = useState('chat'); // 'chat' | 'files' | 'design' | 'settings'
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [deviceViewport, setDeviceViewport] = useState('desktop'); // 'desktop' | 'tablet' | 'mobile'
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
 
   const [publishing, setPublishing] = useState(false);
   const [publishUrl, setPublishUrl] = useState(null);
@@ -70,6 +73,72 @@ const BuilderPage = () => {
     if (!id) return;
     loadProject(id);
   }, [id, loadProject]);
+
+  // Viewport breakpoint detection (< 768px)
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)');
+    const onChange = (e) => setIsMobile(e.matches);
+    setIsMobile(mql.matches);
+    if (mql.addEventListener) {
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    } else {
+      mql.addListener(onChange);
+      return () => mql.removeListener(onChange);
+    }
+  }, []);
+
+  // Global Studio Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const target = e.target;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          (typeof target.getAttribute === 'function' &&
+            target.getAttribute('contenteditable') === 'true'));
+
+      // Ignore events when focus is inside input, textarea, or contenteditable (except Escape)
+      if (isInput && e.key !== 'Escape') {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        if (isMobile && !sidebarCollapsed) {
+          setSidebarCollapsed(true);
+        }
+        return;
+      }
+
+      const modifier = e.metaKey || e.ctrlKey;
+
+      // Cmd/Ctrl + Shift + B: Toggle Component Block Catalog
+      if (modifier && e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setIsBlockCatalogOpen((prev) => !prev);
+        return;
+      }
+
+      // Cmd/Ctrl + B (without Shift): Toggle sidebar collapse
+      if (modifier && !e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setSidebarCollapsed((prev) => !prev);
+        return;
+      }
+
+      // Cmd/Ctrl + E: Toggle Preview / Split Code view
+      if (modifier && !e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        setShowCode((prev) => !prev);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobile, sidebarCollapsed, setShowCode]);
 
   const handleOpenPreview = () => {
     if (!id) return;
@@ -205,18 +274,27 @@ const BuilderPage = () => {
           </button>
         </aside>
 
+        {/* Mobile Backdrop Overlay */}
+        {!sidebarCollapsed && (
+          <div
+            onClick={() => setSidebarCollapsed(true)}
+            className="fixed inset-0 bg-black/60 z-30 md:hidden"
+            aria-hidden="true"
+          />
+        )}
+
         {/* Fluid Collapsible Left Drawer Panel */}
         <AnimatePresence initial={false}>
           {!sidebarCollapsed && (
             <motion.aside
               key="builder-sidebar"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 310, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
+              initial={isMobile ? { opacity: 0, x: -20 } : { width: 0, opacity: 0 }}
+              animate={isMobile ? { opacity: 1, x: 0 } : { width: 310, opacity: 1 }}
+              exit={isMobile ? { opacity: 0, x: -20 } : { width: 0, opacity: 0 }}
               transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-              className="shrink-0 h-full overflow-hidden bg-surface z-10"
+              className="fixed inset-y-12 left-12 z-40 w-[min(310px,calc(100vw-48px))] shadow-2xl md:static md:inset-auto md:z-auto md:shadow-none shrink-0 h-full overflow-hidden bg-surface"
             >
-              <div className="w-[310px] h-full overflow-hidden">
+              <div className="w-[min(310px,calc(100vw-48px))] md:w-[310px] h-full overflow-hidden">
                 {leftTab === 'chat' && (
                   <ChatPanel
                     messages={activeProject.messages}
