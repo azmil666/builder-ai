@@ -24,6 +24,7 @@ import { resolveProjectFramework, getDefaultActiveFile } from '../utils/framewor
 import { useAppContext } from '../context/useAppContext';
 import SandpackErrorMonitor from './SandpackErrorMonitor';
 import QuickOpenModal from './QuickOpenModal';
+import ConsoleDrawer from './ConsoleDrawer';
 
 function getFileIcon(name) {
   if (name.endsWith('.css')) return <FileTextIcon size={12} className="text-sky-400 shrink-0" />;
@@ -492,84 +493,98 @@ const PreviewPanel = ({
             <div
               className={`h-full min-w-0 min-h-0 flex flex-col ${
                 showCode ? 'flex-1' : 'w-full flex-1'
-              } ${
-                deviceViewport !== 'desktop'
-                  ? 'overflow-auto bg-zinc-925 p-4 sm:p-6 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px]'
-                  : 'overflow-hidden bg-zinc-950'
-              }`}
+              } overflow-hidden`}
             >
-              <div style={viewportStyles}>
-                {/* Mobile Camera Notch */}
-                {deviceViewport === 'mobile' && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-4 bg-zinc-900 rounded-full z-30 pointer-events-none flex items-center justify-center">
-                    <div className="size-2 rounded-full bg-black/60" />
-                  </div>
-                )}
+              <div
+                className={`flex-1 min-w-0 min-h-0 flex flex-col ${
+                  deviceViewport !== 'desktop'
+                    ? 'overflow-auto bg-zinc-925 p-4 sm:p-6 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px]'
+                    : 'overflow-hidden bg-zinc-950'
+                }`}
+              >
+                <div style={viewportStyles}>
+                  {/* Mobile Camera Notch */}
+                  {deviceViewport === 'mobile' && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-4 bg-zinc-900 rounded-full z-30 pointer-events-none flex items-center justify-center">
+                      <div className="size-2 rounded-full bg-black/60" />
+                    </div>
+                  )}
 
-                {/* Dependency Error Banner */}
-                {detailedError?.isDependencyError && (
-                  <div className="absolute inset-x-4 top-4 z-40 bg-zinc-900/95 border border-red-500/50 rounded-xl p-4 shadow-2xl backdrop-blur-md">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <AlertTriangleIcon className="size-5 text-red-400 mt-0.5 shrink-0" />
-                        <div>
-                          <h4 className="text-sm font-semibold text-white">Dependency Resolution Error</h4>
-                          <p className="text-xs text-zinc-300 mt-1">
-                            {detailedError.package ? (
-                              <>
-                                Could not resolve package{' '}
-                                <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-amber-300 font-mono font-bold">
-                                  {detailedError.package}
-                                </code>{' '}
-                                from registry.
-                              </>
-                            ) : (
-                              detailedError.reason || 'Unable to download required preview dependencies.'
-                            )}
-                          </p>
-                          <p className="text-xs text-zinc-400 mt-1">
-                            {detailedError.isNetwork
-                              ? 'A network or CDN timeout occurred while contacting the package registry.'
-                              : 'The package name may be invalid, private, or incompatible with the preview environment.'}
-                          </p>
+                  {/* Dependency Error Banner */}
+                  {detailedError?.isDependencyError && (
+                    <div className="absolute inset-x-4 top-4 z-40 bg-zinc-900/95 border border-red-500/50 rounded-xl p-4 shadow-2xl backdrop-blur-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangleIcon className="size-5 text-red-400 mt-0.5 shrink-0" />
+                          <div>
+                            <h4 className="text-sm font-semibold text-white">Dependency Resolution Error</h4>
+                            <p className="text-xs text-zinc-300 mt-1">
+                              {detailedError.package ? (
+                                <>
+                                  Could not resolve package{' '}
+                                  <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-amber-300 font-mono font-bold">
+                                    {detailedError.package}
+                                  </code>{' '}
+                                  from registry.
+                                </>
+                              ) : (
+                                detailedError.reason || 'Unable to download required preview dependencies.'
+                              )}
+                            </p>
+                            <p className="text-xs text-zinc-400 mt-1">
+                              {detailedError.isNetwork
+                                ? 'A network or CDN timeout occurred while contacting the package registry.'
+                                : 'The package name may be invalid, private, or incompatible with the preview environment.'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={handleRetryDependencies}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <RotateCwIcon size={13} />
+                            Retry
+                          </button>
+                          {detailedError.package && (
+                            <button
+                              type="button"
+                              onClick={() => handleIgnorePackage(detailedError.package)}
+                              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                            >
+                              Ignore & Preview
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={handleRetryDependencies}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <RotateCwIcon size={13} />
-                          Retry
-                        </button>
-                        {detailedError.package && (
-                          <button
-                            onClick={() => handleIgnorePackage(detailedError.package)}
-                            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-                          >
-                            Ignore & Preview
-                          </button>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <SandpackPreview
-                  showNavigator={false}
-                  showRefreshButton={false}
-                  showOpenInCodeSandbox={false}
-                  showSandpackErrorOverlay={showErrorOverlay}
-                  style={{
-                    height: '100%',
-                    width: '100%',
-                    minWidth: 0,
-                    minHeight: 0,
-                    flex: 1,
-                    backgroundColor: '#ffffff',
-                  }}
-                />
+                  <SandpackPreview
+                    showNavigator={false}
+                    showRefreshButton={false}
+                    showOpenInCodeSandbox={false}
+                    showSandpackErrorOverlay={showErrorOverlay}
+                    style={{
+                      height: '100%',
+                      width: '100%',
+                      minWidth: 0,
+                      minHeight: 0,
+                      flex: 1,
+                      backgroundColor: '#ffffff',
+                    }}
+                  />
+                </div>
               </div>
+
+              {/* In-Workspace Live Console Drawer (docked cleanly beneath preview when !showCode) */}
+              {!showCode && (
+                <ConsoleDrawer
+                  projectId={project?._id}
+                  framework={framework}
+                />
+              )}
             </div>
           </SandpackLayout>
         </div>
