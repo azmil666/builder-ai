@@ -832,12 +832,51 @@ export function AppContextProvider({children}){
 
   const updateProjectName = useCallback(
     async (newName) => {
-      if (!activeProject || !user || !newName.trim()) return;
+      const trimmedName = typeof newName === "string" ? newName.trim() : "";
+      if (!activeProject || !user || !trimmedName || trimmedName === activeProject.name) return;
+
+      const previousName = activeProject.name;
+      const projectId = activeProject._id;
+
+      // Optimistically update activeProject and projects list state
+      setActiveProject((prev) => (prev ? { ...prev, name: trimmedName } : prev));
+      setProjects((prev) =>
+        prev.map((p) => (p._id === projectId ? { ...p, name: trimmedName } : p)),
+      );
+
       try {
-        setActiveProject((prev) => (prev ? { ...prev, name: newName.trim() } : prev));
+        const { data } = await api.patch(`/api/projects/${projectId}`, {
+          name: trimmedName,
+        });
+
+        // Sync with server response
+        setActiveProject((prev) =>
+          prev && prev._id === projectId
+            ? { ...prev, name: data.name ?? trimmedName, updatedAt: data.updatedAt ?? prev.updatedAt }
+            : prev,
+        );
+        setProjects((prev) =>
+          prev.map((p) =>
+            p._id === projectId
+              ? { ...p, name: data.name ?? trimmedName, updatedAt: data.updatedAt ?? p.updatedAt }
+              : p,
+          ),
+        );
+
         toast.success("Project updated");
+        return data;
       } catch (err) {
         console.error("Failed to update project name:", err);
+        // Rollback state to previous name
+        setActiveProject((prev) =>
+          prev && prev._id === projectId ? { ...prev, name: previousName } : prev,
+        );
+        setProjects((prev) =>
+          prev.map((p) => (p._id === projectId ? { ...p, name: previousName } : p)),
+        );
+
+        const errMsg = err?.response?.data?.error || "Failed to update project name";
+        toast.error(errMsg);
       }
     },
     [activeProject, user],
