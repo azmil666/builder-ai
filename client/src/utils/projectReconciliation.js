@@ -42,8 +42,11 @@ export function isStaleProjectResponse(prev, incoming) {
   const prevStatus = prev.status;
   const incomingStatus = incoming.status;
 
-  // If local state is already terminal, any non-terminal incoming state is stale
+  // If local state is already terminal, any non-terminal incoming state is stale (except revising)
   if (prevStatus === "completed" || prevStatus === "failed") {
+    if (incomingStatus === "revising") {
+      return false;
+    }
     if (incomingStatus !== "completed" && incomingStatus !== "failed") {
       return true;
     }

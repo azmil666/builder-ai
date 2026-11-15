@@ -252,7 +252,7 @@ const FullPagePreview = ({
           title={project?.seo?.title || project?.name || "Published Site Preview"}
           srcDoc={staticSrcDoc}
           className="h-full w-full border-none"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          sandbox="allow-scripts allow-forms allow-popups"
         />
       </div>
     );
