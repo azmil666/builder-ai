@@ -1,5 +1,17 @@
 import { User } from "../models/User.js";
 import jwt from 'jsonwebtoken'
+import { z } from "zod";
+
+export const RegisterSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(50, "Name must be 50 characters or less"),
+  email: z.string().trim().email("Invalid email format").toLowerCase(),
+  password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password must be 100 characters or less"),
+});
+
+export const LoginSchema = z.object({
+  email: z.string().trim().email("Invalid email format").toLowerCase(),
+  password: z.string().min(1, "Password is required").max(100),
+});
 
 export const getJwtSecret = () => {
     const secret = process.env.JWT_SECRET;
@@ -23,63 +35,63 @@ const setSessionCookie = (res, payload)=>{
 }
 
 export async function register(req, res) {
-    const {name, email, password} = req.body
-
-    if(!name || !email || !password){
-        res.status(400).json({error: "Name, email, and password are required"})
+    const parsed = RegisterSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid input" });
         return;
     }
 
-    const trimmedEmail = email.toLowerCase().trim();
-    const existing = await User.findOne({email: trimmedEmail})
-    if(existing){
-        res.status(400).json({error: "An account with this email already exists"})
+    const { name, email, password } = parsed.data;
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+        res.status(400).json({ error: "An account with this email already exists" });
         return;
     }
     const user = await User.create({
         name,
-        email: trimmedEmail,
-        password
-    })
-    setSessionCookie(res, {userID:user._id.toString(),email:user.email})
+        email,
+        password,
+    });
+    setSessionCookie(res, { userID: user._id.toString(), email: user.email });
 
     res.status(201).json({
         user: {
             _id: user._id,
             name: user.name,
             email: user.email,
-        }
-    })
+        },
+    });
 }
 
 export async function login(req, res) {
-    const {email, password} = req.body
-
-    if(!email || !password){
-        res.status(400).json({error: "Email and Password are required"})
+    const parsed = LoginSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid input" });
         return;
     }
 
-    const user = await User.findOne({email: email.toLowerCase().trim()})
-    if(!user){
-        res.status(401).json({error: "Invalid email or password"})
+    const { email, password } = parsed.data;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        res.status(401).json({ error: "Invalid email or password" });
         return;
     }
-    const isValid = await user.comparePassword(password)
+    const isValid = await user.comparePassword(password);
     if (!isValid) {
-        res.status(401).json({error: "Invalid email or password"})
+        res.status(401).json({ error: "Invalid email or password" });
         return;
     }
-    setSessionCookie(res, {userID:user._id.toString(),email:user.email})
+    setSessionCookie(res, { userID: user._id.toString(), email: user.email });
 
     res.status(201).json({
         user: {
             _id: user._id,
             name: user.name,
             email: user.email,
-        }
-    })
-    
+        },
+    });
 }
 
 export async function logout(_req, res) {

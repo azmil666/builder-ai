@@ -63,4 +63,7 @@ ProjectSchema.pre('save', function() {
     }
 });
 
+ProjectSchema.index({ owner: 1, updatedAt: -1 });
+ProjectSchema.index({ published: 1, _id: 1 });
+
 export const Project = mongoose.model('Project', ProjectSchema)
