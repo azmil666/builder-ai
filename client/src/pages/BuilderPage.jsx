@@ -78,14 +78,22 @@ const BuilderPage = () => {
   useEffect(() => {
     const mql = window.matchMedia('(max-width: 767px)');
     const onChange = (e) => setIsMobile(e.matches);
+    const onResize = () => setIsMobile(window.innerWidth < 768);
     setIsMobile(mql.matches);
     if (mql.addEventListener) {
       mql.addEventListener('change', onChange);
-      return () => mql.removeEventListener('change', onChange);
     } else {
       mql.addListener(onChange);
-      return () => mql.removeListener(onChange);
     }
+    window.addEventListener('resize', onResize);
+    return () => {
+      if (mql.removeEventListener) {
+        mql.removeEventListener('change', onChange);
+      } else {
+        mql.removeListener(onChange);
+      }
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   // Global Studio Shortcuts

@@ -58,31 +58,64 @@ const ChatPanel = ({
   loading = false,
   status = '',
   project = null,
+  activeProject = null,
   onFileSelect,
 }) => {
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
 
-  const currentStatus = status || project?.status || '';
+  const currentProject = activeProject || project;
+  const currentStatus = status || currentProject?.status || '';
   const isInitialBuild = INITIAL_BUILD_STATUSES.includes(currentStatus);
   const showLoadingIndicator =
     (currentStatus === 'revising' || loading) && !isInitialBuild;
 
   // Compute 4 contextual suggestion chips based on project archetype, prompt & file contents
   const revisionSuggestions = useMemo(() => {
-    const archetype = (project?.designSpec?.archetype || '').toLowerCase();
+    const archetype = (currentProject?.designSpec?.archetype || '').toLowerCase();
     const promptText = (
-      project?.prompt ||
-      project?.description ||
-      project?.name ||
+      currentProject?.prompt ||
+      currentProject?.description ||
+      currentProject?.name ||
       ''
     ).toLowerCase();
-    const category = (project?.designSpec?.category || '').toLowerCase();
+    const category = (currentProject?.designSpec?.category || '').toLowerCase();
     const combinedContext = `${archetype} ${category} ${promptText}`;
 
     let primaryPool = ARCHETYPE_SUGGESTIONS.fallback;
 
+    // Check archetype directly first for high precision
     if (
+      archetype.includes('ecommerce') ||
+      archetype.includes('store') ||
+      archetype.includes('shop') ||
+      archetype.includes('retail') ||
+      archetype.includes('marketplace')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.ecommerce;
+    } else if (
+      archetype.includes('portfolio') ||
+      archetype.includes('agency') ||
+      archetype.includes('freelance') ||
+      archetype.includes('creative')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.portfolio;
+    } else if (
+      archetype.includes('saas') ||
+      archetype.includes('landing') ||
+      archetype.includes('startup') ||
+      archetype.includes('minimal-saas')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.saas;
+    } else if (
+      archetype.includes('dashboard') ||
+      archetype.includes('admin') ||
+      archetype.includes('crm') ||
+      archetype.includes('portal') ||
+      archetype.includes('analytics')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.dashboard;
+    } else if (
       combinedContext.includes('ecommerce') ||
       combinedContext.includes('e-commerce') ||
       combinedContext.includes('store') ||
@@ -106,17 +139,6 @@ const ChatPanel = ({
     ) {
       primaryPool = ARCHETYPE_SUGGESTIONS.portfolio;
     } else if (
-      combinedContext.includes('dashboard') ||
-      combinedContext.includes('app') ||
-      combinedContext.includes('admin') ||
-      combinedContext.includes('crm') ||
-      combinedContext.includes('portal') ||
-      combinedContext.includes('analytics') ||
-      combinedContext.includes('metrics') ||
-      combinedContext.includes('utility')
-    ) {
-      primaryPool = ARCHETYPE_SUGGESTIONS.dashboard;
-    } else if (
       combinedContext.includes('saas') ||
       combinedContext.includes('landing') ||
       combinedContext.includes('startup') ||
@@ -128,10 +150,21 @@ const ChatPanel = ({
       combinedContext.includes('swiss')
     ) {
       primaryPool = ARCHETYPE_SUGGESTIONS.saas;
+    } else if (
+      combinedContext.includes('dashboard') ||
+      combinedContext.includes('app') ||
+      combinedContext.includes('admin') ||
+      combinedContext.includes('crm') ||
+      combinedContext.includes('portal') ||
+      combinedContext.includes('analytics') ||
+      combinedContext.includes('metrics') ||
+      combinedContext.includes('utility')
+    ) {
+      primaryPool = ARCHETYPE_SUGGESTIONS.dashboard;
     }
 
     // Inspect existing file names / paths in project to filter already built components
-    const fileKeys = Object.keys(project?.files || {}).map((f) => f.toLowerCase());
+    const fileKeys = Object.keys(currentProject?.files || {}).map((f) => f.toLowerCase());
 
     const isExisting = (keywords) => {
       if (!keywords || keywords.length === 0) return false;
@@ -158,7 +191,7 @@ const ChatPanel = ({
       }
     }
 
-    // Fallback if still under 4 items
+    // Backfill from primaryPool if still under 4 items
     if (selected.length < 4) {
       for (const item of primaryPool) {
         if (!selected.includes(item.text)) {
@@ -168,14 +201,24 @@ const ChatPanel = ({
       }
     }
 
+    // Backfill from fallback if still under 4 items
+    if (selected.length < 4) {
+      for (const item of ARCHETYPE_SUGGESTIONS.fallback) {
+        if (!selected.includes(item.text)) {
+          selected.push(item.text);
+        }
+        if (selected.length >= 4) break;
+      }
+    }
+
     return selected.slice(0, 4);
   }, [
-    project?.designSpec?.archetype,
-    project?.designSpec?.category,
-    project?.prompt,
-    project?.description,
-    project?.name,
-    project?.files,
+    currentProject?.designSpec?.archetype,
+    currentProject?.designSpec?.category,
+    currentProject?.prompt,
+    currentProject?.description,
+    currentProject?.name,
+    currentProject?.files,
   ]);
 
   useEffect(() => {
@@ -306,7 +349,7 @@ const ChatPanel = ({
       </div>
 
       {/* Revision Suggestions */}
-      {messages.length > 0 && !showLoadingIndicator && !isInitialBuild && (
+      {!showLoadingIndicator && !isInitialBuild && revisionSuggestions.length > 0 && (
         <div className="px-3 pt-2.5 pb-1.5 border-t border-white/10 flex items-center gap-1.5 overflow-x-auto hide-scrollbar shrink-0 bg-canvas/40">
           {revisionSuggestions.map((suggestion, i) => (
             <button

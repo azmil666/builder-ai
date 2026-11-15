@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeftIcon,
@@ -41,6 +41,18 @@ const BuilderHeader = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isVanilla = framework === 'vanilla';
   const frameworkLabel = isVanilla ? 'HTML · CSS · JS' : 'React';
+
+  // Close mobile overflow menu on Escape
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
 
   return (
     <header className="h-12 shrink-0 flex items-center justify-between px-3 sm:px-4 border-b border-white/10 bg-canvas/90 backdrop-blur-xl text-ink z-30 select-none">
@@ -239,7 +251,7 @@ const BuilderHeader = ({
           type="button"
           onClick={onOpenBlockCatalog}
           disabled={isOngoing}
-          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           title={
             isOngoing
               ? 'Component blocks are unavailable while project is generating or revising'
@@ -256,7 +268,7 @@ const BuilderHeader = ({
             type="button"
             onClick={() => setHistoryOpen((prev) => !prev)}
             disabled={isOngoing}
-            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
               historyOpen
                 ? 'border-white/20 bg-surface-active text-ink'
                 : 'border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink'
@@ -287,7 +299,7 @@ const BuilderHeader = ({
         <button
           type="button"
           onClick={onDownload}
-          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer"
           title="Export Project ZIP"
         >
           <DownloadIcon size={13} />
@@ -299,6 +311,8 @@ const BuilderHeader = ({
           <button
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-label="More actions"
+            aria-expanded={mobileMenuOpen}
             className={`flex size-7 items-center justify-center rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
               mobileMenuOpen
                 ? 'border-white/20 bg-surface-active text-ink'

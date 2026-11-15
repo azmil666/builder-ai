@@ -237,7 +237,12 @@ export default function BlockCatalogModal({ isOpen, onClose }) {
           modal.querySelectorAll(
             'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
           )
-        ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+        ).filter(
+          (el) =>
+            !el.hasAttribute('disabled') &&
+            el.getAttribute('aria-hidden') !== 'true' &&
+            (el.offsetParent !== null || (el.getClientRects && el.getClientRects().length > 0))
+        );
 
         if (focusableElements.length === 0) {
           e.preventDefault();
