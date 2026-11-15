@@ -25,6 +25,7 @@ import AgentProgressDashboard from '../components/AgentProgressDashboard';
 import GenerationFailureView from '../components/GenerationFailureView';
 import PublishModal from '../components/PublishModal';
 import ProjectDeleteModal from '../components/dashboard/ProjectDeleteModal';
+import BlockCatalogModal from '../components/BlockCatalogModal';
 import api from '../api/api';
 import { exportProjectZip } from '../utils/exportProject';
 import { resolveProjectFramework } from '../utils/frameworkUtils';
@@ -42,6 +43,7 @@ const BuilderPage = () => {
   const [publishUrl, setPublishUrl] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [inspectPartialFiles, setInspectPartialFiles] = useState(false);
+  const [isBlockCatalogOpen, setIsBlockCatalogOpen] = useState(false);
 
   const {
     activeProject,
@@ -148,6 +150,7 @@ const BuilderPage = () => {
         onToggleViewMode={() => setShowCode(!showCode)}
         onChangeDeviceViewport={setDeviceViewport}
         onOpenPreview={handleOpenPreview}
+        onOpenBlockCatalog={() => setIsBlockCatalogOpen(true)}
         onPublish={handlePublish}
         onDownload={handleDownload}
         onBack={() => navigate('/')}
@@ -325,6 +328,12 @@ const BuilderPage = () => {
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDeleteConfirm}
+      />
+
+      {/* Component Block Insertion Library Modal */}
+      <BlockCatalogModal
+        isOpen={isBlockCatalogOpen}
+        onClose={() => setIsBlockCatalogOpen(false)}
       />
     </div>
   );

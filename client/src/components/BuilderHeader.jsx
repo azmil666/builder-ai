@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeftIcon,
+  BlocksIcon,
   CheckCircle2Icon,
   Code2Icon,
   DownloadIcon,
@@ -30,6 +31,7 @@ const BuilderHeader = ({
   onToggleViewMode,
   onChangeDeviceViewport,
   onOpenPreview,
+  onOpenBlockCatalog,
   onPublish,
   onDownload,
   onBack,
@@ -228,6 +230,22 @@ const BuilderHeader = ({
         >
           <ExternalLinkIcon size={13} />
           <span className="hidden md:inline">Preview</span>
+        </button>
+
+        {/* Component Blocks Library */}
+        <button
+          type="button"
+          onClick={onOpenBlockCatalog}
+          disabled={isOngoing}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title={
+            isOngoing
+              ? 'Component blocks are unavailable while project is generating or revising'
+              : 'Browse & Insert Component Blocks'
+          }
+        >
+          <BlocksIcon size={13} />
+          <span className="hidden sm:inline">Blocks</span>
         </button>
 
         {/* Version History Popover */}
