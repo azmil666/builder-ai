@@ -12,6 +12,7 @@ import {
   HistoryIcon,
   Loader2Icon,
   MonitorIcon,
+  MoreHorizontal,
   SmartphoneIcon,
   TabletIcon,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ const BuilderHeader = ({
   onBack,
 }) => {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isVanilla = framework === 'vanilla';
   const frameworkLabel = isVanilla ? 'HTML · CSS · JS' : 'React';
 
@@ -237,7 +239,7 @@ const BuilderHeader = ({
           type="button"
           onClick={onOpenBlockCatalog}
           disabled={isOngoing}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           title={
             isOngoing
               ? 'Component blocks are unavailable while project is generating or revising'
@@ -254,7 +256,7 @@ const BuilderHeader = ({
             type="button"
             onClick={() => setHistoryOpen((prev) => !prev)}
             disabled={isOngoing}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
               historyOpen
                 ? 'border-white/20 bg-surface-active text-ink'
                 : 'border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink'
@@ -285,12 +287,84 @@ const BuilderHeader = ({
         <button
           type="button"
           onClick={onDownload}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer"
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink text-xs font-medium transition-colors cursor-pointer"
           title="Export Project ZIP"
         >
           <DownloadIcon size={13} />
           <span className="hidden lg:inline">Export</span>
         </button>
+
+        {/* Compact Overflow Menu on < sm */}
+        <div className="relative sm:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className={`flex size-7 items-center justify-center rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+              mobileMenuOpen
+                ? 'border-white/20 bg-surface-active text-ink'
+                : 'border-white/10 bg-surface hover:bg-surface-elevated text-ink-secondary hover:text-ink'
+            }`}
+            title="More actions"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setMobileMenuOpen(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-2 w-44 p-1.5 rounded-xl border border-white/10 bg-surface/95 backdrop-blur-xl shadow-2xl z-50 flex flex-col gap-0.5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenBlockCatalog();
+                    }}
+                    disabled={isOngoing}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-secondary hover:text-ink hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-left"
+                  >
+                    <BlocksIcon size={13} />
+                    <span>Blocks</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setHistoryOpen(true);
+                    }}
+                    disabled={isOngoing}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-secondary hover:text-ink hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-left"
+                  >
+                    <HistoryIcon size={13} />
+                    <span>History</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onDownload();
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-secondary hover:text-ink hover:bg-surface-elevated transition-colors cursor-pointer text-left"
+                  >
+                    <DownloadIcon size={13} />
+                    <span>Export</span>
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Publish */}
         <button

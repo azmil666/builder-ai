@@ -25,6 +25,7 @@ export default function QuickOpenModal({
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
+  const modalRef = useRef(null);
 
   const fileList = useMemo(() => Object.keys(files || {}).sort(), [files]);
 
@@ -45,6 +46,52 @@ export default function QuickOpenModal({
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
+
+  // Modal Focus Trapping (Tab / Shift+Tab cycling)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleFocusTrap = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const modal = modalRef.current;
+        if (!modal) return;
+
+        const focusableElements = Array.from(
+          modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+
+        if (focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !modal.contains(document.activeElement)) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement || !modal.contains(document.activeElement)) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleFocusTrap);
+    return () => window.removeEventListener('keydown', handleFocusTrap);
+  }, [isOpen, onClose]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
@@ -77,6 +124,7 @@ export default function QuickOpenModal({
           onClick={onClose}
         >
           <motion.div
+            ref={modalRef}
             key="quick-open-dialog"
             initial={{ opacity: 0, scale: 0.97, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
