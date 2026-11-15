@@ -17,6 +17,7 @@ export default defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -30,6 +31,11 @@ export default defineConfig({
               /[\\/]node_modules[\\/](framer-motion|lucide-react)[\\/]/.test(id)
             ) {
               return 'ui-vendor'
+            }
+            if (
+              /[\\/]node_modules[\\/]@codesandbox[\\/](sandpack-react|sandpack-client|sandpack-themes)/.test(id)
+            ) {
+              return 'sandpack-vendor'
             }
           }
         },

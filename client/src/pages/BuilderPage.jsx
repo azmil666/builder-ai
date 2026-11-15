@@ -17,6 +17,7 @@ import BuilderHeader from '../components/BuilderHeader';
 import ChatPanel from '../components/ChatPanel';
 import FileExplorer from '../components/FileExplorer';
 import PreviewPanel from '../components/PreviewPanel';
+import ErrorBoundary from '../components/ErrorBoundary';
 import DesignSpecPanel from '../components/DesignSpecPanel';
 import ProjectSettingsPanel from '../components/ProjectSettingsPanel';
 import VisualQAPanel from '../components/VisualQAPanel';
@@ -293,12 +294,18 @@ const BuilderPage = () => {
                   </button>
                 </div>
               )}
-              <PreviewPanel
-                project={activeProject}
-                activeFile={activeFile}
-                showCode={showCode}
-                deviceViewport={deviceViewport}
-              />
+              <ErrorBoundary
+                compact
+                fallbackTitle="Preview Runtime Error"
+                fallbackMessage="The live preview encountered an unexpected error."
+              >
+                <PreviewPanel
+                  project={activeProject}
+                  activeFile={activeFile}
+                  showCode={showCode}
+                  deviceViewport={deviceViewport}
+                />
+              </ErrorBoundary>
             </>
           )}
         </motion.main>
