@@ -327,11 +327,21 @@ const HomePage = () => {
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                   key={i}
-                  className="rounded-2xl border border-hairline bg-surface/50 p-4 space-y-3 animate-pulse"
+                  className="flex flex-col overflow-hidden rounded-2xl border border-hairline bg-surface animate-pulse"
                 >
-                  <div className="w-full aspect-[16/10] rounded-xl bg-surface-elevated" />
-                  <div className="h-4 w-2/3 rounded bg-surface-active" />
-                  <div className="h-3 w-1/3 rounded bg-surface-elevated" />
+                  {/* Thumbnail Placeholder */}
+                  <div className="w-full aspect-[16/10] bg-surface-elevated" />
+                  {/* Card Content: Title and Metadata Placeholders */}
+                  <div className="flex flex-col gap-2.5 px-4 py-3.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="h-4 w-1/2 rounded bg-surface-elevated" />
+                      <div className="h-3 w-12 rounded bg-surface-active" />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="h-3 w-20 rounded bg-surface-elevated" />
+                      <div className="h-3 w-14 rounded bg-surface-active" />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
