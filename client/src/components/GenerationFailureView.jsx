@@ -20,18 +20,18 @@ export default function GenerationFailureView({
     errorMsg.toLowerCase().includes('overloaded');
 
   return (
-    <div className="h-full w-full bg-zinc-950 flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto">
-      <div className="max-w-xl w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+    <div className="h-full w-full bg-canvas flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto">
+      <div className="max-w-xl w-full bg-surface border border-hairline rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
         {/* Status Header */}
         <div className="flex items-start gap-4 mb-6">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
             <AlertTriangleIcon className="w-5 h-5 text-red-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-zinc-100">
+            <h2 className="text-lg font-semibold text-ink">
               Website Generation Failed
             </h2>
-            <p className="text-xs text-zinc-400 mt-0.5">
+            <p className="text-xs text-ink-muted mt-0.5">
               The AI model encountered an issue while generating your project.
             </p>
           </div>
@@ -66,7 +66,7 @@ export default function GenerationFailureView({
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition shadow-sm cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ink text-canvas hover:bg-white/90 text-xs font-medium transition shadow-sm cursor-pointer"
             >
               <RotateCcwIcon size={14} />
               Try Again
@@ -77,7 +77,7 @@ export default function GenerationFailureView({
             <button
               type="button"
               onClick={onInspectFiles}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-elevated hover:bg-surface-hover text-ink text-xs font-medium border border-hairline transition cursor-pointer"
             >
               <FileCodeIcon size={14} />
               Inspect Partial Files ({Object.keys(project.files).length})
@@ -88,7 +88,7 @@ export default function GenerationFailureView({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700/60 transition cursor-pointer ml-auto"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-elevated hover:bg-surface-hover text-ink-secondary hover:text-ink text-xs font-medium border border-hairline transition cursor-pointer ml-auto"
             >
               <ArrowLeftIcon size={14} />
               Back to Projects
@@ -99,4 +99,3 @@ export default function GenerationFailureView({
     </div>
   );
 }
-

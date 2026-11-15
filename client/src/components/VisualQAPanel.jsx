@@ -57,17 +57,17 @@ export default function VisualQAPanel({
   const issues = report?.issues || [];
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-200 border-r border-zinc-850 overflow-y-auto p-4 space-y-5 hide-scrollbar">
+    <div className="flex flex-col h-full bg-surface text-ink border-r border-hairline overflow-y-auto p-4 space-y-5 hide-scrollbar">
       {/* Header */}
-      <div className="border-b border-zinc-850 pb-3 flex items-center justify-between">
+      <div className="border-b border-hairline pb-3 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <ShieldCheckIcon size={14} className="text-indigo-400" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
+            <ShieldCheckIcon size={14} className="text-ink-secondary" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">
               Visual QA Engine
             </h3>
           </div>
-          <p className="text-[11px] text-zinc-400">
+          <p className="text-[11px] text-ink-muted">
             Automated responsive & layout verification
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function VisualQAPanel({
           type="button"
           onClick={runAudit}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition cursor-pointer disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ink text-canvas hover:bg-white/90 text-xs font-medium transition cursor-pointer disabled:opacity-50"
         >
           {loading ? (
             <Loader2Icon size={12} className="animate-spin" />
@@ -89,11 +89,11 @@ export default function VisualQAPanel({
 
       {!qaData && !loading && (
         <div className="py-12 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="size-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 flex items-center justify-center">
+          <div className="size-11 rounded-xl bg-surface-elevated border border-hairline text-ink-muted flex items-center justify-center">
             <EyeIcon size={20} />
           </div>
-          <h4 className="text-sm font-medium text-zinc-200">No QA Audit Performed</h4>
-          <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
+          <h4 className="text-sm font-medium text-ink">No QA Audit Performed</h4>
+          <p className="text-xs text-ink-muted max-w-xs leading-relaxed">
             Click "Run Audit" to scan your project for horizontal overflow, mobile responsive failures, broken assets, and accessibility issues.
           </p>
         </div>
@@ -106,7 +106,7 @@ export default function VisualQAPanel({
             className={`p-4 rounded-xl border flex items-center justify-between ${
               report.summary.critical === 0 && report.summary.warnings === 0
                 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                : 'bg-zinc-900/90 border-zinc-800 text-zinc-200'
+                : 'bg-surface-elevated border-hairline text-ink'
             }`}
           >
             <div className="flex items-center gap-3">
@@ -121,7 +121,7 @@ export default function VisualQAPanel({
                     ? 'Visual QA Passed'
                     : `${report.summary.totalIssues} Issues Identified`}
                 </h4>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
+                <p className="text-[11px] text-ink-muted mt-0.5">
                   {report.summary.critical} critical · {report.summary.warnings} warnings
                 </p>
               </div>
@@ -132,12 +132,12 @@ export default function VisualQAPanel({
                 type="button"
                 onClick={handleFix}
                 disabled={applyingFix}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-zinc-950 hover:bg-zinc-200 text-xs font-medium transition cursor-pointer disabled:opacity-50 shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ink text-canvas hover:bg-white/90 text-xs font-medium transition cursor-pointer disabled:opacity-50 shadow-sm"
               >
                 {applyingFix ? (
-                  <Loader2Icon size={12} className="animate-spin text-zinc-950" />
+                  <Loader2Icon size={12} className="animate-spin text-canvas" />
                 ) : (
-                  <Wand2Icon size={12} className="text-zinc-950" />
+                  <Wand2Icon size={12} className="text-canvas" />
                 )}
                 <span>1-Click Fix</span>
               </button>
@@ -146,27 +146,27 @@ export default function VisualQAPanel({
 
           {/* Category Metrics */}
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-850">
-              <span className="text-[10px] text-zinc-500 block">Overflow & Clipping</span>
-              <span className="font-mono text-sm font-semibold text-zinc-200">
+            <div className="p-2.5 rounded-lg bg-surface-elevated border border-hairline">
+              <span className="text-[10px] text-ink-muted block">Overflow & Clipping</span>
+              <span className="font-mono text-sm font-semibold text-ink">
                 {report.summary.categories.overflow}
               </span>
             </div>
-            <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-850">
-              <span className="text-[10px] text-zinc-500 block">Responsive Layout</span>
-              <span className="font-mono text-sm font-semibold text-zinc-200">
+            <div className="p-2.5 rounded-lg bg-surface-elevated border border-hairline">
+              <span className="text-[10px] text-ink-muted block">Responsive Layout</span>
+              <span className="font-mono text-sm font-semibold text-ink">
                 {report.summary.categories.responsive}
               </span>
             </div>
-            <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-850">
-              <span className="text-[10px] text-zinc-500 block">Assets & URLs</span>
-              <span className="font-mono text-sm font-semibold text-zinc-200">
+            <div className="p-2.5 rounded-lg bg-surface-elevated border border-hairline">
+              <span className="text-[10px] text-ink-muted block">Assets & URLs</span>
+              <span className="font-mono text-sm font-semibold text-ink">
                 {report.summary.categories.assets}
               </span>
             </div>
-            <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-850">
-              <span className="text-[10px] text-zinc-500 block">Accessibility</span>
-              <span className="font-mono text-sm font-semibold text-zinc-200">
+            <div className="p-2.5 rounded-lg bg-surface-elevated border border-hairline">
+              <span className="text-[10px] text-ink-muted block">Accessibility</span>
+              <span className="font-mono text-sm font-semibold text-ink">
                 {report.summary.categories.accessibility}
               </span>
             </div>
@@ -174,14 +174,14 @@ export default function VisualQAPanel({
 
           {/* Issues List */}
           <div className="space-y-2.5 pt-2">
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">
+            <span className="text-[10px] font-mono text-ink-muted uppercase tracking-wider block">
               Detected Defects ({issues.length})
             </span>
 
             {issues.map((iss, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-2 text-xs"
+                className="p-3 rounded-xl bg-surface-elevated border border-hairline space-y-2 text-xs"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -194,7 +194,7 @@ export default function VisualQAPanel({
                     >
                       {iss.severity}
                     </span>
-                    <span className="text-[10px] font-mono text-zinc-400 capitalize">
+                    <span className="text-[10px] font-mono text-ink-secondary capitalize">
                       {iss.category}
                     </span>
                   </div>
@@ -202,18 +202,18 @@ export default function VisualQAPanel({
                   <button
                     type="button"
                     onClick={() => onFileSelect(iss.file)}
-                    className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-mono transition cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[11px] text-ink-secondary hover:text-ink font-mono transition cursor-pointer"
                   >
                     <FileCodeIcon size={11} />
                     <span>{iss.file.split('/').pop()}:{iss.line}</span>
                   </button>
                 </div>
 
-                <p className="text-zinc-200 text-xs leading-relaxed">{iss.message}</p>
+                <p className="text-ink text-xs leading-relaxed">{iss.message}</p>
 
                 {iss.suggestedFix && (
-                  <div className="p-2 rounded-lg bg-zinc-950 border border-zinc-850 text-[11px] text-zinc-400">
-                    <span className="text-indigo-400 font-semibold">Fix: </span>
+                  <div className="p-2 rounded-lg bg-surface border border-hairline text-[11px] text-ink-secondary">
+                    <span className="text-ink font-semibold">Fix: </span>
                     <span>{iss.suggestedFix}</span>
                   </div>
                 )}
