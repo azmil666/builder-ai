@@ -484,6 +484,33 @@ export function AppContextProvider({children}){
         }
       });
 
+      eventSource.addEventListener("revision_failed", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setActiveProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: data.status || "completed",
+                  error: data.error || "Revision failed",
+                }
+              : prev,
+          );
+          setChatLoading(false);
+          eventSource?.close();
+          if (fallbackInterval) {
+            clearInterval(fallbackInterval);
+            fallbackInterval = null;
+          }
+          if (data.error) {
+            toast.error(data.error);
+          }
+          loadProject(projectId, true);
+        } catch (err) {
+          console.error("Failed to parse revision_failed SSE event:", err);
+        }
+      });
+
       eventSource.onerror = (err) => {
         console.warn("[SSE] Stream disconnected or error, activating polling fallback:", err);
         if (!sseFailed) {
@@ -552,24 +579,75 @@ export function AppContextProvider({children}){
     const handleChat = useCallback(
     async (prompt) => {
       if (!activeProject || !user) return;
+      const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
+      if (!trimmedPrompt) return;
+
+      const userMsg = {
+        role: "user",
+        content: trimmedPrompt,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Optimistically record user prompt in chat
+      setActiveProject((prev) =>
+        prev
+          ? {
+              ...prev,
+              messages: [...(prev.messages || []), userMsg],
+            }
+          : prev,
+      );
       setChatLoading(true);
+
       try {
-        const { data } = await api.post(
+        const response = await api.post(
           `/api/projects/${activeProject._id}/chat`,
-          { prompt },
+          { prompt: trimmedPrompt },
         );
-        setActiveProject(data);
+        const { data, status: resStatus } = response;
+
+        // [R2-P0-01] Non-blocking 202 Accepted response for background revision job
+        if (resStatus === 202 || data.status === "revising") {
+          setActiveProject((prev) => {
+            if (!prev) return data.project || prev;
+            const updated = data.project || {};
+            return {
+              ...prev,
+              ...updated,
+              status: "revising",
+              messages:
+                updated.messages && updated.messages.length > 0
+                  ? updated.messages
+                  : prev.messages,
+            };
+          });
+          // Leave chatLoading true: SSE stream will finalize activeProject and clear chatLoading.
+          return;
+        }
+
+        // Backward compatibility: synchronous 200/201 response
+        setActiveProject((prev) => reconcileProjectState(prev, data.project || data));
+        setChatLoading(false);
         if (data.errors && data.errors.length > 0) {
           toast.error(`${data.errors.length} revision patch(es) failed`);
         } else {
-          toast.success(`Updated to version ${data.version}`);
+          toast.success(`Updated to version ${data.version || (data.project && data.project.version) || ""}`);
         }
       } catch (err) {
-        console.error("Revision request failed:", err);
-        toast.error(err?.response?.data?.error || "Revision request failed");
-        loadProject(activeProject._id, true);
-      } finally {
         setChatLoading(false);
+        if (err?.response?.status === 409) {
+          // [R2-P0-02] Concurrency conflict: surface toast error and preserve user's optimistic chat message
+          const conflictMsg =
+            err?.response?.data?.error ||
+            "Another operation is currently in progress for this project.";
+          toast.error(conflictMsg);
+          return;
+        }
+
+        console.error("Revision request failed:", err);
+        const errMsg = err?.response?.data?.error || "Revision request failed";
+        toast.error(errMsg);
+        loadProject(activeProject._id, true);
       }
     },
     [activeProject, user, loadProject],
@@ -625,7 +703,9 @@ export function AppContextProvider({children}){
         } catch (err) {
           console.error("Failed to auto-save files:", err);
           setSyncStatus("error");
-          toast.error("Failed to save code modifications");
+          const saveErrMsg =
+            err?.response?.data?.error || "Failed to save code modifications";
+          toast.error(saveErrMsg);
         }
       }, 1000),
     [],

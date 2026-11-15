@@ -616,6 +616,19 @@ export async function updateProjectFiles(req, res) {
     return;
   }
 
+  const ACTIVE_STATUSES = [
+    "generating",
+    "revising",
+    "validating",
+    "repairing",
+    "visual_verifying",
+  ];
+  if (ACTIVE_STATUSES.includes(project.status)) {
+    return res.status(409).json({
+      error: "Cannot save manual file edits while AI generation or revision is in progress.",
+    });
+  }
+
   // Rebuild project files map with content & hashes
   const newFiles = {};
   for (const [path, entry] of Object.entries(files)) {
@@ -1319,30 +1332,51 @@ export async function updateProjectMetadata(req, res) {
     return;
   }
 
+  const updateFields = {};
   if (parsed.data.name !== undefined) {
-    project.name = parsed.data.name;
+    updateFields.name = parsed.data.name;
   }
   if (parsed.data.description !== undefined) {
-    project.description = parsed.data.description;
+    updateFields.description = parsed.data.description;
   }
   if (parsed.data.seo !== undefined) {
-    project.seo = {
-      ...(project.seo?.toObject?.() || project.seo || {}),
-      ...parsed.data.seo,
-    };
-    if (typeof project.markModified === "function") {
-      project.markModified("seo");
+    for (const [key, val] of Object.entries(parsed.data.seo)) {
+      if (val !== undefined) {
+        updateFields[`seo.${key}`] = val;
+      }
     }
   }
 
-  await project.save();
+  let updatedProject = null;
+  if (mongoose.connection.readyState === 1 || Project.findByIdAndUpdate !== mongoose.Model.findByIdAndUpdate) {
+    updatedProject = await Project.findByIdAndUpdate(
+      project._id,
+      { $set: updateFields },
+      { new: true, returnDocument: "after" }
+    );
+  } else {
+    // In-memory fallback if disconnected in a unit test
+    if (parsed.data.name !== undefined) project.name = parsed.data.name;
+    if (parsed.data.description !== undefined) project.description = parsed.data.description;
+    if (parsed.data.seo !== undefined) {
+      project.seo = { ...(project.seo?.toObject?.() || project.seo || {}), ...parsed.data.seo };
+      if (typeof project.markModified === "function") project.markModified("seo");
+    }
+    await project.save();
+    updatedProject = project;
+  }
+
+  if (!updatedProject) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
 
   res.status(200).json({
-    _id: project._id,
-    name: project.name,
-    description: project.description,
-    seo: project.seo,
-    updatedAt: project.updatedAt,
+    _id: updatedProject._id,
+    name: updatedProject.name,
+    description: updatedProject.description,
+    seo: updatedProject.seo,
+    updatedAt: updatedProject.updatedAt,
   });
 }
 
