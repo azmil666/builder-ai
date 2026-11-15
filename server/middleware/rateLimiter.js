@@ -10,7 +10,7 @@ export function createRateLimiter({
   windowMs = 15 * 60 * 1000,
   max = 100,
   message = "Too many requests. Please try again later.",
-  keyGenerator = (req) => req.ip || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "global",
+  keyGenerator = (req) => req.ip || req.socket?.remoteAddress || "global",
 }) {
   const hits = new Map();
 
@@ -142,7 +142,7 @@ export const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: "Too many authentication attempts. Please try again in 15 minutes.",
-  keyGenerator: (req) => `auth:${req.ip || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "ip"}`,
+  keyGenerator: (req) => `auth:${req.ip || req.socket?.remoteAddress || "ip"}`,
 });
 export const authLimiter = authRateLimiter;
 

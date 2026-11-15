@@ -585,8 +585,8 @@ export async function deleteProject(req, res) {
 // PUT /api/projects/:id/files
 // Update project files (manual edits).
 export async function updateProjectFiles(req, res) {
-  const { files } = req.body;
-  if (!files || typeof files !== "object") {
+  const { files } = req.body || {};
+  if (!files || typeof files !== "object" || Array.isArray(files)) {
     res.status(400).json({ error: "files object is required" });
     return;
   }
@@ -615,12 +615,17 @@ export async function updateProjectFiles(req, res) {
 
   // Rebuild project files map with content & hashes
   const newFiles = {};
-  for (const [path, content] of Object.entries(files)) {
-    if (typeof content === "string") {
-      newFiles[path] = { content, hash: hashContent(content) };
+  for (const [path, entry] of Object.entries(files)) {
+    const text =
+      typeof entry === "string"
+        ? entry
+        : entry && typeof entry.content === "string"
+        ? entry.content
+        : null;
+    if (text !== null) {
+      newFiles[path] = { content: text, hash: hashContent(text) };
     }
   }
-
   project.files = newFiles;
   await project.save();
 
@@ -698,6 +703,7 @@ export async function getPublicProject(req, res) {
     _id: project._id,
     name: project.name,
     description: project.description,
+    framework: project.framework || "react",
     files: filesObj,
     version: project.version,
   });
