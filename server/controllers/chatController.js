@@ -348,7 +348,7 @@ export async function runRevisionInBackground(projectId, prompt, options = {}) {
     }
 
     // Capture point-in-time snapshot for this revision
-    recordSnapshot(project, prompt.slice(0, 100));
+    await recordSnapshot(project, prompt.slice(0, 100));
 
     project.messages.push({
       role: "assistant",
