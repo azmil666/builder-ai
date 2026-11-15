@@ -1,25 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   AlertTriangleIcon,
   CheckIcon,
   GlobeIcon,
   PencilIcon,
   SettingsIcon,
+  Share2Icon,
   Trash2Icon,
 } from 'lucide-react';
+import { AppContext } from '../context/useAppContext';
 
 export default function ProjectSettingsPanel({
   project,
   onUpdateName,
   onDelete,
+  onUpdateSeo,
 }) {
+  const context = useContext(AppContext);
+  const updateProjectSeo = onUpdateSeo || context?.updateProjectSeo;
+
   const [name, setName] = useState(project?.name || '');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [seo, setSeo] = useState({
+    title: project?.seo?.title || '',
+    description: project?.seo?.description || '',
+    ogImage: project?.seo?.ogImage || '',
+    favicon: project?.seo?.favicon || '',
+  });
+  const [isSavingSeo, setIsSavingSeo] = useState(false);
+
   useEffect(() => {
     setName(project?.name || '');
   }, [project?.name]);
+
+  useEffect(() => {
+    setSeo({
+      title: project?.seo?.title || '',
+      description: project?.seo?.description || '',
+      ogImage: project?.seo?.ogImage || '',
+      favicon: project?.seo?.favicon || '',
+    });
+  }, [project?.seo]);
 
   const handleNameSave = async (e) => {
     e.preventDefault();
@@ -35,6 +58,22 @@ export default function ProjectSettingsPanel({
     } else {
       setName(project?.name || '');
       setIsEditing(false);
+    }
+  };
+
+  const handleSeoSave = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!updateProjectSeo) return;
+    setIsSavingSeo(true);
+    try {
+      await updateProjectSeo({
+        title: seo.title.trim(),
+        description: seo.description.trim(),
+        ogImage: seo.ogImage.trim(),
+        favicon: seo.favicon.trim(),
+      });
+    } finally {
+      setIsSavingSeo(false);
     }
   };
 
@@ -128,6 +167,105 @@ export default function ProjectSettingsPanel({
             )}
           </span>
         </div>
+      </div>
+
+      {/* SEO & Social Sharing */}
+      <div className="p-3.5 rounded-xl bg-surface-elevated border border-hairline space-y-3 text-xs">
+        <div className="flex items-center justify-between pb-2 border-b border-hairline">
+          <div className="flex items-center gap-1.5 font-semibold text-ink">
+            <Share2Icon size={13} className="text-ink-secondary" />
+            <span>SEO & Social Sharing</span>
+          </div>
+        </div>
+
+        {/* Page Title */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-ink-secondary block">
+            Page Title
+          </label>
+          <input
+            type="text"
+            value={seo.title}
+            onChange={(e) => setSeo((prev) => ({ ...prev, title: e.target.value }))}
+            placeholder={project?.name || "Page title"}
+            maxLength={100}
+            disabled={isSavingSeo}
+            className="w-full bg-surface-elevated border border-hairline focus:border-white/30 rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-muted/50 outline-none disabled:opacity-50 transition-colors"
+          />
+        </div>
+
+        {/* Meta Description */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-medium text-ink-secondary block">
+              Meta Description
+            </label>
+            <span className="text-[10px] text-ink-muted tabular-nums">
+              {(seo.description || '').length}/300
+            </span>
+          </div>
+          <textarea
+            rows={3}
+            value={seo.description}
+            onChange={(e) => setSeo((prev) => ({ ...prev, description: e.target.value.slice(0, 300) }))}
+            placeholder="Brief summary for search engines and social cards..."
+            maxLength={300}
+            disabled={isSavingSeo}
+            className="w-full bg-surface-elevated border border-hairline focus:border-white/30 rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-muted/50 outline-none disabled:opacity-50 transition-colors resize-none"
+          />
+        </div>
+
+        {/* Social Preview Image URL */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-ink-secondary block">
+            Social Preview Image URL (<code className="font-mono text-[10px]">og:image</code>)
+          </label>
+          <input
+            type="url"
+            value={seo.ogImage}
+            onChange={(e) => setSeo((prev) => ({ ...prev, ogImage: e.target.value }))}
+            placeholder="https://example.com/og-image.png"
+            maxLength={500}
+            disabled={isSavingSeo}
+            className="w-full bg-surface-elevated border border-hairline focus:border-white/30 rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-muted/50 outline-none disabled:opacity-50 transition-colors"
+          />
+        </div>
+
+        {/* Favicon URL */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-ink-secondary block">
+            Favicon URL
+          </label>
+          <input
+            type="url"
+            value={seo.favicon}
+            onChange={(e) => setSeo((prev) => ({ ...prev, favicon: e.target.value }))}
+            placeholder="https://example.com/favicon.ico"
+            maxLength={500}
+            disabled={isSavingSeo}
+            className="w-full bg-surface-elevated border border-hairline focus:border-white/30 rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-muted/50 outline-none disabled:opacity-50 transition-colors"
+          />
+        </div>
+
+        {/* Save SEO Settings Button */}
+        <button
+          type="button"
+          onClick={handleSeoSave}
+          disabled={isSavingSeo}
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-canvas hover:bg-white/90 disabled:opacity-50 text-xs font-medium cursor-pointer transition-colors"
+        >
+          {isSavingSeo ? (
+            <>
+              <span className="size-3 border-2 border-canvas border-t-transparent rounded-full animate-spin" />
+              <span>Saving SEO Settings...</span>
+            </>
+          ) : (
+            <>
+              <CheckIcon size={13} />
+              <span>Save SEO Settings</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Danger Zone */}

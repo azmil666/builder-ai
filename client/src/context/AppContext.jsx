@@ -882,6 +882,65 @@ export function AppContextProvider({children}){
     [activeProject, user],
   );
 
+  const updateProjectSeo = useCallback(
+    async (seoUpdates) => {
+      if (!activeProject || !user) {
+        toast.error("No active project");
+        return;
+      }
+
+      const projectId = activeProject._id;
+      const previousSeo = activeProject.seo || {};
+      const optimisticSeo = { ...previousSeo, ...seoUpdates };
+
+      // Optimistically update activeProject and projects list
+      setActiveProject((prev) =>
+        prev && prev._id === projectId ? { ...prev, seo: optimisticSeo } : prev,
+      );
+      setProjects((prev) =>
+        prev.map((p) => (p._id === projectId ? { ...p, seo: optimisticSeo } : p)),
+      );
+
+      try {
+        const { data } = await api.patch(`/api/projects/${projectId}`, {
+          seo: seoUpdates,
+        });
+
+        const returnedSeo = data.seo ?? optimisticSeo;
+        // Sync with server response
+        setActiveProject((prev) =>
+          prev && prev._id === projectId
+            ? { ...prev, seo: returnedSeo, updatedAt: data.updatedAt ?? prev.updatedAt }
+            : prev,
+        );
+        setProjects((prev) =>
+          prev.map((p) =>
+            p._id === projectId
+              ? { ...p, seo: returnedSeo, updatedAt: data.updatedAt ?? p.updatedAt }
+              : p,
+          ),
+        );
+
+        toast.success("SEO settings saved");
+        return data;
+      } catch (err) {
+        console.error("Failed to update project SEO:", err);
+        // Rollback state to previous SEO
+        setActiveProject((prev) =>
+          prev && prev._id === projectId ? { ...prev, seo: previousSeo } : prev,
+        );
+        setProjects((prev) =>
+          prev.map((p) => (p._id === projectId ? { ...p, seo: previousSeo } : p)),
+        );
+
+        const errMsg = err?.response?.data?.error || "Failed to update SEO settings";
+        toast.error(errMsg);
+        throw err;
+      }
+    },
+    [activeProject, user],
+  );
+
     return (
        <AppContext.Provider value={{
         user,
@@ -921,6 +980,7 @@ export function AppContextProvider({children}){
         renameFile,
         deleteFile,
         updateProjectName,
+        updateProjectSeo,
         }}>
         {children}
        </AppContext.Provider> 
