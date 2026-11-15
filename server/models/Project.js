@@ -13,8 +13,8 @@ const PlannedFileSchema = new Schema({
 
 const HistoryEntrySchema = new Schema({
     version: { type: Number, required: true },
-    label: { type: String, required: true, maxlength: 100 },
-    files: { type: Schema.Types.Mixed, required: true },
+    label: { type: String, trim: true, maxlength: 120, default: "" },
+    files: { type: Schema.Types.Mixed },
     createdAt: { type: Date, default: Date.now },
 }, { _id: false });
 
@@ -66,6 +66,14 @@ ProjectSchema.pre('save', function() {
         this.CurrentFile = this.currentFile;
     } else if (this.CurrentFile !== undefined) {
         this.currentFile = this.CurrentFile;
+    }
+    // Decouple full file tree from embedded history in MongoDB BSON
+    if (Array.isArray(this.history)) {
+        for (const entry of this.history) {
+            if (entry && entry.files !== undefined) {
+                entry.files = undefined;
+            }
+        }
     }
 });
 

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { z } from "zod";
 import { Project } from "../models/Project.js";
+import { ProjectVersion } from "../models/ProjectVersion.js";
 import crypto from "crypto";
 import { generateProject } from "../services/ai.js";
 import { emitProjectEvent, formatSSE, subscribeProjectEvents, getMissedProjectEvents, getMissedProjectEventsAsync } from "../services/projectEvents.js";
@@ -30,7 +31,7 @@ export function sanitizeError(error) {
 }
 
 /**
- * Appends an immutable snapshot of project files to project.history,
+ * Appends an immutable snapshot of project files to ProjectVersion and project.history,
  * capping stored snapshots at the most recent 15 versions.
  */
 export function recordSnapshot(project, label = "Initial generation") {
@@ -38,12 +39,17 @@ export function recordSnapshot(project, label = "Initial generation") {
   if (!project.history) {
     project.history = [];
   }
+  const cleanLabel = (label || "").slice(0, 100);
+  const filesCopy = JSON.parse(JSON.stringify(project.files || {}));
+  const now = new Date();
+
   const snapshot = {
     version: project.version,
-    label: (label || "").slice(0, 100),
-    files: JSON.parse(JSON.stringify(project.files || {})),
-    createdAt: new Date(),
+    label: cleanLabel,
+    files: filesCopy,
+    createdAt: now,
   };
+
   project.history.push(snapshot);
   if (project.history.length > 15) {
     project.history = project.history.slice(-15);
@@ -51,7 +57,37 @@ export function recordSnapshot(project, label = "Initial generation") {
   if (typeof project.markModified === "function") {
     project.markModified("history");
   }
-  return snapshot;
+
+  const persistPromise = (async () => {
+    if (project._id) {
+      try {
+        if (mongoose.connection.readyState === 1 || ProjectVersion.findOneAndUpdate !== mongoose.Model.findOneAndUpdate) {
+          await ProjectVersion.findOneAndUpdate(
+            { project: project._id, version: project.version },
+            { $set: { label: cleanLabel, files: filesCopy, createdAt: now } },
+            { upsert: true, new: true }
+          );
+
+          // Prune older ProjectVersion documents beyond the 15 most recent versions
+          const olderDocs = await ProjectVersion.find({ project: project._id })
+            .sort({ version: -1 })
+            .skip(15)
+            .select("_id")
+            .lean();
+
+          if (olderDocs && olderDocs.length > 0) {
+            const idsToDelete = olderDocs.map((d) => d._id);
+            await ProjectVersion.deleteMany({ _id: { $in: idsToDelete } });
+          }
+        }
+      } catch (err) {
+        console.warn(`[ProjectVersion] Could not persist snapshot for project ${project._id}:`, err.message || err);
+      }
+    }
+    return snapshot;
+  })();
+
+  return Object.assign(persistPromise, snapshot);
 }
 
 /**
@@ -385,7 +421,7 @@ export async function runBackgroundGeneration(projectId, prompt, framework = nul
           (h) => h.version === finalProject.version
         );
         if (!alreadyHasSnapshot) {
-          recordSnapshot(finalProject, "Initial generation");
+          await recordSnapshot(finalProject, "Initial generation");
           await finalProject.save();
         }
       }
@@ -461,7 +497,7 @@ export async function waitForClientVisualVerification(projectId, project) {
         content: "Website generation complete. (Visual preview verification skipped: preview runtime was not available).",
         timestamp: new Date(),
       });
-      recordSnapshot(updated, "Initial generation");
+      await recordSnapshot(updated, "Initial generation");
       await updated.save();
 
       emitProjectEvent(projectId, "completed", {
@@ -582,6 +618,13 @@ export async function deleteProject(req, res) {
     res.status(404).json({ error: "Project not found" });
     return;
   }
+
+  try {
+    await ProjectVersion.deleteMany({ project: result._id });
+  } catch (err) {
+    console.warn(`[ProjectVersion] Could not clean up versions for project ${result._id}:`, err.message || err);
+  }
+
   res.json({ success: true });
 }
 
@@ -978,7 +1021,7 @@ export async function handleVisualVerification(req, res) {
       repairedFiles: project.visualVerification?.repairedFiles || [],
     };
     project.status = "completed";
-    recordSnapshot(project, "Initial generation");
+    await recordSnapshot(project, "Initial generation");
     await project.save();
 
     emitProjectEvent(project._id, "completed", {
@@ -1019,7 +1062,7 @@ export async function handleVisualVerification(req, res) {
         : `✅ Visual verification passed. Both desktop (1440×900) and mobile (375×812) viewports render cleanly with 0 overflow.`,
       timestamp: new Date(),
     });
-    recordSnapshot(project, "Initial generation");
+    await recordSnapshot(project, "Initial generation");
     await project.save();
 
     emitProjectEvent(project._id, "completed", {
@@ -1060,7 +1103,7 @@ export async function handleVisualVerification(req, res) {
       content: `⚠️ Visual verification unresolved: ${aggregated.issues.length} issue(s) remaining after 1 targeted repair attempt. Retaining best available project.`,
       timestamp: new Date(),
     });
-    recordSnapshot(project, "Initial generation");
+    await recordSnapshot(project, "Initial generation");
     await project.save();
 
     emitProjectEvent(project._id, "completed", {
@@ -1172,12 +1215,37 @@ export async function getProjectVersions(req, res) {
     return;
   }
 
-  const versions = (project.history || []).map((entry) => ({
-    version: entry.version,
-    label: entry.label,
-    createdAt: entry.createdAt,
-    fileCount: Object.keys(entry.files || {}).length,
-  }));
+  let versions = [];
+  try {
+    if (mongoose.connection.readyState === 1 || ProjectVersion.find !== mongoose.Model.find) {
+      const docs = await ProjectVersion.find({ project: project._id })
+        .sort({ version: -1 })
+        .limit(15)
+        .select("version label createdAt files")
+        .lean();
+
+      if (docs && docs.length > 0) {
+        versions = docs.map((doc) => ({
+          version: doc.version,
+          label: doc.label || "",
+          createdAt: doc.createdAt,
+          fileCount: Object.keys(doc.files || {}).length,
+        }));
+      }
+    }
+  } catch (err) {
+    versions = [];
+  }
+
+  // Backward Compatibility: If ProjectVersion returns no documents for an older project that still has legacy embedded snapshots with files inside project.history, fall back gracefully to reading from project.history
+  if (versions.length === 0 && Array.isArray(project.history) && project.history.length > 0) {
+    versions = project.history.map((entry) => ({
+      version: entry.version,
+      label: entry.label || "",
+      createdAt: entry.createdAt,
+      fileCount: Object.keys(entry.files || {}).length,
+    }));
+  }
 
   versions.sort((a, b) => b.version - a.version);
 
@@ -1216,11 +1284,26 @@ export async function restoreProjectVersion(req, res) {
     return;
   }
 
-  const snapshot = (project.history || []).find(
-    (h) => Number(h.version) === targetVersion
-  );
+  let snapshot = null;
+  try {
+    if (mongoose.connection.readyState === 1 || ProjectVersion.findOne !== mongoose.Model.findOne) {
+      snapshot = await ProjectVersion.findOne({
+        project: project._id,
+        version: targetVersion,
+      }).lean();
+    }
+  } catch (err) {
+    snapshot = null;
+  }
 
-  if (!snapshot) {
+  // Fall back to checking legacy project.history if not found in ProjectVersion
+  if (!snapshot && Array.isArray(project.history)) {
+    snapshot = project.history.find(
+      (h) => Number(h.version) === targetVersion
+    );
+  }
+
+  if (!snapshot || !snapshot.files) {
     res.status(404).json({ error: `Version ${targetVersion} not found in project history` });
     return;
   }
@@ -1230,10 +1313,12 @@ export async function restoreProjectVersion(req, res) {
 
   // Overwrite project.files with a deep clone of snapshot's files
   project.files = JSON.parse(JSON.stringify(snapshot.files || {}));
-  project.markModified("files");
+  if (typeof project.markModified === "function") {
+    project.markModified("files");
+  }
 
   // Push new snapshot labeled "Restored from v<version>" (capped to last 15)
-  recordSnapshot(project, `Restored from v${targetVersion}`);
+  await recordSnapshot(project, `Restored from v${targetVersion}`);
 
   project.status = "completed";
   project.messages.push({
